@@ -26,26 +26,6 @@ def remove_images():
     pass
 
 
-def open_post():
-    '''
-        Open post
-    '''
-
-    # Click on post button to open post page
-    pass
-
-
-def select_photos():
-    '''
-        Select photos for post
-    '''
-
-    # Click on Add Photos button
-    # Click Photos to get.
-    # Map out screen areas, I am assuming the view changes size depeding on amount of photos in gallery
-    pass
-
-
 def choose_images(driver: webdriver.Remote):
     '''
         Once the select images screen is open, this will tap the required images.
