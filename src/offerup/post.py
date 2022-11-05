@@ -194,8 +194,6 @@ def post_offer(**kwargs):
     # sleep(15)  # Wait for app to start
     driver = kwargs['driver']
     _post_offer(**kwargs)
-    input("Press to close")
-    driver.quit()
 
 
 if __name__ == "__main__":
