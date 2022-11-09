@@ -59,17 +59,38 @@ def crawl(driver: webdriver.Remote):
         Store all buttons under this Screen.
         Click buttons on this screen and recurse
     '''
+    driver.implicitly_wait() # only needs to be called once per session
+
     get_screen_name = ""
     btns = driver.find_elements(
         by=AppiumBy.CLASS_NAME, value='android.widget.Button')
     print("Btns", btns)
 
-    all_btns['screen_1'].extend(btns)
+    view_groups = driver.find_elements(
+        by=AppiumBy.CLASS_NAME, value='android.view.ViewGroup')
+        
+    view_groups = [vg for vg in view_groups if vg.get_attribute("clickable") == 'true']
+    print("Viewgroups", view_groups)
 
-    for btn in btns:
-        print(btn.text)
-        print(btn.get_attribute("displayed"))
-        print(btn.get_attribute("displayed"))
-        print(btn.get_attribute("displayed"))
-        print(btn.get_attribute("displayed"))
-        print(btn.get_attribute("displayed"))
+    all_btns['screen_1'].extend(btns)  # Colllect all buttons for a given activity/ screen.
+
+    # Possibly keep a set of all elements we have found,
+    #  When a click a new page, we search for elements we havent found.
+    #    The page source will likely have old ViewGroups, if we click a page
+    #       and do not find a ney elements to add, we probably havent waited long enough for the new page to load.
+    #           If this becomes  a problem, we can use this tracking idea using a set.
+
+
+
+    # First test run, I was successfully able to click and open each view
+    # pressing the system back key after each view was opened.
+    # Seems somewhat promising...
+    for v in view_groups:
+        v.click()
+        # Find new elements loop here...
+        v.find_elements(AppiumBy.CLASS_NAME, value='android.view.ViewGroup')
+        # Take advatage of the implicit wait.
+        driver.back()
+        sleep(2)
+
+            
