@@ -20,7 +20,7 @@ def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: An
         'appium:nativeWebScreenshot': "true",
         'appium:newCommandTimeout': 3600,
         'appium:connectHardwareKeyboard': "true",
-        'appium:noReset': "true",
+        'appium:noReset': True,
     }
 
 device_name = "192.168.0.163:5555"

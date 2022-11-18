@@ -1,17 +1,24 @@
-from collections import defaultdict
 import collections
+from collections import defaultdict
 from time import sleep
-from typing import AnyStr, List, Dict
+from typing import AnyStr, Dict, List
+
+import hashlib
+
 from appium import webdriver
 from appium.webdriver.common.appiumby import AppiumBy
-from utils.utils import android_des_caps
-from selenium.common.exceptions import WebDriverException
-
+from selenium.common.exceptions import (StaleElementReferenceException,
+                                        WebDriverException)
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.actions import interaction
 from selenium.webdriver.common.actions.action_builder import ActionBuilder
 from selenium.webdriver.common.actions.pointer_input import PointerInput
-from selenium.common.exceptions import StaleElementReferenceException
+
+from utils.utils import android_des_caps
+from xmldiff import main
+
+main.diff_texts
+
 
 '''
 Testing strategy....
@@ -143,10 +150,20 @@ def r_crawl(driver: webdriver.Remote, all_views: Dict, depth: int):
     for i, v in enumerate(clickable_views):
         print(f"{depth}, {i} Clicked view", v)
         try:
+            # Take ScreenShot to compare later once we come back to this frame
             v.click()
             print("Crawling on new view \n")
+            input("Before")                                                                                                 
             r_crawl(driver, all_views, depth + 1)
+            # Take new screen shot, determine:
+            #   - How different the two images are
+            #       - If the page is so different, we may be able to deduct a new page, press back button
+
+            #   - See if a new close btn or 'X' icon is showing....
+            #           - If something just opened, we can just close it
+            input("After, we need to know how to undo the action on this call frame")
         except StaleElementReferenceException as e:
+
             print("Error clicking? ", e)
         
         print('Going back')
@@ -154,7 +171,114 @@ def r_crawl(driver: webdriver.Remote, all_views: Dict, depth: int):
 
 
 
+def hash_src():
+    return hashlib.md5(driver.page_source.encode()).hexdigest()
 
+'''
+
+In addition to a crawling bot, we can also perform specific tasks using image recognition
+
+If fast enough, after each button press we can compare images.
+    - If images are very similar, we didnt go to a new page
+    - If images vary by certain amount, we have gone to a new page.
+
+Detect (Specific Icons) 
+    - Camera Icons
+    - Share Icons
+
+
+
+
+
+
+1. Starting on MainActivity we gather all clickable element types.
+    - View - clickable
+    - Buttons 
+
+2. With the current list of clickable elements
+    - Click element
+
+3. Result of clicked element
+    - a Modal pops up
+        - Essentailly a new screen but current activity. Fragments, RN SPA
+    - b Some visual or data state is toggled
+    - c App navigates to new screen
+    - d App navigates back to previous screen
+    - e App opens new intent.
+
+    
+    Each case will produce new source code.
+        - Hashing might not work well if every button produces new source code.
+
+3a. Close pop up
+3b. Do nothing
+3c. Crawl
+3d. Avoid going back (until current page elements are searched.)
+3e. Go back top app
+
+
+
+How do we detect what the button does?
+    - Image recognition
+
+    - Ignore it, and figure out a method to track old views (below)
+
+
+
+
+
+
+dict(list)
+{
+    srcHash:  [views_to_click]
+}
+
+
+
+
+**If we can find a way to detect what actions has been done, we can undo that action during the crawl
+
+
+Tracking old views:
+    - Get current src
+    - Check if we have seen current source 
+        - Huge problem:
+            - Src is different on every click, if a single attr changes, hashed src is different
+
+    - if not seen current src
+        - Get btns on current src
+        - If btns not in globally stored views
+            - Hash current source
+                - Store Views to click at this current source
+            - Store Views found globally
+            - Remove current btn from current hashed src btn list
+            - Click button
+        - return
+
+    -else if seen current src
+        - get btn from list
+        - remove from list
+        - click btn
+
+METHODS to Compare App State
+    - Compare XML differences
+    - Build Image recognition to detect close buttons
+        - https://www.flaticon.com/search/3?word=close&order_by=4
+        - we can count the number of close buttons before and after.
+            - We can close whatever was opened.
+    
+
+
+
+'''
+
+
+def cmp_xml(a, b):
+    return main.diff_texts(a, b, diff_options={'F': 0.5, 'ratio_mode': 'fast'})
+
+a = driver.page_source
+b = driver.page_source
+len(cmp_xml(a.encode(),b.encode()))
 
 # Frame layouts might be useful, at least in OfferUp, framelayouts seem tto be new screen on same activity....
 
