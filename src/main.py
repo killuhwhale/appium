@@ -1,18 +1,14 @@
-from offerup.post import post_offer
+# from offerup.post import post_offer
 # from offerup.crawl import crawl
-
 from playstore.playstore import discover_and_install, open_playstore, is_open, is_installed
-
-
 from time import sleep
+# from utils.utils import android_des_caps
 from typing import AnyStr, List, Dict
 from appium import webdriver
 from appium.webdriver.common.appiumby import AppiumBy
-# from utils.utils import android_des_caps
 from selenium.common.exceptions import WebDriverException
 from utils.utils import PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT
 
-# cd /opt/android-studio/bin && ./studio.sh
 
 def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: AnyStr) -> Dict:
     return {
@@ -45,19 +41,16 @@ driver = webdriver.Remote(
 driver.wait_activity(main_activity, 5)
 driver.implicitly_wait(10)
 
-
+# Run session
 open_playstore()
 sleep(2)
 discover_and_install(driver, app_title, install_package_name)
 
 
+input("Quit")
+driver.quit()
 
-
-
-
-
-
-
+# Test code
 # categories = {
 #     'cell phone': 0,
 #     'computer accessories': 1,
@@ -95,5 +88,3 @@ discover_and_install(driver, app_title, install_package_name)
 
 # crawl(driver)
 
-input("Quit")
-driver.quit()
