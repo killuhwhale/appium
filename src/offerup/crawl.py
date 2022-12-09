@@ -91,7 +91,7 @@ def crawl(driver: webdriver.Remote):
     #           If this becomes  a problem, we can use this tracking idea using a set.
 
 
-    all_views = collections.defaultdict("")
+    all_views = collections.defaultdict(str)
     views_to_check = view_groups
     # First test run, I was successfully able to click and open each view
     # pressing the system back key after each view was opened.
@@ -143,31 +143,32 @@ def filter_clickable(driver: webdriver.Remote, all_views: Dict):
             print("Error", e, "\n", f"Bad ele ID: ", vg.get_attribute("resourceId"))
     return res
 
+# Take ScreenShot to compare later once we come back to this frame
+# Take new screen shot, determine:
+#   - How different the two images are
+#       - If the page is so different, we may be able to deduct a new page, press back button
+
+#   - See if a new close btn or 'X' icon is showing....
+#           - If something just opened, we can just close it
 def r_crawl(driver: webdriver.Remote, all_views: Dict, depth: int):
     clickable_views = filter_clickable(driver, all_views)
     print("Found clicked views", clickable_views, "\n")
-    
     for i, v in enumerate(clickable_views):
         print(f"{depth}, {i} Clicked view", v)
         try:
-            # Take ScreenShot to compare later once we come back to this frame
-            v.click()
+            v.click()  # new screen
             print("Crawling on new view \n")
             input("Before")                                                                                                 
             r_crawl(driver, all_views, depth + 1)
-            # Take new screen shot, determine:
-            #   - How different the two images are
-            #       - If the page is so different, we may be able to deduct a new page, press back button
+            
+            # we can undo that action 
 
-            #   - See if a new close btn or 'X' icon is showing....
-            #           - If something just opened, we can just close it
+            # here on a new screen, we want press back key
             input("After, we need to know how to undo the action on this call frame")
         except StaleElementReferenceException as e:
-
             print("Error clicking? ", e)
-        
-        print('Going back')
-        driver.back()
+            print('Going back')
+            # driver.back()
 
 
 
@@ -284,4 +285,4 @@ len(cmp_xml(a.encode(),b.encode()))
 
 
 
-r_crawl(driver, {}, 0)
+r_crawl(driver, collections.defaultdict(str), 0)
