@@ -1,6 +1,6 @@
 # from offerup.post import post_offer
 # from offerup.crawl import crawl
-from playstore.playstore import discover_and_install, open_playstore, is_open, is_installed
+from playstore.playstore import AppValidator
 from time import sleep
 # from utils.utils import android_des_caps
 from typing import AnyStr, List, Dict
@@ -9,7 +9,8 @@ from appium.webdriver.common.appiumby import AppiumBy
 from selenium.common.exceptions import WebDriverException
 from utils.utils import PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT
 
-
+# Dev
+# Defined here for easy copy-paste into terminal to start an interactive session.
 def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: AnyStr) -> Dict:
     return {
         'platformName': 'Android',
@@ -26,26 +27,30 @@ def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: An
 
 # device_name = "192.168.0.163:5555"
 device_name = "emulator-5554"
+
+# Driver target: App to control via Appium 
 app_package = PLAYSTORE_PACKAGE_NAME
-main_activity = 'MainActivity'
-install_package_name = 'com.offerup'
-app_title = 'OfferUp: Buy. Sell. Letgo.'
+main_activity = PLAYSTORE_MAIN_ACT
+
+
 driver = webdriver.Remote(
     "http://localhost:4723/wd/hub",
     android_des_caps(
         device_name,
         app_package,
-        PLAYSTORE_MAIN_ACT
+        main_activity
     )
 )
 driver.wait_activity(main_activity, 5)
 driver.implicitly_wait(10)
 
-# Run session
-open_playstore()
-sleep(2)
-discover_and_install(driver, app_title, install_package_name)
+package_names_to_test = [
+    ['Offerup: Buy. Sell. Letgo.', 'com.offerup'],
+]
 
+validator = AppValidator(driver, package_names_to_test)
+validator.run()
+validator.report.print_report()
 
 input("Quit")
 driver.quit()
