@@ -2,13 +2,15 @@ from collections import defaultdict
 import collections
 import re
 import subprocess
-from time import sleep
+from time import sleep, time
 from typing import AnyStr, Dict, List
 
 from appium import webdriver
-from appium.common.exceptions import NoSuchElementError
+
+
 from appium.webdriver.common.appiumby import AppiumBy
-from selenium.common.exceptions import (StaleElementReferenceException,
+
+from selenium.common.exceptions import (StaleElementReferenceException, NoSuchElementException,
                                         WebDriverException)
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.actions import interaction
@@ -38,7 +40,7 @@ class ValidationReport:
     FAIL = 1
 
     def __init__(self, report_title: str):
-        self.report = collections.dict(dict)
+        self.report = collections.defaultdict(dict)
         self.report_title = ""
 
     def add(self, package_name: str, status: int, reason: str):
@@ -61,13 +63,31 @@ class ValidationReport:
 
 
 
+'''
+Problems:
 
+- Playstore will crash randomly....
+
+- we need a strategy to handle this scenario.
+    - Detect PlayStore closed.
+    - Uninstall current app (Possibly has started to download)
+    - Restart search/ discovery/ install process.
+
+
+
+'''
 
 class AppValidator:
     def __init__(self, driver: webdriver.Remote, package_names: List[List[str]]):
         self.driver = driver
         self.package_names = package_names  # List of packages to test as [app_title, app_package_name]
         self.report = ValidationReport("App discovery and Install")
+        self.steps = [
+            'Click search icon',
+            'Send keys for search',
+            'Click app icon',
+            'Click install button',
+        ]
         # Run session
         self.open_app(PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT)
         sleep(2)
@@ -75,7 +95,7 @@ class AppValidator:
     
     def run(self):
         for app_title, app_package_name in self.package_names:
-            self.discover_and_install(self.driver, app_title, app_package_name)
+            self.discover_and_install(app_title, app_package_name)
     
     def open_app(self, package_name: str, act_name: str):
         try:
@@ -134,6 +154,33 @@ class AppValidator:
         print(f'Found package name: "{matches[0]}"')
         return True
 
+
+    # 
+
+    def is_installed_UI(self):
+        '''
+            Checks for the presence of the Uninstall button indicating that the app has completely finished installing.
+
+            Using adb shows that the app is installed well before PlayStore UI says its ready to open.
+        '''
+        max_wait = 420  # 7 mins
+        content_desc = 'Uninstall'
+        ready = False
+        t = time()
+        while not ready and (time() - t) < max_wait:
+            print("While")
+            try:
+                print("Searching for uninstall button....")
+                uninstall_btn = self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value=content_desc)  # implicit wait time here, also
+                print("Setting Ready to TRUE")
+                ready = True
+            except Exception as e:
+                print("App not ready to open, sleeping 2s")
+                sleep(2)
+        return ready            
+        
+
+
     def uninstall_app(self, package_name: str):
         cmd = ( 'adb', 'uninstall', package_name)
         outstr = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
@@ -150,23 +197,46 @@ class AppValidator:
         
         '''
         try:
+            last_step = 0  # track last sucessful step to, atleast, report in console.
             error = None
             # From Playstore home screen, click search icon
             search_icon = self.driver.find_element(by=AppiumBy.XPATH, value='//android.view.View[@content-desc="Search Google Play"]')	
             search_icon.click()
+            # input("continue")
 
+            last_step = 1
             # Send keys
-            cmd = ( 'adb', 'shell', 'input', 'text', title)
+            cmd = ( 'adb', 'shell', 'input', 'text', title.replace(" ", "\ "))
             outstr = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
             # Press enter to search for title
             cmd = ( 'adb', 'shell', 'input', 'keyevent', ADB_KEYCODE_ENTER)
             outstr = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
-
+            
+            last_step = 2
             ## Content desctiption
-            content_desc = f'Image of app or game icon for {title}'
+            # Image of app or game icon for Offerup: Buy. Sell. Letgo.
+            content_desc = f'Image of app or game icon for {title}'.strip()
+            
+            # Old debug code,
+            # print("Content desc matches target?", content_desc == target)
+            # print("Searching content desc: ",)
+            # print(target, len(target))
+            # print(content_desc, len(content_desc))
+            # for i in range(len(target)):
+            #     a, b = ord(target[i]), ord(content_desc[i])
+            #     if(not a== b):
+            #         print(a,b)
+            #         print(target[i], content_desc[i])
+                
+
+            sleep(2)
+            # input("continue")
             app_icon = self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value=content_desc)
             app_icon.click()
             
+            sleep(2)
+            # input("continue")
+            last_step = 3
             content_desc = 'Install'
             install_BTN = self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value=content_desc)
             install_BTN.click()
@@ -174,25 +244,32 @@ class AppValidator:
             # If we can find the size of the app before install, we can try to determine the install time.
             sleep(5)
             sleep_cycle = 0
-            while not self.is_installed(install_package_name) and sleep_cycle <= 20:
-                sleep(2)
-                print("Sleeping.... zzz")
-                sleep_cycle += 1
 
-            print(f"Took roughly {5 + sleep_cycle * 2} seconds.")
+            # Better install check would be to wait until the UI shows the "Uninstall button"
+            #    	//android.view.View[@content-desc="Uninstall"]
+            # Before the uninstall button, the cancel button will be present
+            #    //android.view.View[@content-desc="Cancel"]
+
+            if not self.is_installed_UI():
+                raise Exception("Failed to find Unisntall button to verify ")
+            
+
+            
+            # input("continue")
             self.driver.back()  # back to seach results
             self.driver.back()  # back to home page
 
 
             print("App discovery and installation complete!")
             return True
-        except NoSuchElementError as e:
+        except NoSuchElementException as e:
             error = e
         except Exception as e:
             error = e
         finally:
             if not error is None:
                 self.report.add(install_package_name, ValidationReport.FAIL, error)
+                print("Failed on step: ", last_step, self.steps[last_step])
                 print("Err: ", error)
                 self.driver.quit()
                 return False

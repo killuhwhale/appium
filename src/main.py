@@ -45,7 +45,7 @@ driver.wait_activity(main_activity, 5)
 driver.implicitly_wait(10)
 
 package_names_to_test = [
-    ['Offerup: Buy. Sell. Letgo.', 'com.offerup'],
+    ['OfferUp: Buy. Sell. Letgo.', 'com.offerup'],
 ]
 
 validator = AppValidator(driver, package_names_to_test)
