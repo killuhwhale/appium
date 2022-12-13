@@ -179,7 +179,10 @@ class AppValidator:
                 sleep(2)
         return ready            
         
-
+    def uninstall_multiple(self):
+        for name in [pack_info[1] for pack_info in self.package_names]:
+            self.uninstall_app(name)
+        
 
     def uninstall_app(self, package_name: str):
         cmd = ( 'adb', 'uninstall', package_name)
@@ -211,7 +214,7 @@ class AppValidator:
             # Press enter to search for title
             cmd = ( 'adb', 'shell', 'input', 'keyevent', ADB_KEYCODE_ENTER)
             outstr = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
-            
+
             last_step = 2
             ## Content desctiption
             # Image of app or game icon for Offerup: Buy. Sell. Letgo.

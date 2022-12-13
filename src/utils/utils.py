@@ -1,3 +1,4 @@
+import subprocess
 from typing import AnyStr, Dict
 import os
 
@@ -15,6 +16,18 @@ def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: An
         'appium:connectHardwareKeyboard': "true",
         'appium:noReset': "true",
     }
+
+def open_app(package_name: str):
+    try:
+        cmd = ('adb', 'shell', 'monkey', '-p', package_name, '-c', 'android.intent.category.LAUNCHER', '1')
+        outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+                                capture_output=True).stdout.strip()
+        print(f"Starting {package_name} w/ monkey...")
+        print(outstr)
+    except Exception as e:
+        print("Error opening app with monkey")
+        return False
+    return True
 
 
 EXECUTOR = 'http://192.168.0.175:4723/wd/hub'

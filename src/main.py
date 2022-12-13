@@ -1,6 +1,7 @@
 # from offerup.post import post_offer
 # from offerup.crawl import crawl
 from playstore.playstore import AppValidator
+from launcher.launcher import Launcher
 from time import sleep
 # from utils.utils import android_des_caps
 from typing import AnyStr, List, Dict
@@ -44,11 +45,18 @@ driver = webdriver.Remote(
 driver.wait_activity(main_activity, 5)
 driver.implicitly_wait(10)
 
+
+
+# TODO() 3 columns: [Title in playstore, package_name, main_activity_name]
 package_names_to_test = [
     ['OfferUp: Buy. Sell. Letgo.', 'com.offerup'],
+    ['Spotify: Music, Podcasts, Lit', 'com.spotify.music'],
 ]
 
+
+launcher = Launcher(package_names_to_test)
 validator = AppValidator(driver, package_names_to_test)
+validator.uninstall_multiple()
 validator.run()
 validator.report.print_report()
 
