@@ -8,7 +8,7 @@ from typing import AnyStr, List, Dict
 from appium import webdriver
 from appium.webdriver.common.appiumby import AppiumBy
 from selenium.common.exceptions import WebDriverException
-from utils.utils import PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT
+from utils.utils import PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, TOP_500_APPS
 
 # Dev
 # Defined here for easy copy-paste into terminal to start an interactive session.
@@ -33,6 +33,24 @@ device_name = "emulator-5554"
 app_package = PLAYSTORE_PACKAGE_NAME
 main_activity = PLAYSTORE_MAIN_ACT
 
+# Prerequisites
+# Chromebook turned on, logged in, Linux Started, Appium Server Running pointing to the correct IP Address from Linux, Port Forwarding turned on
+
+# We can create drivers for multiple hosts...
+# We can run the client from a more powerful machine and have other
+# chromebooks running APPIUM server
+# We then use those chromebook's local IPs as the executor address and the adb device name would be consisten most  likely
+# The chromebooks used would be the machines we would want to test on and verify with.
+# The client could manage all these chroomebooks and run object detection.
+
+
+# TODO create architecture to create multiple Drivers and start a job for each one.
+# Currently the code represents  single Driver and the job to do.
+# We could simply package this into a class ClientDriver and then run these in parallel
+
+# For ip in machine_ips:
+#    run_thread(ClientDriver, ip, package_names_to_test)
+
 
 driver = webdriver.Remote(
     "http://localhost:4723/wd/hub",
@@ -46,19 +64,22 @@ driver.wait_activity(main_activity, 5)
 driver.implicitly_wait(10)
 
 
+# package_names_to_test = [
+#     ['OfferUp: Buy. Sell. Letgo.', 'com.offerup'],
+#     ['Spotify: Music, Podcasts, Lit', 'com.spotify.music'],
+# ]
 
-# TODO() 3 columns: [Title in playstore, package_name, main_activity_name]
-package_names_to_test = [
-    ['OfferUp: Buy. Sell. Letgo.', 'com.offerup'],
-    ['Spotify: Music, Podcasts, Lit', 'com.spotify.music'],
-]
+start = 153
+end = 200
+package_names_to_test = TOP_500_APPS[start: end]
 
-
-launcher = Launcher(package_names_to_test)
 validator = AppValidator(driver, package_names_to_test)
 validator.uninstall_multiple()
 validator.run()
 validator.report.print_report()
+# launcher = Launcher(package_names_to_test)
+
+# launcher.run()
 
 input("Quit")
 driver.quit()
