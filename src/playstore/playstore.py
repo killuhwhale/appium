@@ -1,12 +1,15 @@
 from collections import defaultdict
 import collections
+
 import re
 import subprocess
+import sys
 from time import sleep, time
 from typing import AnyStr, Dict, List
 import math
 from appium import webdriver
-
+import requests
+from bs4 import BeautifulSoup
 
 from appium.webdriver.common.appiumby import AppiumBy
 
@@ -16,9 +19,10 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.actions import interaction
 from selenium.webdriver.common.actions.action_builder import ActionBuilder
 from selenium.webdriver.common.actions.pointer_input import PointerInput
+import signal
+from objdetector.objdetector import ObjDetector
 
-from utils.utils import PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, close_app, open_app
-
+from utils.utils import CONTINUE, GOOGLE_AUTH, IMAGE_LABELS, LOGIN, PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, close_app, open_app
 
 
 ''''
@@ -59,7 +63,7 @@ class ValidationReport:
         White,
     ]
 
-    REPEAT_TIMES = 10*len(COLORS)
+    REPEAT_TIMES = 3*len(COLORS)
 
 
     def __init__(self, report_title: str):
@@ -72,17 +76,6 @@ class ValidationReport:
         if "empty" in self.report[package_name]:
             self.report[package_name] = self.status_obj(status, reason, app_name)
     
-    def gen_sine(self):
-        sine_wave = []
-        for i in range(self.REPEAT_TIMES):
-            angle = i * 2 * math.pi / 80  # convert i to an angle in radians
-            value = math.sin(angle)  # calculate the sine of the angle
-            value = (value + 1) / 2  # scale the value to a range between 0 and 1
-            sine_wave.append(value)  # add the scaled value to the list
-        
-        return sine_wave
-
-
     def status_obj(self, status: int, reason: str, name: str):
         return {
             'status': status,
@@ -102,8 +95,7 @@ class ValidationReport:
               |_||_|   |_||_|   |_||_|   \_| \_/_|_|_|\__,_|_| |_|  \/  \/|_| |_|\__,_|_|\____/    |_||_|   |_||_|   |_||_|                                                                                             
         ''')
         print(self.RESET)
-        
-    
+           
     def ascii_header(self):
         print(self.Green)
         print(f'''
@@ -118,15 +110,13 @@ class ValidationReport:
         ''')
         print(self.RESET)
 
-
     def anim_starting(self):
         print("\033[2J")  # clear the screen
-        sine_wave = self.gen_sine()
-        for i in range(len(sine_wave)):
+        for i in range(self.REPEAT_TIMES):
             color = self.COLORS[i % 3]
             print("\033[0;0H")  # move cursor to top-left corner
             self.ascii_starting(color)
-            sleep(sine_wave[i]/5)
+            sleep(0.125)
 
     def ascii_starting(self, color=None):
         if color is None:
@@ -197,10 +187,158 @@ class AppValidator:
             'Click app icon',
             'Click install button',
         ]
+        self.prev_act = None
+        self.detector = ObjDetector()
+        
+        
         # Open Playstore 
         # self.open_app(PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT)
         # sleep(2)
+        signal.signal(signal.SIGINT, self.handle_sigint)
 
+    def handle_sigint(self, signal, frame):
+        # This function will be called when the user presses CTRL+C
+        print("CTRL+C pressed. Exiting program.")
+        self.report.print_report()
+        try:
+            self.driver.quit()
+        except Exception as e:
+            pass
+        sys.exit(1)
+
+    
+
+    def check_playstore_invalid(self, package_name):
+        url = f'https://play.google.com/store/apps/details?id={package_name}'
+        response = requests.get(url)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            error_section = soup.find('div', {'id': 'error-section'})
+            if error_section:
+                return True
+            else:
+                return False
+        else:
+            return True
+
+
+    def is_new_activity(self):
+        '''
+            Calls adb shell dumpsys activity | grep mFocusedWindow
+            Remermbers previous called, returns True on first call and when a new value is found.
+
+        '''
+
+        
+        tmp = self.prev_act
+        now = self.prev_act 
+        cmd = ('adb', 'shell', 'dumpsys', 'activity', '|', 'grep', 'mFocusedWindow')
+        text = subprocess.run(cmd, check=True, encoding='utf-8',
+                                    capture_output=True).stdout.strip()
+        print(text)
+        # TODO create regex
+        # mFocusedWindow=Window{3f50b2f u0 com.netflix.mediaclient/com.netflix.mediaclient.acquisition.screens.signupContainer.SignupNativeActivity}
+        match = re.search(r"", text)
+
+        if match:
+            print("Matched: ", match.group(1))
+            now = match.group(1)
+            self.prev_act = now
+
+        # On first run, we will say that it isnt new..
+        if tmp is None:
+            return False
+
+        return tmp != now
+
+
+
+
+
+    def handle_login(self):
+        '''
+            On a given page we will look at it and perform an action, if there is one .
+        '''
+        self.is_new_activity() # init
+        results = self.detector.detect() 
+        if results is None:
+            return False
+        # here we have a dict of results from detection
+        # Consists of 4 labels
+        # We want to prioritize 
+            # 1. Click Google Auth
+            # 2. Filling out Email and Password
+            # 3. Click Continue button to attempt to get to a page with #1 or #2
+        actions = 0 # At most, we should take 3 actions on a single page
+        # Find Email, Password and Login button.
+        LOGIN_ENTERED = False
+        PASSWORD_ENTERED = False
+        CONTINUE_SUBMITTED = False
+        while actions < 5 and not CONTINUE_SUBMITTED:
+            input("Start handle login loop....")
+            print(results, CONTINUE in results)
+            print("Activity", self.prev_act)
+            if self.is_new_activity():
+                print("We found a new activity ")
+                actions = 0
+
+            if GOOGLE_AUTH in results:
+                # We have A google Auth button presents lets press it
+                google_btns = sorted(results[GOOGLE_AUTH], key=lambda p: p[2], reverse=True)
+                if(len(google_btns) == 1):
+                    print("Good scenario, we found one google button.")
+                    btn = google_btns[0]
+                    self.tap_screen(btn[0], btn[1])
+                elif(len(google_btns) > 1):
+                    print("Found multiple Google Auth Buttons.")
+                
+                actions = 3
+                # At this point we will consider this a successful test..
+                return True
+            elif LOGIN in results and not LOGIN_ENTERED:
+                 # We have A google Auth button presents lets press it
+                login_fields = sorted(results[LOGIN], key=lambda p: p[2], reverse=True)
+                if(len(login_fields) == 1):
+                    print("Good scenario, we found one email field .")
+                    btn = login_fields[0]
+                    self.tap_screen(str(btn[0]), str(btn[1]))
+                elif(len(login_fields) > 1):
+                    print("Found multiple Login fields.")
+                actions += 1
+                LOGIN_ENTERED = True
+
+            elif PASSWORD in results and not PASSWORD_ENTERED:
+                 # We have A google Auth button presents lets press it
+                password_fields = sorted(results[PASSWORD], key=lambda p: p[2], reverse=True)
+                if(len(password_fields) == 1):
+                    print("Good scenario, we found one Password field.")
+                    btn = password_fields[0]
+                    self.tap_screen(btn[0], btn[1])
+                elif(len(password_fields) > 1):
+                    print("Found multiple Password fields.")
+                actions += 1
+                PASSWORD_ENTERED = True
+            elif CONTINUE in results:
+                # We have A google Auth button presents lets press it
+                continue_btns = sorted(results[CONTINUE], key=lambda p: int(p[2]), reverse=True)
+                print("cont btns", continue_btns)
+                if(len(continue_btns) == 1):
+                    print("Good scenario, we found one continue button.")
+                    btn = continue_btns[0]
+                    
+                    self.tap_screen(*self.get_coords(btn))
+                elif(len(continue_btns) > 1):
+                    print("Found multiple continue buttons.")
+                actions += 1
+                if LOGIN_ENTERED and PASSWORD_ENTERED:
+                    CONTINUE_SUBMITTED = True
+                
+
+    def get_coords(self, btn: List):
+        x = (btn[0][0] + btn[1][0]) / 2
+        y = (btn[0][1] + btn[1][1]) / 2
+        return str(int(x)), str(int(y))
+        
     
     def run(self):
         '''
@@ -221,7 +359,10 @@ class AppValidator:
             
             if not open_app(app_package_name):
                 ERR = True
-                self.report.add(app_package_name, app_title, ValidationReport.FAIL, "Failed to open")
+                if self.check_playstore_invalid(app_package_name):
+                    self.report.add(app_package_name, app_title, ValidationReport.FAIL, "App package is invalid, update/ remove from list.")
+                else:
+                    self.report.add(app_package_name, app_title, ValidationReport.FAIL, "Failed to open")
 
             # TODO wait for activity to start intelligently, not just package
             # DEV: Using to scrape the first image of each app. (Will remove)
@@ -229,18 +370,36 @@ class AppValidator:
                 sleep(8)  # Wait for app to finsh loading the "MainActivity"
                 self.report.add(app_package_name, app_title, ValidationReport.PASS, '')
                 _app_title = app_title.replace(" ", "_")
-                self.driver.get_screenshot_as_file(f"{self.PICUTRES}/{_app_title}.png")
+                self.driver.get_screenshot_as_file(f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/test.png")
+                self.is_new_activity() # init
+                
+                
+                # TODO Do login, building obj detection            
+                self.handle_login()
 
-            # TODO Do login, building obj detection            
-            # input("Close app")            
-            close_app(app_package_name)
+              
+                input("Inspect results")
+
+                input("Close app")            
+                close_app(app_package_name)
             
-            # Change the orientation to portrait
-            self.driver.orientation = 'PORTRAIT'
+                # Change the orientation to portrait
+                self.driver.orientation = 'PORTRAIT'
 
-            # TODO Make sure PlayStore is in ForeGround and back to portrait ori
-            # Uninstall app (save space when doing hundreds of apps)
-            self.uninstall_app(app_package_name)
+                # TODO Make sure PlayStore is in ForeGround and back to portrait ori
+                # Uninstall app (save space when doing hundreds of apps)
+                self.uninstall_app(app_package_name)
+    
+    def tap_screen(self, x:str, y:str):
+        try:
+            print(f"Tapping ({x},{y})")
+            cmd = ('adb', 'shell', 'input', 'tap', x, y)
+            outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+                                    capture_output=True).stdout.strip()
+        except Exception as e:
+            print("Error tapping app", e)
+            return False
+        return True
     
     def open_app(self, package_name: str, act_name: str):
         try:
@@ -299,6 +458,45 @@ class AppValidator:
         ready = False
         t = time()
         while not ready and (time() - t) < max_wait:
+            try:
+                print("Searching for uninstall button....")
+                uninstall_btn = self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value=content_desc)  # implicit wait time here, also
+                print("Setting Ready to TRUE")
+                ready = True
+            except Exception as e:
+                print("App not ready to open, retrying...")
+                sleep(0.5)
+        return ready            
+    
+    def needs_purchase(self) -> bool:
+        content_desc = f'''new UiSelector().descriptionMatches(\"\$\d+\.\d+\");'''
+        print("Searching for Button with Price...", content_desc)
+        try:
+            self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+            return True
+        except Exception as e:
+            return False        
+   
+    def needs_update(self) -> bool:
+        '''
+            Checks if apps needs an update via the UI on the playstore app details page.
+        '''
+        try:
+            self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value="Update")
+            return True
+        except Exception as e:
+            return False        
+
+    # Might not need....
+    def wait_for_install(self):
+        '''
+            Checks for "cancel" butto while app is installing.
+        '''
+        max_wait = 420  # 7 mins, Large gaming apps may take a while to download.
+        content_desc = 'Cancel'
+        ready = False
+        t = time()
+        while not ready and (time() - t) < max_wait:
             print("While")
             try:
                 print("Searching for uninstall button....")
@@ -308,13 +506,18 @@ class AppValidator:
             except Exception as e:
                 print("App not ready to open, sleeping 2s")
                 sleep(2)
-        return ready            
-        
+        return ready    
+
     def uninstall_multiple(self):
         for name in [pack_info[1] for pack_info in self.package_names]:
             self.uninstall_app(name)
         
     def uninstall_app(self, package_name: str):
+        '''
+            Uninstalls app and waits 40 seconds or so while checking if app is still installed.
+            Returns True once app is fianlly unisntalled.
+            Returns False if it takes too long to unisntall or some other unexpected error.
+        '''
         uninstalled = False
         try:
             cmd = ( 'adb', 'uninstall', package_name)
@@ -340,9 +543,17 @@ class AppValidator:
         title_search = title_search.replace(" ", "\ ")
         title_search = title_search.replace('"', '\\"')
         title_search = title_search.replace("&", "\&")
+        title_search = title_search.replace("-", "\-")
+        title_search = title_search.replace("!", "\!")
+        title_search = title_search.replace("?", "\?")
+        title_search = title_search.replace("@", "\@")
+        title_search = title_search.replace("#", "\#")
+        title_search = title_search.replace("$", "\$")
+        title_search = title_search.replace("%", "\%")
+        title_search = title_search.replace("+", "\+")
         return title_search
 
-    def return_error(self, last_step):
+    def return_error(self, last_step: int, error: str):
         if last_step == 0:
             self.driver.back() 
             return [False, f"Failed: {self.steps[0]}"]
@@ -355,10 +566,12 @@ class AppValidator:
         elif last_step == 3:
             self.driver.back() 
             self.driver.back()  
-            return [False, f"Failed: {self.steps[3]}"]
+            print(f"Failed: {self.steps[3]} :: {error}")
+            return [False, f"Failed: {self.steps[3]} :: {error}"]
 
     def click_playstore_search(self):
         # From Playstore home screen, click search icon
+        print("Clicking search icon...")
         search_icon = self.driver.find_element(by=AppiumBy.XPATH, value='//android.view.View[@content-desc="Search Google Play"]')	
         search_icon.click()
 
@@ -379,20 +592,56 @@ class AppValidator:
         app_icon.click()
         sleep(2)
 
+
+
+
     def install_app_UI(self, install_package_name: str):
+        '''
+            We are on the app detail page:
+            1. Install
+            2. Price
+            3. Cancel / Play[Open]
+            4. Uninstall / Play[Open]
+        
+        '''
         already_installed = False  # Potentailly already isntalled
+        err = False
         try:
             install_BTN = self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value='Install')
             install_BTN.click()
-        except Exception as e:  # Install btn not found
+        except Exception as e:  # Install btn not found    
+            err = True
             already_installed = self.is_installed(install_package_name)
-                    
-        if not already_installed:
-            print("Verifying if installed already...")
-            if not self.is_installed_UI():
-                raise("Failed to find Unisntall button to verify ")
-            else:
-                print("App already installed...")
+
+
+        # Error finding/Clicking Install button  amd app is not installed still...
+        if err and not already_installed:
+            print("Verifying UI for Needs to Purchase...")
+            if self.needs_purchase():
+                print("raising needs purchase")
+                raise Exception("Needs purchase")
+            
+            if self.needs_update():
+                print("raising needs update")
+                raise Exception("Needs update")
+            
+            # Now, Install and Price, Update are not present,
+            # To get here, we must be looking for a package 
+            # com.abc.foogame
+            # When we search by name, foogame, 
+            # The app foogame, by com.zyx.foogames is actually showing.
+            # So we check if the packge is installed via ADB cmd because this will be a source of truth
+            # Therefore, at this point we have an installed app, that doesnt match our targeted package name.
+            # NOTE: On the first run, it will install this package and report as correct....
+            
+            raise Exception(f"Program installed incorrect package, {install_package_name} was not actually installed")
+        else:
+            # We have successfully clicked an install buttin
+            # 1. We wait for it to download. We will catch if its the correct package or not after installation.
+            if not self.is_installed_UI():  # Waits up to 7mins to find install button.
+                # If returns False, (after 7mins)
+                raise Exception("Failed to install app!!")
+        
 
 
     def discover_and_install(self, title: str, install_package_name: str):
@@ -400,8 +649,9 @@ class AppValidator:
          A method to search Google Playstore for an app and install via the Playstore UI.
         '''
         try:
-            last_step = 0  # track last sucessful step to, atleast, report in console.
             error = None
+            last_step = 0  # track last sucessful step to, atleast, report in console.
+            self.click_playstore_search()
 
             last_step = 1
             self.send_keys_playstore_search(title)
@@ -422,8 +672,9 @@ class AppValidator:
             else:
                 # Debug
                 print("\n\n", title, install_package_name, "Failed on step: ", last_step, self.steps[last_step])
+                print("Eror:::: ", error)
                 # input('Error')  # Debug
-                return self.return_error(last_step)
+                return self.return_error(last_step, error)
 
 
 

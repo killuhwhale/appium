@@ -138,8 +138,20 @@ BAD_PACKAGES = [
 ]
 
 
+LOGIN = 'Login Field'
+PASSWORD = 'Password Field'
+CONTINUE = 'Continue'
+GOOGLE_AUTH = 'Google Auth'
+
+IMAGE_LABELS = [
+    LOGIN,
+    PASSWORD,
+    CONTINUE,
+    GOOGLE_AUTH,
+]
 
 PACKAGE_NAMES = [
+    [ "Rocket League Sideswipe", "com.Psyonix.RL2D"],
     ['ROBLOX', 'com.roblox.client'],
     ['Netflix', 'com.netflix.mediaclient'],
     ['YouTube Kids', 'com.google.android.apps.youtube.kids'],
@@ -345,7 +357,7 @@ PACKAGE_NAMES = [
     ['Queen Bee!', 'com.MoodGames.QueenBee'],
     ['Tumblr', 'com.tumblr'],
     ['Bus Simulator : Ultimate', 'com.zuuks.bus.simulator.ultimate'],
-    ['My Boy! - GBA Emulator', 'com.fastemulator.gba'],
+    ['My Boy! - GBA Emulator', 'com.fastemulator.gba'],  # Purchase required, unable to install...
     ['Zeus', 'com.thezeusnetwork.www'],
     ['CATS: Crash Arena Turbo Stars', 'com.zeptolab.cats.google'],
     ['Work Chat', 'com.facebook.workchat'],
@@ -394,36 +406,36 @@ PACKAGE_NAMES = [
     ['SiriusXM', 'com.sirius'],
     ['Castle Solitaire: Card Game', 'com.mobilityware.CastleSolitaire'],
     ['Word Stacks', 'com.peoplefun.wordstacks'],
-    ['com.roku.trc', 'com.roku.trc'],
+    # ['com.roku.trc', 'com.roku.trc'],  #  Invalid package name
     ['Albion Online', 'com.albiononline'],
-    ['Dress up! Time Princess', 'com.igg.android.dressuptimeprincess'],
+    ['Time Princess: Story Traveler', 'com.igg.android.dressuptimeprincess'],
     ['Mahjong Solitaire Epic', 'com.kristanix.android.mahjongsolitaireepic'],
     ['Farm Land: Farming Life Game', 'com.loltap.farmland'],
     ['Lost Island: Blast Adventure', 'com.plarium.blast'],
     ['FNF Music Battle: Original Mod', 'com.os.falcon.fnf.battle.friday.night.funkin'],
     ['Stumble Guys: Multiplayer Royale', 'com.kitkagames.fallbuddies'],
-    ['dplay - Stream something real', 'com.discovery.dplay'],
+    ['discovery+', 'com.discovery.dplay'], # com.discovery.discoveryplus is the disccovery+ package name. This OG package name is NA in region
     ['Sonos', 'com.sonos.acr2'],
-    ['Binge', 'au.com.streamotion.ares'],
+    ['Binge', 'au.com.streamotion.ares'],  # NA ion Pixel 2
     ['Wordfeud', 'com.hbwares.wordfeud.free'],
     ['Farming Simulator 16', 'com.giantssoftware.fs16'],
     ['Piano Kids - Music & Songs', 'com.orange.kidspiano.music.songs'],
-    ['FreeCell', 'com.hapogames.FreeCell'],
+    # ['FreeCell', 'com.hapogames.FreeCell'],  # Invalid package name
     ['Word Cookies!', 'com.bitmango.go.wordcookies'],
     ['Floor Plan Creator', 'pl.planmieszkania.android'],
-    ['Legión Anime Tema Oscuro', 'aplicaciones.paleta.alterlegionanime'],
-    ['Adobe Illustrator Draw', 'com.adobe.creativeapps.draw'],
+    ['Legión Anime Tema Oscuro', 'aplicaciones.paleta.alterlegionanime'],  # Fialst o send keys
+    ['Adobe Illustrator Draw', 'com.adobe.creativeapps.draw'],  # NA on Pixel 2 
     ['aquapark.io', 'com.cassette.aquapark'],
     ['Bridge Race', 'com.Garawell.BridgeRace'],
     ['Jewels Magic: Mystery Match3', 'com.bitmango.go.jewelsmagicmysterymatch3'],
     ['LogMeIn Pro', 'com.logmein.ignitionpro.android'],
-    ['Roku Remote Control: RoSpikes (WiFi+IR)', 'roid.spikesroid.roku_tv_remote'],
+    ['Roku Remote: RoSpikes (WiFi&', 'roid.spikesroid.roku_tv_remote'],
     ['Battle of Warships', 'com.CubeSoftware.BattleOfWarships'],
     ['Mini Block Craft', 'mini.block.craft.free.mc'],
     ['AmongLock - Among Us Lock Screen', 'amonguslock.amonguslockscreen.amonglock'],
     ['Bloons Monkey City', 'com.ninjakiwi.monkeycity'],
     ['Match Triple 3D - Match 3D Master Puzzle', 'and.lihuhu.machingtriple'],
-    ['Showmax', 'com.showmax.app'],
+    # ['Showmax', 'com.showmax.app'],  # NA in region
     ['Pocket Cine Pro', 'com.flix.Pocketplus'],
     ['Guess Their Answer', 'com.qoni.guesstheiranswer'],
     ['Gold and Goblins: Idle Digging', 'com.redcell.goldandgoblins'],
@@ -459,7 +471,7 @@ PACKAGE_NAMES = [
     ['DAFU Casino', 'com.grandegames.slots.dafu.casino'],
     ['Cookie Jam Blast', 'air.com.sgn.cookiejamblast.gp'],
     ['Investigation Discovery GO', 'com.discovery.idsgo'],
-    ['Contacts', 'com.google.android.contacts'],
+    # ['Contacts', 'com.google.android.contacts'], # Unable to uninstall, default app?
     ['FanFiction.Net', 'com.fictionpress.fanfiction'],
     ['Eerskraft', 'com.eers.kraft.eerskraft'],
     ['CW Seed on Fire TV', 'com.cw.seed.android'],
@@ -499,7 +511,7 @@ PACKAGE_NAMES = [
     ['House Flipper: Home Design & Simulator Games', 'com.imaginalis.HouseFlipperMobile'],
     ['Grand Hotel Mania', 'com.deuscraft.TurboTeam'],
     ['Nick Jr.', 'com.nick.android.nickjr'],
-    ['Whats Web Scan', 'com.softinit.iquitos.whatswebscan'],
+    # ['Whats Web Scan', 'com.softinit.iquitos.whatswebscan'], # NA on Playstore
     ["Hide 'N Seek!", 'com.seenax.HideAndSeek'],
     ['Ball Run 2048', 'com.kayac.ball_run'],
     ['Manor Cafe', 'com.gamegos.mobile.manorcafe'],

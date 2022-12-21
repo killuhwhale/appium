@@ -60,8 +60,8 @@ driver = webdriver.Remote(
         main_activity
     )
 )
+driver.implicitly_wait(5)
 driver.wait_activity(main_activity, 5)
-driver.implicitly_wait(10)
 
 
 # package_names_to_test = [
@@ -69,8 +69,8 @@ driver.implicitly_wait(10)
 #     ['Spotify: Music, Podcasts, Lit', 'com.spotify.music'],
 # ]
 
-start = 153
-end = 200
+start = 2
+end = 10
 package_names_to_test = TOP_500_APPS[start: end]
 
 validator = AppValidator(driver, package_names_to_test)
@@ -82,8 +82,10 @@ validator.report.print_report()
 # launcher.run()
 
 input("Quit")
-driver.quit()
-
+try:
+    driver.quit()
+except Exception as e:
+    pass
 # Test code
 # categories = {
 #     'cell phone': 0,
