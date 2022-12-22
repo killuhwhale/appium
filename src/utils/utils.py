@@ -1,6 +1,7 @@
+import re
 import subprocess
-from typing import AnyStr, Dict
-import os
+from time import time
+from typing import AnyStr, Dict, List
 
 
 def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: AnyStr) -> Dict:
@@ -17,15 +18,51 @@ def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: An
         'appium:noReset': "true",
     }
 
+def get_cur_activty() -> List[str]:
+
+    MAX_WAIT_FOR_OPEN_APP = 420  # 7 mins
+    t = time()
+    while int(time() - t) < MAX_WAIT_FOR_OPEN_APP:
+        try:
+            cmd = ('adb', 'shell', 'dumpsys', 'activity', '|', 'grep', 'mFocusedWindow')
+            text = subprocess.run(cmd, check=True, encoding='utf-8',
+                                        capture_output=True).stdout.strip()
+            
+            # mFocusedWindow=Window{3f50b2f u0 com.netflix.mediaclient/com.netflix.mediaclient.acquisition.screens.signupContainer.SignupNativeActivity}
+            # Returns "u0 com.netflix.mediaclient/com.netflix.mediaclient.acquisition.screens.signupContainer.SignupNativeActivity"
+            result = re.search(r"=Window{.*\s.*\s(?P<package_name>.*)/(?P<act_name>.*)}", text)
+            if result is None:
+                return "",""
+            return result.group("package_name"), result.group("act_name")
+        except Exception as e:
+            print(e)
+
+
+
+
+    
+
 def open_app(package_name: str):
     try:
         cmd = ('adb', 'shell', 'monkey', '-p', package_name, '-c', 'android.intent.category.LAUNCHER', '1')
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
                                 capture_output=True).stdout.strip()
         print(f"Starting {package_name} w/ monkey...")
+
+        # Call get activty and wait until the package name matches....
+        cur_package = ""
+        MAX_WAIT_FOR_OPEN_APP = 420  # 7 mins
+        t = time()
+        while cur_package != package_name and int(time() - t) < MAX_WAIT_FOR_OPEN_APP:
+            try:
+                cur_package, act_name = get_cur_activty()
+            except Exception as e:
+                print(e)
         print(outstr)
+
+        
     except Exception as e:
-        print("Error opening app with monkey")
+        print("Error opening app with monkey", e)
         return False
     return True
 
@@ -153,7 +190,7 @@ IMAGE_LABELS = [
 PACKAGE_NAMES = [
     [ "Rocket League Sideswipe", "com.Psyonix.RL2D"],
     ['ROBLOX', 'com.roblox.client'],
-    ['Netflix', 'com.netflix.mediaclient'],
+    ['Netflix', 'com.netflix.mediaclient'],  # Unable to take SS of app due to protections.
     ['YouTube Kids', 'com.google.android.apps.youtube.kids'],
     ['Facebook Messenger', 'com.facebook.orca'],
     ['Free Fire', 'com.dts.freefireth'],

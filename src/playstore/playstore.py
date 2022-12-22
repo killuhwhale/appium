@@ -1,28 +1,23 @@
-from collections import defaultdict
 import collections
-
 import re
+import requests
+import signal
 import subprocess
 import sys
-from time import sleep, time
-from typing import AnyStr, Dict, List
-import math
 from appium import webdriver
-import requests
-from bs4 import BeautifulSoup
-
 from appium.webdriver.common.appiumby import AppiumBy
-
+from bs4 import BeautifulSoup
 from selenium.common.exceptions import (StaleElementReferenceException, NoSuchElementException,
-                                        WebDriverException)
+                                        WebDriverException, ScreenshotException)
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.actions import interaction
 from selenium.webdriver.common.actions.action_builder import ActionBuilder
 from selenium.webdriver.common.actions.pointer_input import PointerInput
-import signal
-from objdetector.objdetector import ObjDetector
+from time import sleep, time
+from typing import AnyStr, Dict, List
 
-from utils.utils import CONTINUE, GOOGLE_AUTH, IMAGE_LABELS, LOGIN, PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, close_app, open_app
+from objdetector.objdetector import ObjDetector
+from utils.utils import CONTINUE, GOOGLE_AUTH, IMAGE_LABELS, LOGIN, PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, close_app, get_cur_activty, open_app
 
 
 ''''
@@ -147,6 +142,8 @@ class ValidationReport:
             if is_good:
                 print(self.Green, end="")
                 print("PASSED")
+                if len(status_obj['reason']) > 0:
+                    print("\n\t\t", status_obj['reason'])
                 print(self.RESET, end="")
 
             else:
@@ -188,6 +185,7 @@ class AppValidator:
             'Click install button',
         ]
         self.prev_act = None
+        self.cur_act = None
         self.detector = ObjDetector()
         
         
@@ -208,7 +206,12 @@ class AppValidator:
 
     
 
-    def check_playstore_invalid(self, package_name):
+    def check_playstore_invalid(self, package_name) -> bool:
+        ''' Checks if an app's package_name is invalid vai Google playstore URL 
+            If invalid, returns True
+            If valid, returns False
+        '''
+        
         url = f'https://play.google.com/store/apps/details?id={package_name}'
         response = requests.get(url)
         if response.status_code == 200:
@@ -220,68 +223,91 @@ class AppValidator:
                 return False
         else:
             return True
+    
+
+   
 
 
-    def is_new_activity(self):
+
+    def is_new_activity(self) -> bool:
         '''
             Calls adb shell dumpsys activity | grep mFocusedWindow
-            Remermbers previous called, returns True on first call and when a new value is found.
+
 
         '''
 
+        # cmd = ('adb', 'shell', 'dumpsys', 'activity', '|', 'grep', 'mFocusedWindow')
+        # text = subprocess.run(cmd, check=True, encoding='utf-8',
+        #                             capture_output=True).stdout.strip()
         
-        tmp = self.prev_act
-        now = self.prev_act 
-        cmd = ('adb', 'shell', 'dumpsys', 'activity', '|', 'grep', 'mFocusedWindow')
-        text = subprocess.run(cmd, check=True, encoding='utf-8',
-                                    capture_output=True).stdout.strip()
-        print(text)
-        # TODO create regex
-        # mFocusedWindow=Window{3f50b2f u0 com.netflix.mediaclient/com.netflix.mediaclient.acquisition.screens.signupContainer.SignupNativeActivity}
-        match = re.search(r"", text)
+        # # mFocusedWindow=Window{3f50b2f u0 com.netflix.mediaclient/com.netflix.mediaclient.acquisition.screens.signupContainer.SignupNativeActivity}
+        # # Returns "u0 com.netflix.mediaclient/com.netflix.mediaclient.acquisition.screens.signupContainer.SignupNativeActivity"
+        # act_name = re.search(r"=Window{[^ ]* ([^}]*)}", text).group(1)
 
-        if match:
-            print("Matched: ", match.group(1))
-            now = match.group(1)
-            self.prev_act = now
+        package, activity = get_cur_activty()
+        act_name = f"{package}/{activity}"
+        self.prev_act = self.cur_act  # Update 
+        self.cur_act = act_name
 
-        # On first run, we will say that it isnt new..
-        if tmp is None:
-            return False
+        # Init 
+        if self.prev_act is None:
+            self.prev_act = act_name
 
-        return tmp != now
+        return self.prev_act != self.cur_act
+        
+        
+
+    def get_test_ss(self) -> bool:
+        '''
+            Attempts to get SS of device and saves to a location where the object detector is configured to look.
+            This image will be used as the source to detect our buttons and fields.
+        '''
+        try:
+            self.driver.get_screenshot_as_file(f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/test.png")
+            return True
+        except ScreenshotException as e:
+            print("App is scured!")
+        except Exception as e:
+            print("Error taking SS: ", e)
+        return False
 
 
-
-
-
-    def handle_login(self):
+    def handle_login(self) -> bool:
         '''
             On a given page we will look at it and perform an action, if there is one .
         '''
-        self.is_new_activity() # init
-        results = self.detector.detect() 
+
+        # Do
+        self.is_new_activity() ## Init current activty
+        self.get_test_ss()
+        results = self.detector.detect()
         if results is None:
             return False
+
+        # While
+
         # here we have a dict of results from detection
         # Consists of 4 labels
         # We want to prioritize 
             # 1. Click Google Auth
             # 2. Filling out Email and Password
             # 3. Click Continue button to attempt to get to a page with #1 or #2
-        actions = 0 # At most, we should take 3 actions on a single page
+        actions = 0 # At most, we should take 3 actions on a single page [may not be necessary but is a hard limit to prevent loops.]
         # Find Email, Password and Login button.
         LOGIN_ENTERED = False
         PASSWORD_ENTERED = False
         CONTINUE_SUBMITTED = False
-        while actions < 5 and not CONTINUE_SUBMITTED:
-            input("Start handle login loop....")
-            print(results, CONTINUE in results)
-            print("Activity", self.prev_act)
-            if self.is_new_activity():
-                print("We found a new activity ")
-                actions = 0
+        while actions < 8 and not CONTINUE_SUBMITTED:
+            # input("Start handle login loop....")
+            print("\n\n Activity \n", self.prev_act, "\n", self.cur_act )
 
+            if self.is_new_activity():
+                self.get_test_ss()
+                print("\n\n New Activity \n", self.prev_act, "\n", self.cur_act )
+                print("We found a new activity, take new screenshot and run detect again. ")
+                results = self.detector.detect() 
+
+            print("results: ", results)
             if GOOGLE_AUTH in results:
                 # We have A google Auth button presents lets press it
                 google_btns = sorted(results[GOOGLE_AUTH], key=lambda p: p[2], reverse=True)
@@ -292,7 +318,6 @@ class AppValidator:
                 elif(len(google_btns) > 1):
                     print("Found multiple Google Auth Buttons.")
                 
-                actions = 3
                 # At this point we will consider this a successful test..
                 return True
             elif LOGIN in results and not LOGIN_ENTERED:
@@ -319,22 +344,34 @@ class AppValidator:
                 actions += 1
                 PASSWORD_ENTERED = True
             elif CONTINUE in results:
+                # TODO Remove the button once we click it, so we dont keep clicking the same element.
                 # We have A google Auth button presents lets press it
                 continue_btns = sorted(results[CONTINUE], key=lambda p: int(p[2]), reverse=True)
                 print("cont btns", continue_btns)
                 if(len(continue_btns) == 1):
                     print("Good scenario, we found one continue button.")
-                    btn = continue_btns[0]
-                    
+                    btn = continue_btns[0]                    
                     self.tap_screen(*self.get_coords(btn))
                 elif(len(continue_btns) > 1):
                     print("Found multiple continue buttons.")
                 actions += 1
                 if LOGIN_ENTERED and PASSWORD_ENTERED:
                     CONTINUE_SUBMITTED = True
-                
+            else:
+                # No Keys in results
+                return False
+
 
     def get_coords(self, btn: List):
+        ''' Given a list of list representing a bounding box's top left & 
+            bottom right corners, return the mid point as a string to be
+            compatible with adb shell input text.
+            
+            Args: 
+                btn = [[x1, y1], [x2, y2]] 
+            Returns:
+                (x, y): List[str]
+         '''
         x = (btn[0][0] + btn[1][0]) / 2
         y = (btn[0][1] + btn[1][1]) / 2
         return str(int(x)), str(int(y))
@@ -367,28 +404,35 @@ class AppValidator:
             # TODO wait for activity to start intelligently, not just package
             # DEV: Using to scrape the first image of each app. (Will remove)
             if not ERR:
-                sleep(8)  # Wait for app to finsh loading the "MainActivity"
-                self.report.add(app_package_name, app_title, ValidationReport.PASS, '')
-                _app_title = app_title.replace(" ", "_")
-                self.driver.get_screenshot_as_file(f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/test.png")
-                self.is_new_activity() # init
+                # sleep(8)  # Wait for app to finsh loading the "MainActivity"
+                _app_title = app_title.replace(" ", "_")  # Used to save screenshots of apps during DEV
+                # DEV SS
+                # self.driver.get_screenshot_as_file(f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/test.png")
+                
+                # TODO, improve open_app to detect failures more robustly.
+                self.report.add(app_package_name, app_title, ValidationReport.PASS, '')  # For now, if app opens without error, we will sayy its successful
                 
                 
                 # TODO Do login, building obj detection            
-                self.handle_login()
+                login_attemps = 0
+                logged_in = False
+                while not logged_in and login_attemps < 4:
+                    logged_in = self.handle_login()
+                    sleep(2) # Wait 2s, reattempt
+                    login_attemps += 1
+                if not logged_in:
+                    self.report.add(app_package_name, app_title, ValidationReport.PASS, 'Failed to log in')  
 
-              
-                input("Inspect results")
-
-                input("Close app")            
+            
+                # input("Close app")            
                 close_app(app_package_name)
             
                 # Change the orientation to portrait
                 self.driver.orientation = 'PORTRAIT'
 
-                # TODO Make sure PlayStore is in ForeGround and back to portrait ori
-                # Uninstall app (save space when doing hundreds of apps)
-                self.uninstall_app(app_package_name)
+                # TODO Make sure PlayStore is in ForeGround 
+                
+                self.uninstall_app(app_package_name)  # (save space) 
     
     def tap_screen(self, x:str, y:str):
         try:
