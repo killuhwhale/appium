@@ -8,85 +8,107 @@ from typing import AnyStr, List, Dict
 from appium import webdriver
 from appium.webdriver.common.appiumby import AppiumBy
 from selenium.common.exceptions import WebDriverException
-from utils.utils import PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, TOP_500_APPS
-
-# Dev
-# Defined here for easy copy-paste into terminal to start an interactive session.
-def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: AnyStr) -> Dict:
-    return {
-        'platformName': 'Android',
-        'appium:deviceName': device_name,
-        'appium:appPackage': app_package,
-        'appium:automationName': 'UiAutomator2',
-        'appium:appActivity': main_activity,
-        'appium:ensureWebviewHavepages': "true",
-        'appium:nativeWebScreenshot': "true",
-        'appium:newCommandTimeout': 3600,
-        'appium:connectHardwareKeyboard': "true",
-        'appium:noReset': True,
-    }
-
-# device_name = "192.168.0.163:5555"
-device_name = "emulator-5554"
-
-# Driver target: App to control via Appium 
-app_package = PLAYSTORE_PACKAGE_NAME
-main_activity = PLAYSTORE_MAIN_ACT
-
-# Prerequisites
-# Chromebook turned on, logged in, Linux Started, Appium Server Running pointing to the correct IP Address from Linux, Port Forwarding turned on
-
-# We can create drivers for multiple hosts...
-# We can run the client from a more powerful machine and have other
-# chromebooks running APPIUM server
-# We then use those chromebook's local IPs as the executor address and the adb device name would be consisten most  likely
-# The chromebooks used would be the machines we would want to test on and verify with.
-# The client could manage all these chroomebooks and run object detection.
+from utils.parallel import MultiprocessTaskRunner
+from utils.utils import PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, TOP_500_APPS, adb_connect, android_des_caps, find_transport_id
 
 
-# TODO create architecture to create multiple Drivers and start a job for each one.
-# Currently the code represents  single Driver and the job to do.
-# We could simply package this into a class ClientDriver and then run these in parallel
+# Multiprocessing Runs
 
-# For ip in machine_ips:
-#    run_thread(ClientDriver, ip, package_names_to_test)
+# ips = [
+#     '192.168.1.113:5555',
+#     # '192.168.1.238:5555',
+# ]
+# runner = MultiprocessTaskRunner(ips, TOP_500_APPS[:4])
+# runner.run()
 
+# Single run
+
+
+# https://github.com/appium/appium-uiautomator2-driver#driverserver
+#   - appium:skipServerInstallation => Improve startup speed if we know UIAutomator is already installed...
+
+# TODO
+# Need to identify each device so we can use the correct commands
+# So far Pixel 2 and Chromebook Coachz have different View Names
+#   - Chromebooks views are obfuscated
+# We can use this to get deviceInfo
+# https://github.com/appium/appium-uiautomator2-driver#mobile-deviceinfo
+# self.driver.execute_script("mobile: scroll", {'direction': 'down'})
+# self.driver.execute_script("mobile: acceptAlert", {'buttonLabel': 'Accept'})
+# self.driver.execute_script("mobile: dismissAlert", {'buttonLabel': 'Dismiss'})
+# self.driver.execute_script("mobile: deviceInfo", {})
+
+# self.driver.execute_script("mobile: activateApp", {appId: "my.app.id"})
+    # Activates the given application or launches it if necessary. The action literally simulates clicking the corresponding application icon on the dashboard.
+# self.driver.execute_script("mobile: queryAppState", {appId: "my.app.id" })
+    # The app is not installed: 0
+    # The app is installed and is not running: 1
+    # The app is running in background: 3
+    # The app is running in foreground: 4
+
+
+
+# self.driver.execute_script("mobile: changePermissions", {
+#                                   permissions: 'all',
+#                                   appPackage: '',
+#                                   action: 'allow',
+# })
+#  mobile: 
+
+
+# deviceInfo::
+# androidId
+# manufacturer
+# model
+# brand
+# apiVersion
+# platformVersion
+# carrierName
+# realDisplaySize
+# displayDensity
+# networks
+# locale
+# timeZone
+# bluetooth
+
+
+# adb -t 31 shell monkey -p com.netflix.mediaclient -c android.intent.category.LAUNCHER 1
+
+ip = '192.168.1.113:5555'
+res = adb_connect(ip)
+transport_id = find_transport_id(ip)
 
 driver = webdriver.Remote(
     "http://localhost:4723/wd/hub",
     android_des_caps(
-        device_name,
-        app_package,
-        main_activity
+        ip,
+        PLAYSTORE_PACKAGE_NAME,
+        PLAYSTORE_MAIN_ACT
     )
 )
 driver.implicitly_wait(5)
-driver.wait_activity(main_activity, 5)
+driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
 
-
-# package_names_to_test = [
-#     ['OfferUp: Buy. Sell. Letgo.', 'com.offerup'],
-#     ['Spotify: Music, Podcasts, Lit', 'com.spotify.music'],
-# ]
-
-start = 2
-end = 10
-package_names_to_test = TOP_500_APPS[start: end]
-
-validator = AppValidator(driver, package_names_to_test)
+validator = AppValidator(driver, TOP_500_APPS[:5], str(transport_id))
 validator.uninstall_multiple()
 validator.run()
 validator.report.print_report()
-# launcher = Launcher(package_names_to_test)
+print("Putting driver & valdiator")
+driver.quit()
 
-# launcher.run()
 
-input("Quit")
-try:
-    driver.quit()
-except Exception as e:
-    pass
-# Test code
+
+
+
+
+
+
+
+
+
+
+
+# Old Test code, still want...
 # categories = {
 #     'cell phone': 0,
 #     'computer accessories': 1,
