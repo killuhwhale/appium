@@ -46,3 +46,57 @@ TODO:
 Features/ Optimizations:
 
 - Get size of an app to anticipate download time
+
+
+
+# NOTES
+
+# https://github.com/appium/appium-uiautomator2-driver#driverserver
+#   - appium:skipServerInstallation => Improve startup speed if we know UIAutomator is already installed...
+
+# TODO
+# Need to identify each device so we can use the correct commands
+# So far Pixel 2 and Chromebook Coachz have different View Names
+#   - Chromebooks views are obfuscated
+# We can use this to get deviceInfo
+# https://github.com/appium/appium-uiautomator2-driver#mobile-deviceinfo
+# self.driver.execute_script("mobile: scroll", {'direction': 'down'})
+# self.driver.execute_script("mobile: acceptAlert", {'buttonLabel': 'Accept'})
+# self.driver.execute_script("mobile: dismissAlert", {'buttonLabel': 'Dismiss'})
+# self.driver.execute_script("mobile: deviceInfo", {})
+
+# self.driver.execute_script("mobile: activateApp", {appId: "my.app.id"})
+    # Activates the given application or launches it if necessary. The action literally simulates clicking the corresponding application icon on the dashboard.
+# self.driver.execute_script("mobile: queryAppState", {appId: "my.app.id" })
+    # The app is not installed: 0
+    # The app is installed and is not running: 1
+    # The app is running in background: 3
+    # The app is running in foreground: 4
+
+
+
+# self.driver.execute_script("mobile: changePermissions", {
+#                                   permissions: 'all',
+#                                   appPackage: '',
+#                                   action: 'allow',
+# })
+#  mobile: 
+
+
+# deviceInfo::
+# androidId
+# manufacturer
+# model
+# brand
+# apiVersion
+# platformVersion
+# carrierName
+# realDisplaySize
+# displayDensity
+# networks
+# locale
+# timeZone
+# bluetooth
+
+
+# adb -t 31 shell monkey -p com.netflix.mediaclient -c android.intent.category.LAUNCHER 1
