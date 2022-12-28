@@ -1,9 +1,7 @@
 import collections
 import re
 import requests
-import signal
 import subprocess
-import sys
 from appium import webdriver
 from appium.webdriver.common.appiumby import AppiumBy
 from bs4 import BeautifulSoup
@@ -17,7 +15,7 @@ from time import sleep, time
 from typing import AnyStr, Dict, List
 
 from objdetector.objdetector import ObjDetector
-from utils.utils import CONTINUE, GOOGLE_AUTH, IMAGE_LABELS, LOGIN, PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, close_app, get_cur_activty, open_app
+from utils.utils import ARC_VERSIONS, CONTINUE, GOOGLE_AUTH, IMAGE_LABELS, LOGIN, PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, close_app, get_cur_activty, open_app
 
 
 ''''
@@ -187,7 +185,7 @@ class AppValidator:
     '''
 
     PICUTRES = "/home/killuh/Pictures"
-    def __init__(self, driver: webdriver.Remote, package_names: List[List[str]], transport_id: str):
+    def __init__(self, driver: webdriver.Remote, package_names: List[List[str]], transport_id: str, ARC_VERSION: ARC_VERSIONS):
         self.driver = driver
         self.package_names = package_names  # List of packages to test as [app_title, app_package_name]
         self.report = ValidationReport("App discovery and Install")
@@ -201,25 +199,11 @@ class AppValidator:
         self.cur_act = None
         self.detector = ObjDetector()
         self.transport_id = transport_id
+        self.ARC_VERSION = ARC_VERSION
         
         
-        # Open Playstore 
-        # self.open_app(PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT)
-        # sleep(2)
-        signal.signal(signal.SIGINT, self.handle_sigint)
 
-    def handle_sigint(self, signal, frame):
-        # This function will be called when the user presses CTRL+C
-        print("CTRL+C pressed. Exiting program.")
-        # self.report.print_report()
-        try:
-            self.driver.quit()
-        except Exception as e:
-            pass
-        sys.exit(1)
-
-    
-
+   
     def check_playstore_invalid(self, package_name) -> bool:
         ''' Checks if an app's package_name is invalid vai Google playstore URL 
             If invalid, returns True
@@ -258,7 +242,7 @@ class AppValidator:
         # # Returns "u0 com.netflix.mediaclient/com.netflix.mediaclient.acquisition.screens.signupContainer.SignupNativeActivity"
         # act_name = re.search(r"=Window{[^ ]* ([^}]*)}", text).group(1)
 
-        package, activity = get_cur_activty(self.transport_id)
+        package, activity = get_cur_activty(self.transport_id,  self.ARC_VERSION)
         act_name = f"{package}/{activity}"
         self.prev_act = self.cur_act  # Update 
         self.cur_act = act_name
@@ -406,10 +390,13 @@ class AppValidator:
                 ERR = True
                 continue
             
-            if not open_app(app_package_name, self.transport_id):
+            if not open_app(app_package_name, self.transport_id, self.ARC_VERSION):
                 ERR = True
+                # TODO, we can also detect if we actually haev the package installed before just reporting else: Failed to open
                 if self.check_playstore_invalid(app_package_name):
                     self.report.add(app_package_name, app_title, ValidationReport.FAIL, "App package is invalid, update/ remove from list.")
+                elif not self.is_installed(app_package_name):
+                    self.report.add(app_package_name, app_title, ValidationReport.FAIL, "Failed to open because the package was not installed.")
                 else:
                     self.report.add(app_package_name, app_title, ValidationReport.FAIL, "Failed to open")
 
@@ -429,6 +416,9 @@ class AppValidator:
                 login_attemps = 0
                 logged_in = False
                 while not logged_in and login_attemps < 4:
+                    # ChromeOS does have mFocusedWindow -> get_cur_activty -> is_new_activity
+                    # Throws an error and stays in continuous loop....
+                    sleep(5)
                     logged_in = self.handle_login()
                     sleep(2) # Wait 2s, reattempt    
                     login_attemps += 1
@@ -441,8 +431,7 @@ class AppValidator:
             
                 # Change the orientation to portrait
                 self.driver.orientation = 'PORTRAIT'
-
-                # TODO Make sure PlayStore is in ForeGround 
+                open_app(PLAYSTORE_PACKAGE_NAME, self.transport_id, self.ARC_VERSION)
                 
                 self.uninstall_app(app_package_name)  # (save space) 
     
@@ -457,17 +446,6 @@ class AppValidator:
             return False
         return True
     
-    def open_app(self, package_name: str, act_name: str):
-        try:
-            cmd = ('adb', '-t', self.transport_id, 'shell', 'am', 'start', '-n', f'{package_name}/{act_name}')
-            outstr = subprocess.run(cmd, check=True, encoding='utf-8',
-                                    capture_output=True).stdout.strip()
-            print(f"Starting {package_name}/{act_name}...")
-            print(outstr)
-        except Exception as e:
-            print("Error opening app")
-            return False
-        return True
     
     def is_open(self, package_name: str) -> bool:
         cmd = ('adb', '-t', self.transport_id, 'shell', 'pidof', package_name)
@@ -516,10 +494,13 @@ class AppValidator:
         while not ready and (time() - t) < max_wait:
             try:
                 print("Searching for uninstall button....")
-                # Pixel 2
-                # uninstall_btn = self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value=content_desc)  # implicit wait time here, also
-                content_desc = f'''new UiSelector().className("android.widget.Button").text("Uninstall")'''
-                uninstall_btn = self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+                if self.ARC_VERSION == ARC_VERSIONS.ARC_P:
+                    content_desc = f'''new UiSelector().className("android.widget.Button").text("Uninstall")'''
+                    self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+                elif self.ARC_VERSION == ARC_VERSIONS.ARC_R:
+                    # Pixel 2
+                    self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value=content_desc)  # implicit wait time here, also
+                
                 print("Setting Ready to TRUE")
                 ready = True
             except Exception as e:
@@ -638,10 +619,13 @@ class AppValidator:
         # From Playstore home screen, click search icon
         print("Clicking search icon...")
         # Pixel 2
-        # search_icon = self.driver.find_element(by=AppiumBy.XPATH, value='//android.view.View[@content-desc="Search Google Play"]')	
-        # ARC-P CoachZ
-        search_icon = self.driver.find_element(by=AppiumBy.XPATH, value="/hierarchy/android.widget.FrameLayout/android.widget.LinearLayout/android.widget.FrameLayout/android.widget.FrameLayout/android.widget.FrameLayout/androidx.drawerlayout.widget.DrawerLayout/android.widget.FrameLayout/android.widget.FrameLayout[2]/android.widget.FrameLayout/android.view.ViewGroup/android.view.ViewGroup/android.widget.FrameLayout[1]/android.view.ViewGroup/android.widget.ImageView")
-        search_icon.click()
+        search_icon = None
+        if self.ARC_VERSION == ARC_VERSIONS.ARC_P:
+            search_icon = self.driver.find_element(by=AppiumBy.XPATH, value="/hierarchy/android.widget.FrameLayout/android.widget.LinearLayout/android.widget.FrameLayout/android.widget.FrameLayout/android.widget.FrameLayout/androidx.drawerlayout.widget.DrawerLayout/android.widget.FrameLayout/android.widget.FrameLayout[2]/android.widget.FrameLayout/android.view.ViewGroup/android.view.ViewGroup/android.widget.FrameLayout[1]/android.view.ViewGroup/android.widget.ImageView")
+        elif self.ARC_VERSION == ARC_VERSIONS.ARC_R:
+            search_icon = self.driver.find_element(by=AppiumBy.XPATH, value='//android.view.View[@content-desc="Search Google Play"]')	
+        if search_icon:
+            search_icon.click()
 
     def send_keys_ADB(self, title: str):
         title_search = self.escape_chars(title)
@@ -655,6 +639,7 @@ class AppValidator:
     def press_app_icon(self, title: str):
         '''
         
+        # Sometime the app has a different view on the same device.
         contentdesc = App: My Boy! - GBA Emulator Fast Emulator Arcade Star rating: 4.6 1,000,000+ downloads $4.99
         
         '''
@@ -700,13 +685,20 @@ class AppValidator:
         already_installed = False  # Potentailly already isntalled
         err = False
         try:
-            # Pixel 2
-            # install_BTN = self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value='Install')
-            content_desc = f'''new UiSelector().className("android.widget.Button").text("Install")'''
-            install_BTN = self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+            install_BTN = None
+            if self.ARC_VERSION == ARC_VERSIONS.ARC_P:
+                content_desc = f'''new UiSelector().className("android.widget.Button").text("Install")'''
+                install_BTN = self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+            elif self.ARC_VERSION == ARC_VERSIONS.ARC_R:
+                install_BTN = self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value='Install')
+            
+            
             install_BTN.click()
+            
+            
         except Exception as e:  # Install btn not found    
             err = True
+            print("Failed to find install button on transport id: ", self.transport_id)
             already_installed = self.is_installed(install_package_name)
 
 
@@ -753,14 +745,13 @@ class AppValidator:
             last_step = 1
             self.send_keys_ADB(title)
 
-            input("Step 2, press icon")
+            
             last_step = 2
             self.press_app_icon(title)
 
-            input("Step 3, press install")
             last_step = 3
             self.install_app_UI(install_package_name)
-            input("Step 3, press install")
+            # input("Step 3, press install")
                     
             self.driver.back()  # back to seach results
             self.driver.back()  # back to home page

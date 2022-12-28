@@ -1,7 +1,6 @@
 # from offerup.post import post_offer
 # from offerup.crawl import crawl
 from playstore.playstore import AppValidator
-from launcher.launcher import Launcher
 from time import sleep
 # from utils.utils import android_des_caps
 from typing import AnyStr, List, Dict
@@ -9,41 +8,54 @@ from appium import webdriver
 from appium.webdriver.common.appiumby import AppiumBy
 from selenium.common.exceptions import WebDriverException
 from utils.parallel import MultiprocessTaskRunner
-from utils.utils import PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, TOP_500_APPS, adb_connect, android_des_caps, find_transport_id
+from utils.utils import ARC_VERSIONS, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, TOP_500_APPS, adb_connect, android_des_caps, find_transport_id, get_arc_version, get_cur_activty
 
 
 # Multiprocessing Runs
 
-# ips = [
-#     '192.168.1.113:5555',
-#     # '192.168.1.238:5555',
-# ]
-# runner = MultiprocessTaskRunner(ips, TOP_500_APPS[:4])
-# runner.run()
+ips = [
+    '192.168.1.113:5555',
+    '710KPMZ0409387',  # Device connected via USB (Pixel 2)
+    # '192.168.1.238:5555',
 
-# Single run
+]
+runner = MultiprocessTaskRunner(ips, TOP_500_APPS[:9])
+runner.run()
 
-ip = '192.168.1.113:5555'
-res = adb_connect(ip)
-transport_id = find_transport_id(ip)
+###################################
+#   Single run
+###################################
 
-driver = webdriver.Remote(
-    "http://localhost:4723/wd/hub",
-    android_des_caps(
-        ip,
-        PLAYSTORE_PACKAGE_NAME,
-        PLAYSTORE_MAIN_ACT
-    )
-)
-driver.implicitly_wait(5)
-driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
+# ip = '710KPMZ0409387' # ARC-R
+# ip = '192.168.1.113:5555' # ARC-P
 
-validator = AppValidator(driver, TOP_500_APPS[:5], str(transport_id))
-validator.uninstall_multiple()
-validator.run()
-validator.report.print_report()
-print("Putting driver & valdiator")
-driver.quit()
+# res = adb_connect(ip)
+# transport_id = find_transport_id(ip)
+# version = get_arc_version(transport_id)
+
+# # stop = ""
+# # while stop != "q":
+# #     get_cur_activty(str(transport_id), version)
+#     # stop = input("stop")
+
+
+
+# driver = webdriver.Remote(
+#     "http://localhost:4723/wd/hub",
+#     android_des_caps(
+#         ip,
+#         PLAYSTORE_PACKAGE_NAME,
+#         PLAYSTORE_MAIN_ACT
+#     )
+# )
+# driver.implicitly_wait(5)
+# driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
+
+# validator = AppValidator(driver, TOP_500_APPS[:5], transport_id, version)
+# # validator.uninstall_multiple()
+# validator.run()
+# validator.report.print_report()
+# driver.quit()
 
 
 

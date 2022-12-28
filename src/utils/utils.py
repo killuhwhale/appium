@@ -1,34 +1,55 @@
 import re
 import subprocess
+from enum import Enum
 from time import time
 from typing import AnyStr, Dict, List
 
 
-def get_cur_activty(transport_id: int) -> List[str]:
+# ARC_VERSIONS
+class ARC_VERSIONS(Enum):
+    ARC_P = 1
+    ARC_R = 2
+
+def get_cur_activty(transport_id: str, ARC_VERSION: ARC_VERSIONS = ARC_VERSIONS.ARC_R) -> List[str]:
 
     MAX_WAIT_FOR_OPEN_APP = 420  # 7 mins
     t = time()
     while int(time() - t) < MAX_WAIT_FOR_OPEN_APP:
         try:
-            cmd = ('adb', '-t', transport_id, 'shell', 'dumpsys', 'activity', '|', 'grep', 'mFocusedWindow')
-            text = subprocess.run(cmd, check=True, encoding='utf-8',
-                                        capture_output=True) # .stdout.strip()
-            text = text.stderr.strip()
-            # Pixel 2
-            # mFocusedWindow=Window{3f50b2f u0 com.netflix.mediaclient/com.netflix.mediaclient.acquisition.screens.signupContainer.SignupNativeActivity}
-            # Returns "u0 com.netflix.mediaclient/com.netflix.mediaclient.acquisition.screens.signupContainer.SignupNativeActivity"
+            '''
+            
+                ARC-P
+                mResumedActivity: ActivityRecord{9588d06 u0 com.netflix.mediaclient/o.cwK t127}
+                ARC-R
+                mFocusedWindow=Window{b3ef1fc u0 NotificationShade} ## Sleep
+                mFocusedWindow=Window{3f50b2f u0 com.netflix.mediaclient/com.netflix.mediaclient.acquisition.screens.signupContainer.SignupNativeActivity}
+            '''
+            keyword = ""
+            if ARC_VERSION == ARC_VERSIONS.ARC_P:
+                keyword = "mResumedActivity"
+            if ARC_VERSION == ARC_VERSIONS.ARC_R:
+                keyword = "mFocusedWindow"
+            print("Key word ", ARC_VERSIONS.ARC_R, ARC_VERSION,  keyword)
+            cmd = ('adb', '-t', transport_id, 'shell', 'dumpsys', 'activity', 
+                    '|', 'grep', keyword)
+            text = subprocess.run(cmd, encoding='utf-8',
+                capture_output=True).stdout.strip()
+            print("res text: ", text)
 
-            # TODO Chrome Book need to update...
-            # mResumedActivity: ActivityRecord{e825abc u0 com.netflix.mediaclient/.acquisition.screens.signupContainer.SignupNativeTabletActivity t123}
-            result = re.search(r"=Window{.*\s.*\s(?P<package_name>.*)/(?P<act_name>.*)}", text)
+            query = r".*{.*\s.*\s(?P<package_name>.*)/(?P<act_name>[\S\.]*)\s*.*}"
+            result = re.search(query, text)
+            
             if result is None:
+                print("Cant find current activity.")
                 return "",""
+            
+            print(result.group("package_name"), result.group("act_name"))
             return result.group("package_name"), result.group("act_name")
         except Exception as e:
             print("Err get_cur_activty ", e)
     return "",""
     
-def open_app(package_name: str, transport_id: int):
+def open_app(package_name: str, transport_id: int, ARC_VERSION: ARC_VERSIONS = ARC_VERSIONS.ARC_R):
     try:
         cmd = ('adb','-t', transport_id, 'shell', 'monkey', '--pct-syskeys', '0', '-p', package_name, '-c', 'android.intent.category.LAUNCHER', '1')
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
@@ -41,7 +62,7 @@ def open_app(package_name: str, transport_id: int):
         t = time()
         while cur_package != package_name and int(time() - t) < MAX_WAIT_FOR_OPEN_APP:
             try:
-                cur_package, act_name = get_cur_activty(transport_id)
+                cur_package, act_name = get_cur_activty(transport_id, ARC_VERSION)
             except Exception as e:
                 print("Err getting cur act", e)
         print(outstr)
@@ -92,7 +113,7 @@ def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: An
     }
 
 
-def find_transport_id(ip_address):
+def find_transport_id(ip_address)-> str:
   # Call the adb command to list devices
   cmd = ('adb', 'devices', '-l')
   outstr = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
@@ -109,8 +130,21 @@ def find_transport_id(ip_address):
       # The transport ID is the first word in the line
       return words[-1].split(":")[-1]
   # If the IP address was not found, return None
-  return -1
+  return '-1'
 
+
+def get_arc_version(transport_id: str):
+    cmd = ('adb','-t', transport_id, 'shell', 'getprop', "ro.build.version.release")
+    try:
+        res = subprocess.run(cmd,  encoding='utf-8', capture_output=True).stdout.strip()
+        print("Res: ", res)
+        if res == "9":
+            return ARC_VERSIONS.ARC_P
+        elif res == "11":
+            return ARC_VERSIONS.ARC_R
+    except:
+        print("Cannot find Android Version")    
+    return None
 
 EXECUTOR = 'http://192.168.0.175:4723/wd/hub'
 
@@ -223,8 +257,8 @@ IMAGE_LABELS = [
 PACKAGE_NAMES = [
     # ['My Boy! - GBA Emulator', 'com.fastemulator.gba'],  # Purchase required, unable to install...
     # [ "Rocket League Sideswipe", "com.Psyonix.RL2D"],
-    ['Netflix', 'com.netflix.mediaclient'],  # Unable to take SS of app due to protections.
-    ['ROBLOX', 'com.roblox.client'],
+    # ['Netflix', 'com.netflix.mediaclient'],  # Unable to take SS of app due to protections.
+    # ['Roblox', 'com.roblox.client'],
     ['YouTube Kids', 'com.google.android.apps.youtube.kids'],
     ['Messenger', 'com.facebook.orca'],
     ['Free Fire', 'com.dts.freefireth'],
