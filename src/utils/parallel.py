@@ -17,7 +17,10 @@ def validate_task(queue: Queue, packages: List[List[str]], ip: str):
     '''
         A single task to validate apps on a given device.
     '''
-    res = adb_connect(ip)
+    
+    if not adb_connect(ip):
+        return
+
     transport_id = find_transport_id(ip)
     version = get_arc_version(transport_id)
     driver = webdriver.Remote(
@@ -34,7 +37,6 @@ def validate_task(queue: Queue, packages: List[List[str]], ip: str):
     validator = AppValidator(driver, packages, transport_id, version)
     validator.uninstall_multiple()
     validator.run()
-    # validator.report.print_report()
     print("Putting driver & valdiator")
     driver.quit()
     queue.put(validator.report.report)
@@ -46,7 +48,6 @@ def validate_task(queue: Queue, packages: List[List[str]], ip: str):
 
 class MultiprocessTaskRunner:
     def __init__(self, ips: List[str], packages: List[List[str]]):
-        # Create a queue for communication between the main process and the separate process
         self.queue = Queue()
         self.drivers: List[webdriver.Remote] = []
         self.valdiators: List[AppValidator] = []
@@ -105,12 +106,8 @@ class MultiprocessTaskRunner:
         total_packages = len(self.packages)
         num_packages_ea = total_packages // len(self.ips)
         rem_packages = total_packages % len(self.ips)
-        # 1000 apps
-        # 250 ea
-        # 0, 1 ,2 ,3 
-        print(num_packages_ea)
         start = 0
-        for i, ip in enumerate(self.ips):            
+        for ip in self.ips:
             '''
                 How to distribute remaining packages.
                     Image we have 10 ips and 999 packages to test
@@ -122,22 +119,15 @@ class MultiprocessTaskRunner:
                     0 -> 0 + 9 + 1
             '''
             end = start + num_packages_ea
-
             if rem_packages > 0:
                 end += 1
                 packages_to_test = self.packages[start: end]
                 rem_packages -= 1
             else:
                 packages_to_test = self.packages[start: end]
-            
             start = end
 
-            # make sure
-            # TODO() modify so that the last ip gets the remainder of the packages... (rem_packages)
-            
-            
             process = Process(target=validate_task, args=(self.queue, packages_to_test, ip ))
-            # Start the process
             process.start()
             self.processes.append(process)
             

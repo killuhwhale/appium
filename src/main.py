@@ -14,9 +14,9 @@ from utils.utils import ARC_VERSIONS, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT
 # Multiprocessing Runs
 
 ips = [
+    '192.168.1.238:5555',
     '192.168.1.113:5555',
-    '710KPMZ0409387',  # Device connected via USB (Pixel 2)
-    # '192.168.1.238:5555',
+    # '710KPMZ0409387',  # Device connected via USB (Pixel 2)
 
 ]
 runner = MultiprocessTaskRunner(ips, TOP_500_APPS[:9])
