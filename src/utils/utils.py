@@ -1,7 +1,8 @@
+from datetime import datetime
 import re
 import subprocess
 from enum import Enum
-from time import time
+from time import strftime, time, localtime
 from typing import AnyStr, Dict, List
 
 
@@ -146,93 +147,69 @@ def get_arc_version(transport_id: str):
         print("Cannot find Android Version")    
     return None
 
+
+def check_for_win_death(package_name: str, start_time: str, transport_id: str):
+    '''
+        12-28 17:48:37.233   153   235 I WindowManager: WIN DEATH: Window{913e5ce u0 com.Psyonix.RL2D/com.epicgames.ue4.GameActivity}
+    '''
+    # adb logcat -v time -t 10:30:00
+    cmd = ('adb', '-t', transport_id, 'logcat', '-v', 'time', '-t', start_time, '|', 'grep', '-i', package_name)  # 
+    logs = subprocess.run(cmd, encoding='utf-8', capture_output=True).stdout.strip()
+
+    win_death = rf"\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*I WindowManager: WIN DEATH: Window{'{'}.*\s.*\s{package_name}/.*{'}'}"
+    win_death_pattern = re.compile(win_death, re.MULTILINE)
+    match = win_death_pattern.search(logs)
+
+    print(logs, match)
+
+    if match:
+        print("match ", match.group(0))
+        failed_activity = match.group(0).split("/")[-1][:-1]
+        print("failed act: ", failed_activity)
+        return failed_activity
+    return ""
+
+def check_force_remove_record(package_name: str, start_time: str, transport_id: str):
+    '''
+        12-28 17:48:37.254   153  4857 W ActivityManager: Force removing ActivityRecord{f024fcc u0 com.Psyonix.RL2D/com.epicgames.ue4.GameActivity t195}: app died, no saved state
+    '''
+    # adb logcat -v time -t 10:30:00
+    cmd = ('adb', '-t', transport_id, 'logcat', '-v', 'time', '-t', start_time)
+    logs = subprocess.run(cmd, encoding='utf-8', capture_output=True).stdout.strip()
+
+    force_removed = rf"^\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*W ActivityManager: Force removing ActivityRecord{'{'}.*\s.*\s{package_name}/.*\s.*{'}'}: app died, no saved state$"
+    force_removed_pattern = re.compile(force_removed, re.MULTILINE)
+    match = force_removed_pattern.search(logs)
+    
+    
+    if match:
+        print("match ", match.group(0))
+        failed_activity = match.group(0).split("/")[-1][:-1].split(" ")[0]
+        print("failed act: ", failed_activity)
+        return failed_activity
+    return ""
+
+
+
+def get_start_time():
+  # Convert the timestamp to a datetime object
+  dt = datetime.fromtimestamp(time())
+
+  # Format the datetime object as a string in the desired format
+  s = dt.strftime('%m-%d %H:%M:%S.%f')[:-3].split(" ")
+  return rf"{s[0]} {s[1]}"
+
+# def get_start_time():
+#     """Converts a timestamp to the format "12-28 18:10:29"."""
+#     # Convert the timestamp to a local time tuple
+#     local_time = localtime(time())
+#     # Format the time tuple as a string using the strftime function
+#     time_str = strftime("%H:%M:%S", local_time)
+#     return time_str
+
 EXECUTOR = 'http://192.168.0.175:4723/wd/hub'
 
-ADB_KEYCODE_UNKNOWN = "0"
-ADB_KEYCODE_MENU = "1"
-ADB_KEYCODE_SOFT_RIGHT = "2"
-ADB_KEYCODE_HOME = "3"
-ADB_KEYCODE_BACK = "4"
-ADB_KEYCODE_CALL = "5"
-ADB_KEYCODE_ENDCALL = "6"
-ADB_KEYCODE_0 = "7"
-ADB_KEYCODE_1 = "8"
-ADB_KEYCODE_2 = "9"
-ADB_KEYCODE_3 = "10"
-ADB_KEYCODE_4 = "11"
-ADB_KEYCODE_5 = "12"
-ADB_KEYCODE_6 = "13"
-ADB_KEYCODE_7 = "14"
-ADB_KEYCODE_8 = "15"
-ADB_KEYCODE_9 = "16"
-ADB_KEYCODE_STAR = "17"
-ADB_KEYCODE_POUND = "18"
-ADB_KEYCODE_DPAD_UP = "19"
-ADB_KEYCODE_DPAD_DOWN = "20"
-ADB_KEYCODE_DPAD_LEFT = "21"
-ADB_KEYCODE_DPAD_RIGHT = "22"
-ADB_KEYCODE_DPAD_CENTER = "23"
-ADB_KEYCODE_VOLUME_UP = "24"
-ADB_KEYCODE_VOLUME_DOWN = "25"
-ADB_KEYCODE_POWER = "26"
-ADB_KEYCODE_CAMERA = "27"
-ADB_KEYCODE_CLEAR = "28"
-ADB_KEYCODE_A = "29"
-ADB_KEYCODE_B = "30"
-ADB_KEYCODE_C = "31"
-ADB_KEYCODE_D = "32"
-ADB_KEYCODE_E = "33"
-ADB_KEYCODE_F = "34"
-ADB_KEYCODE_G = "35"
-ADB_KEYCODE_H = "36"
-ADB_KEYCODE_I = "37"
-ADB_KEYCODE_J = "38"
-ADB_KEYCODE_K = "39"
-ADB_KEYCODE_L = "40"
-ADB_KEYCODE_M = "41"
-ADB_KEYCODE_N = "42"
-ADB_KEYCODE_O = "43"
-ADB_KEYCODE_P = "44"
-ADB_KEYCODE_Q = "45"
-ADB_KEYCODE_R = "46"
-ADB_KEYCODE_S = "47"
-ADB_KEYCODE_T = "48"
-ADB_KEYCODE_U = "49"
-ADB_KEYCODE_V = "50"
-ADB_KEYCODE_W = "51"
-ADB_KEYCODE_X = "52"
-ADB_KEYCODE_Y = "53"
-ADB_KEYCODE_Z = "54"
-ADB_KEYCODE_COMMA = "55"
-ADB_KEYCODE_PERIOD = "56"
-ADB_KEYCODE_ALT_LEFT = "57"
-ADB_KEYCODE_ALT_RIGHT = "58"
-ADB_KEYCODE_SHIFT_LEFT = "59"
-ADB_KEYCODE_SHIFT_RIGHT = "60"
-ADB_KEYCODE_TAB = "61"
-ADB_KEYCODE_SPACE = "62"
-ADB_KEYCODE_SYM = "63"
-ADB_KEYCODE_EXPLORER = "64"
-ADB_KEYCODE_ENVELOPE = "65"
-ADB_KEYCODE_ENTER = "66"
-ADB_KEYCODE_DEL = "67"
-ADB_KEYCODE_GRAVE = "68"
-ADB_KEYCODE_MINUS = "69"
-ADB_KEYCODE_EQUALS = "70"
-ADB_KEYCODE_LEFT_BRACKET = "71"
-ADB_KEYCODE_RIGHT_BRACKET = "72"
-ADB_KEYCODE_BACKSLASH = "73"
-ADB_KEYCODE_SEMICOLON = "74"
-ADB_KEYCODE_APOSTROPHE = "75"
-ADB_KEYCODE_SLASH = "76"
-ADB_KEYCODE_AT = "77"
-ADB_KEYCODE_NUM = "78"
-ADB_KEYCODE_HEADSETHOOK = "79"
-ADB_KEYCODE_FOCUS = "80"
-ADB_KEYCODE_PLUS = "81"
-ADB_KEYCODE_MENU = "82"
-ADB_KEYCODE_NOTIFICATION = "83"
-ADB_KEYCODE_SEARCH = "84"
+
 
 PLAYSTORE_PACKAGE_NAME = "com.android.vending"
 PLAYSTORE_MAIN_ACT = "com.google.android.finsky.activities.MainActivity"
@@ -255,9 +232,10 @@ IMAGE_LABELS = [
 ]
 
 PACKAGE_NAMES = [
+    [ "Rocket League Sideswipe", "com.Psyonix.RL2D"],
     # ['My Boy! - GBA Emulator', 'com.fastemulator.gba'],  # Purchase required, unable to install...
     # [ "Rocket League Sideswipe", "com.Psyonix.RL2D"],
-    # ['Netflix', 'com.netflix.mediaclient'],  # Unable to take SS of app due to protections.
+    ['Netflix', 'com.netflix.mediaclient'],  # Unable to take SS of app due to protections.
     # ['Roblox', 'com.roblox.client'],
     ['YouTube Kids', 'com.google.android.apps.youtube.kids'],
     ['Messenger', 'com.facebook.orca'],
@@ -648,3 +626,90 @@ PACKAGE_NAMES = [
 
 
 TOP_500_APPS = PACKAGE_NAMES[:500]
+
+
+ADB_KEYCODE_UNKNOWN = "0"
+ADB_KEYCODE_MENU = "1"
+ADB_KEYCODE_SOFT_RIGHT = "2"
+ADB_KEYCODE_HOME = "3"
+ADB_KEYCODE_BACK = "4"
+ADB_KEYCODE_CALL = "5"
+ADB_KEYCODE_ENDCALL = "6"
+ADB_KEYCODE_0 = "7"
+ADB_KEYCODE_1 = "8"
+ADB_KEYCODE_2 = "9"
+ADB_KEYCODE_3 = "10"
+ADB_KEYCODE_4 = "11"
+ADB_KEYCODE_5 = "12"
+ADB_KEYCODE_6 = "13"
+ADB_KEYCODE_7 = "14"
+ADB_KEYCODE_8 = "15"
+ADB_KEYCODE_9 = "16"
+ADB_KEYCODE_STAR = "17"
+ADB_KEYCODE_POUND = "18"
+ADB_KEYCODE_DPAD_UP = "19"
+ADB_KEYCODE_DPAD_DOWN = "20"
+ADB_KEYCODE_DPAD_LEFT = "21"
+ADB_KEYCODE_DPAD_RIGHT = "22"
+ADB_KEYCODE_DPAD_CENTER = "23"
+ADB_KEYCODE_VOLUME_UP = "24"
+ADB_KEYCODE_VOLUME_DOWN = "25"
+ADB_KEYCODE_POWER = "26"
+ADB_KEYCODE_CAMERA = "27"
+ADB_KEYCODE_CLEAR = "28"
+ADB_KEYCODE_A = "29"
+ADB_KEYCODE_B = "30"
+ADB_KEYCODE_C = "31"
+ADB_KEYCODE_D = "32"
+ADB_KEYCODE_E = "33"
+ADB_KEYCODE_F = "34"
+ADB_KEYCODE_G = "35"
+ADB_KEYCODE_H = "36"
+ADB_KEYCODE_I = "37"
+ADB_KEYCODE_J = "38"
+ADB_KEYCODE_K = "39"
+ADB_KEYCODE_L = "40"
+ADB_KEYCODE_M = "41"
+ADB_KEYCODE_N = "42"
+ADB_KEYCODE_O = "43"
+ADB_KEYCODE_P = "44"
+ADB_KEYCODE_Q = "45"
+ADB_KEYCODE_R = "46"
+ADB_KEYCODE_S = "47"
+ADB_KEYCODE_T = "48"
+ADB_KEYCODE_U = "49"
+ADB_KEYCODE_V = "50"
+ADB_KEYCODE_W = "51"
+ADB_KEYCODE_X = "52"
+ADB_KEYCODE_Y = "53"
+ADB_KEYCODE_Z = "54"
+ADB_KEYCODE_COMMA = "55"
+ADB_KEYCODE_PERIOD = "56"
+ADB_KEYCODE_ALT_LEFT = "57"
+ADB_KEYCODE_ALT_RIGHT = "58"
+ADB_KEYCODE_SHIFT_LEFT = "59"
+ADB_KEYCODE_SHIFT_RIGHT = "60"
+ADB_KEYCODE_TAB = "61"
+ADB_KEYCODE_SPACE = "62"
+ADB_KEYCODE_SYM = "63"
+ADB_KEYCODE_EXPLORER = "64"
+ADB_KEYCODE_ENVELOPE = "65"
+ADB_KEYCODE_ENTER = "66"
+ADB_KEYCODE_DEL = "67"
+ADB_KEYCODE_GRAVE = "68"
+ADB_KEYCODE_MINUS = "69"
+ADB_KEYCODE_EQUALS = "70"
+ADB_KEYCODE_LEFT_BRACKET = "71"
+ADB_KEYCODE_RIGHT_BRACKET = "72"
+ADB_KEYCODE_BACKSLASH = "73"
+ADB_KEYCODE_SEMICOLON = "74"
+ADB_KEYCODE_APOSTROPHE = "75"
+ADB_KEYCODE_SLASH = "76"
+ADB_KEYCODE_AT = "77"
+ADB_KEYCODE_NUM = "78"
+ADB_KEYCODE_HEADSETHOOK = "79"
+ADB_KEYCODE_FOCUS = "80"
+ADB_KEYCODE_PLUS = "81"
+ADB_KEYCODE_MENU = "82"
+ADB_KEYCODE_NOTIFICATION = "83"
+ADB_KEYCODE_SEARCH = "84"

@@ -201,7 +201,6 @@ class AppValidator:
         self.transport_id = transport_id
         self.ARC_VERSION = ARC_VERSION
         
-        
 
    
     def check_playstore_invalid(self, package_name) -> bool:
@@ -222,10 +221,6 @@ class AppValidator:
         else:
             return True
     
-
-   
-
-
 
     def is_new_activity(self) -> bool:
         '''
@@ -403,11 +398,17 @@ class AppValidator:
             # TODO wait for activity to start intelligently, not just package
             # DEV: Using to scrape the first image of each app. (Will remove)
             if not ERR:
+                # At this point we have successfully launched the app.
+                # We can check
+
+
+                ###### Image Scraping #####
                 # sleep(8)  # Wait for app to finsh loading the "MainActivity"
                 _app_title = app_title.replace(" ", "_")  # Used to save screenshots of apps during DEV
                 # DEV SS
                 # self.driver.get_screenshot_as_file(f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/test.png")
-                
+                ###### END  Image Scraping #####
+
                 # TODO, improve open_app to detect failures more robustly.
                 self.report.add(app_package_name, app_title, ValidationReport.PASS, '')  # For now, if app opens without error, we will sayy its successful
                 
@@ -493,14 +494,11 @@ class AppValidator:
         t = time()
         while not ready and (time() - t) < max_wait:
             try:
+                content_desc = f'''new UiSelector().className("android.widget.Button").text("Uninstall")'''
+                self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+                # # Pixel 2
+                # self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value=content_desc)  # implicit wait time here, also
                 print("Searching for uninstall button....")
-                if self.ARC_VERSION == ARC_VERSIONS.ARC_P:
-                    content_desc = f'''new UiSelector().className("android.widget.Button").text("Uninstall")'''
-                    self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
-                elif self.ARC_VERSION == ARC_VERSIONS.ARC_R:
-                    # Pixel 2
-                    self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value=content_desc)  # implicit wait time here, also
-                
                 print("Setting Ready to TRUE")
                 ready = True
             except Exception as e:
@@ -532,27 +530,6 @@ class AppValidator:
             return True
         except Exception as e:
             return False        
-
-    # Might not need....
-    def wait_for_install(self):
-        '''
-            Checks for "cancel" butto while app is installing.
-        '''
-        max_wait = 420  # 7 mins, Large gaming apps may take a while to download.
-        content_desc = 'Cancel'
-        ready = False
-        t = time()
-        while not ready and (time() - t) < max_wait:
-            print("While")
-            try:
-                print("Searching for uninstall button....")
-                uninstall_btn = self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value=content_desc)  # implicit wait time here, also
-                print("Setting Ready to TRUE")
-                ready = True
-            except Exception as e:
-                print("App not ready to open, sleeping 2s")
-                sleep(2)
-        return ready    
 
     def uninstall_multiple(self):
         for name in [pack_info[1] for pack_info in self.package_names]:
@@ -616,14 +593,21 @@ class AppValidator:
             return [False, f"Failed: {self.steps[3]} :: {error}"]
 
     def click_playstore_search(self):
-        # From Playstore home screen, click search icon
         print("Clicking search icon...")
-        # Pixel 2
         search_icon = None
-        if self.ARC_VERSION == ARC_VERSIONS.ARC_P:
-            search_icon = self.driver.find_element(by=AppiumBy.XPATH, value="/hierarchy/android.widget.FrameLayout/android.widget.LinearLayout/android.widget.FrameLayout/android.widget.FrameLayout/android.widget.FrameLayout/androidx.drawerlayout.widget.DrawerLayout/android.widget.FrameLayout/android.widget.FrameLayout[2]/android.widget.FrameLayout/android.view.ViewGroup/android.view.ViewGroup/android.widget.FrameLayout[1]/android.view.ViewGroup/android.widget.ImageView")
-        elif self.ARC_VERSION == ARC_VERSIONS.ARC_R:
-            search_icon = self.driver.find_element(by=AppiumBy.XPATH, value='//android.view.View[@content-desc="Search Google Play"]')	
+        content_desc = f'''new UiSelector().className("android.widget.TextView").text("Search for apps & games")'''
+        search_icon = self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+        # if self.ARC_VERSION == ARC_VERSIONS.ARC_P:
+        #     search_icon = self.driver.find_element(by=AppiumBy.XPATH, value="/hierarchy/android.widget.FrameLayout/android.widget.LinearLayout/android.widget.FrameLayout/android.widget.FrameLayout/android.widget.FrameLayout/androidx.drawerlayout.widget.DrawerLayout/android.widget.FrameLayout/android.widget.FrameLayout[2]/android.widget.FrameLayout/android.view.ViewGroup/android.view.ViewGroup/android.widget.FrameLayout[1]/android.view.ViewGroup/android.widget.ImageView")
+        # elif self.ARC_VERSION == ARC_VERSIONS.ARC_R:
+        #     # ToDo figure out a way to choose or just try each...
+        #     # Helios 
+        #     content_desc = f'''new UiSelector().className("android.widget.TextView").text("Search for apps & games")'''
+        #     self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+            
+        #     # CoachZ 
+        #     search_icon = self.driver.find_element(by=AppiumBy.XPATH, value='//android.view.View[@content-desc="Search Google Play"]')
+
         if search_icon:
             search_icon.click()
 
@@ -665,14 +649,6 @@ class AppValidator:
         sleep(2)
 
 
-        
-
-
-        
-
-
-
-
     def install_app_UI(self, install_package_name: str):
         '''
             We are on the app detail page:
@@ -685,14 +661,13 @@ class AppValidator:
         already_installed = False  # Potentailly already isntalled
         err = False
         try:
-            install_BTN = None
-            if self.ARC_VERSION == ARC_VERSIONS.ARC_P:
-                content_desc = f'''new UiSelector().className("android.widget.Button").text("Install")'''
-                install_BTN = self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
-            elif self.ARC_VERSION == ARC_VERSIONS.ARC_R:
-                install_BTN = self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value='Install')
+            # install_BTN = None
+            # if self.ARC_VERSION == ARC_VERSIONS.ARC_P:
+            # elif self.ARC_VERSION == ARC_VERSIONS.ARC_R:
+            #     install_BTN = self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value='Install')
             
-            
+            content_desc = f'''new UiSelector().className("android.widget.Button").text("Install")'''
+            install_BTN = self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
             install_BTN.click()
             
             
@@ -750,8 +725,9 @@ class AppValidator:
             self.press_app_icon(title)
 
             last_step = 3
+            input("Step 3, press install")
             self.install_app_UI(install_package_name)
-            # input("Step 3, press install")
+            input("Step 3, press install")
                     
             self.driver.back()  # back to seach results
             self.driver.back()  # back to home page
