@@ -15,7 +15,7 @@ from time import sleep, time
 from typing import AnyStr, Dict, List
 
 from objdetector.objdetector import ObjDetector
-from utils.utils import ARC_VERSIONS, CONTINUE, GOOGLE_AUTH, IMAGE_LABELS, LOGIN, PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, close_app, get_cur_activty, open_app
+from utils.utils import ARC_VERSIONS, CONTINUE, CRASH_TYPE, GOOGLE_AUTH, IMAGE_LABELS, LOGIN, PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, check_crash, close_app, get_cur_activty, get_start_time, open_app
 
 
 ''''
@@ -377,8 +377,10 @@ class AppValidator:
         '''
         self.driver.orientation = 'PORTRAIT'
         for app_title, app_package_name in self.package_names:
+            start_time = get_start_time()
             ERR = False
-            installed, error = self.discover_and_install(app_title, app_package_name)
+            # installed, error = self.discover_and_install(app_title, app_package_name)
+            installed, error = True, False # Successful
 
             if not installed and not error is None:
                 self.report.add(app_package_name, app_title, ValidationReport.FAIL, error)
@@ -400,7 +402,11 @@ class AppValidator:
             if not ERR:
                 # At this point we have successfully launched the app.
                 # We can check
-
+                sleep(5) # ANR Period
+                crash_type, crashed_act = check_crash(app_package_name, start_time, self.transport_id)
+                if(not crash_type == CRASH_TYPE.SUCCESS):
+                    self.report.add(app_package_name, app_title, ValidationReport.FAIL, crash_type.value)
+                    continue
 
                 ###### Image Scraping #####
                 # sleep(8)  # Wait for app to finsh loading the "MainActivity"
@@ -434,7 +440,7 @@ class AppValidator:
                 self.driver.orientation = 'PORTRAIT'
                 open_app(PLAYSTORE_PACKAGE_NAME, self.transport_id, self.ARC_VERSION)
                 
-                self.uninstall_app(app_package_name)  # (save space) 
+                # self.uninstall_app(app_package_name)  # (save space) 
     
     def tap_screen(self, x:str, y:str):
         try:
@@ -720,15 +726,16 @@ class AppValidator:
             last_step = 1
             self.send_keys_ADB(title)
 
-            
+
             last_step = 2
             self.press_app_icon(title)
 
             last_step = 3
-            input("Step 3, press install")
+            
+            # input("Step 3, press install")
             self.install_app_UI(install_package_name)
-            input("Step 3, press install")
-                    
+            # input("Step 3, press install")
+
             self.driver.back()  # back to seach results
             self.driver.back()  # back to home page
         except Exception as e:

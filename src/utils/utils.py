@@ -11,6 +11,12 @@ class ARC_VERSIONS(Enum):
     ARC_P = 1
     ARC_R = 2
 
+# ARC_VERSIONS
+class CRASH_TYPE(Enum):
+    SUCCESS = "Success"
+    WIN_DEATH = "Win Death"
+    FORCE_RM_ACT_RECORD = "Force removed ActivityRecord"
+
 def get_cur_activty(transport_id: str, ARC_VERSION: ARC_VERSIONS = ARC_VERSIONS.ARC_R) -> List[str]:
 
     MAX_WAIT_FOR_OPEN_APP = 420  # 7 mins
@@ -88,6 +94,15 @@ def close_app(package_name: str, transport_id: int):
 
 
 def adb_connect(ip: str):
+    '''
+        Connects device via ADB
+
+        Params:
+            ip: ip_address on local network of device to connect to.
+        
+        Returns:
+            A boolean representing if the connection was successful.
+    '''
     try:
         cmd = ('adb', 'connect', ip)
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
@@ -99,6 +114,9 @@ def adb_connect(ip: str):
     return True
 
 def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: AnyStr) -> Dict:
+    '''
+        Formats the Desired Capabilities for Appium Server.    
+    '''
     return {
         'platformName': 'Android',
         'appium:udid': device_name,
@@ -115,26 +133,46 @@ def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: An
 
 
 def find_transport_id(ip_address)-> str:
-  # Call the adb command to list devices
-  cmd = ('adb', 'devices', '-l')
-  outstr = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
-  print(outstr)
-  # Split the output into a list of lines
-  lines = outstr.split("\n")
-  # Iterate over the lines
-  for line in lines:
-    # Split the line into words
-    words = line.split()
-    # Check if the IP address is in the line
-    print("Checking ", ip_address, "  ", words)
-    if ip_address in words:
-      # The transport ID is the first word in the line
-      return words[-1].split(":")[-1]
-  # If the IP address was not found, return None
-  return '-1'
+    ''' Gets the transport_id from ADB devices command.
+
+        ['192.168.1.113:5555', 'device', 'product:strongbad', 'model:strongbad', 
+            'device:strongbad_cheets', 'transport_id:1']
+
+        Params:
+            ip_address: A string representing the name of the device
+                according to ADB devices, typically the ip address.
+        
+        Returns:
+            A string representing the transport id for the device matching the 
+                @ip_adress
+
+    '''
+    cmd = ('adb', 'devices', '-l')
+    outstr = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+    # Split the output into a list of lines
+    lines = outstr.split("\n")
+    for line in lines:
+        # Split the line into words
+        words = line.split()
+        if ip_address in words:
+            # The transport ID is the last word in the line
+            return words[-1].split(":")[-1]
+    # If the IP address was not found, return None
+    return '-1'
 
 
 def get_arc_version(transport_id: str):
+    ''' Gets Android OS version on connected device.
+
+        Params: 
+            transport_id: The transport id of the connected android device.
+
+        Returns:
+            An ENUM representing the Android Version [P, R] else None if 
+                release if not found from ADB getprop. 
+    
+    
+    '''
     cmd = ('adb','-t', transport_id, 'shell', 'getprop', "ro.build.version.release")
     try:
         res = subprocess.run(cmd,  encoding='utf-8', capture_output=True).stdout.strip()
@@ -148,34 +186,51 @@ def get_arc_version(transport_id: str):
     return None
 
 
-def check_for_win_death(package_name: str, start_time: str, transport_id: str):
+def get_logs(start_time: str, transport_id: str):
+    '''Grabs logs from ADB logcat starting at a specified time.
+
+        Params: 
+            start_time: The formatted string representing the time the app was 
+                launched/ started.
+            transport_id: The transport id of the connected android device.
+        
+        Returns 
+
     '''
+    cmd = ('adb', '-t', transport_id, 'logcat', 'time', '-t', start_time)  # 
+    logs =  subprocess.run(cmd, encoding='utf-8',
+         capture_output=True).stdout.strip()
+    return logs
+
+
+def check_for_win_death(package_name: str, logs: str):
+    ''' Searches logs for WIN DEATH record.
+
         12-28 17:48:37.233   153   235 I WindowManager: WIN DEATH: Window{913e5ce u0 com.Psyonix.RL2D/com.epicgames.ue4.GameActivity}
+        
+        Returns:
+            A string representing the failing activity otherwise it returns an empty string.
     '''
     # adb logcat -v time -t 10:30:00
-    cmd = ('adb', '-t', transport_id, 'logcat', '-v', 'time', '-t', start_time, '|', 'grep', '-i', package_name)  # 
-    logs = subprocess.run(cmd, encoding='utf-8', capture_output=True).stdout.strip()
 
     win_death = rf"\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*I WindowManager: WIN DEATH: Window{'{'}.*\s.*\s{package_name}/.*{'}'}"
     win_death_pattern = re.compile(win_death, re.MULTILINE)
     match = win_death_pattern.search(logs)
-
-    print(logs, match)
-
     if match:
-        print("match ", match.group(0))
+        # print("match ", match.group(0))
         failed_activity = match.group(0).split("/")[-1][:-1]
-        print("failed act: ", failed_activity)
+        # print("failed act: ", failed_activity)
         return failed_activity
     return ""
 
-def check_force_remove_record(package_name: str, start_time: str, transport_id: str):
-    '''
+def check_force_remove_record(package_name: str, logs: str):
+    ''' Searches logs for Force remove ActivtyRecord.
+
         12-28 17:48:37.254   153  4857 W ActivityManager: Force removing ActivityRecord{f024fcc u0 com.Psyonix.RL2D/com.epicgames.ue4.GameActivity t195}: app died, no saved state
+    
+        Returns:
+            A string representing the failing activity otherwise it returns an empty string.
     '''
-    # adb logcat -v time -t 10:30:00
-    cmd = ('adb', '-t', transport_id, 'logcat', '-v', 'time', '-t', start_time)
-    logs = subprocess.run(cmd, encoding='utf-8', capture_output=True).stdout.strip()
 
     force_removed = rf"^\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*W ActivityManager: Force removing ActivityRecord{'{'}.*\s.*\s{package_name}/.*\s.*{'}'}: app died, no saved state$"
     force_removed_pattern = re.compile(force_removed, re.MULTILINE)
@@ -190,22 +245,51 @@ def check_force_remove_record(package_name: str, start_time: str, transport_id: 
     return ""
 
 
+def check_crash(package_name: str, start_time: str, transport_id: str):
+    ''' Grabs logcat logs starting at a specified time and check for crash logs.
+
+        Params: 
+            package_name: The name of the package to check crash logs for.
+            start_time: The formatted string representing the time the app was 
+                launched/ started.
+            transport_id: The transport id of the connected android device.
+
+        Return:
+            A string representing the failing activity otherwise it returns an empty string.
+    
+    '''
+    logs = get_logs(start_time, transport_id)
+
+    failed_act: str = check_for_win_death(package_name, logs)
+    if len(failed_act) > 0:
+        return (CRASH_TYPE.WIN_DEATH, failed_act)
+    
+    failed_act: str = check_force_remove_record(package_name, logs)
+    if len(failed_act) > 0:
+        return (CRASH_TYPE.WIN_DEATH, failed_act)
+    return (CRASH_TYPE.SUCCESS, "")
+    
 
 def get_start_time():
-  # Convert the timestamp to a datetime object
-  dt = datetime.fromtimestamp(time())
+    '''
+        Gets current time and formats it properly to match ADB -t arg.
 
-  # Format the datetime object as a string in the desired format
-  s = dt.strftime('%m-%d %H:%M:%S.%f')[:-3].split(" ")
-  return rf"{s[0]} {s[1]}"
+        This is used at the beginning of a test for an app.
+        It will limit the amount logs we will need to search each run.
 
-# def get_start_time():
-#     """Converts a timestamp to the format "12-28 18:10:29"."""
-#     # Convert the timestamp to a local time tuple
-#     local_time = localtime(time())
-#     # Format the time tuple as a string using the strftime function
-#     time_str = strftime("%H:%M:%S", local_time)
-#     return time_str
+        Returns a string in the format "MM-DD HH:MM:SS.ms"
+    '''
+    return datetime.fromtimestamp(time()).strftime('%m-%d %H:%M:%S.%f')[:-3]
+    
+
+
+
+
+
+
+
+
+
 
 EXECUTOR = 'http://192.168.0.175:4723/wd/hub'
 
