@@ -2,29 +2,42 @@ from datetime import datetime
 import re
 import subprocess
 from enum import Enum
-from time import strftime, time, localtime
+from time import time
 from typing import AnyStr, Dict, List
 
 
-# ARC_VERSIONS
-class ARC_VERSIONS(Enum):
+class ArcVersions(Enum):
+    '''
+        Enumeration for each Android Version we intend to support.
+    '''
     ARC_P = 1
     ARC_R = 2
 
-# ARC_VERSIONS
-class CRASH_TYPE(Enum):
+class CrashType(Enum):
+    '''
+        Enumeration for the result when checking if a program crashed.
+    '''
     SUCCESS = "Success"
     WIN_DEATH = "Win Death"
     FORCE_RM_ACT_RECORD = "Force removed ActivityRecord"
 
-def get_cur_activty(transport_id: str, ARC_VERSION: ARC_VERSIONS = ARC_VERSIONS.ARC_R) -> List[str]:
+def get_cur_activty(transport_id: str, ArcVersion: ArcVersions = ArcVersions.ARC_R) -> List[str]:
+    '''
+        Gets the current activity running in the foreground.
 
+        Params:
+            transport_id: The transport id of the connected android device.
+            ArcVersion: ArcVersion Enum for the device.
+
+        Returns:
+            A List of strings: [package_name, activity_name]
+    '''
     MAX_WAIT_FOR_OPEN_APP = 420  # 7 mins
     t = time()
     while int(time() - t) < MAX_WAIT_FOR_OPEN_APP:
         try:
             '''
-            
+
                 ARC-P
                 mResumedActivity: ActivityRecord{9588d06 u0 com.netflix.mediaclient/o.cwK t127}
                 ARC-R
@@ -32,31 +45,39 @@ def get_cur_activty(transport_id: str, ARC_VERSION: ARC_VERSIONS = ARC_VERSIONS.
                 mFocusedWindow=Window{3f50b2f u0 com.netflix.mediaclient/com.netflix.mediaclient.acquisition.screens.signupContainer.SignupNativeActivity}
             '''
             keyword = ""
-            if ARC_VERSION == ARC_VERSIONS.ARC_P:
+            if ArcVersion == ArcVersions.ARC_P:
                 keyword = "mResumedActivity"
-            if ARC_VERSION == ARC_VERSIONS.ARC_R:
+            if ArcVersion == ArcVersions.ARC_R:
                 keyword = "mFocusedWindow"
-            print("Key word ", ARC_VERSIONS.ARC_R, ARC_VERSION,  keyword)
-            cmd = ('adb', '-t', transport_id, 'shell', 'dumpsys', 'activity', 
+            print("Key word ", ArcVersions.ARC_R, ArcVersion,  keyword)
+            cmd = ('adb', '-t', transport_id, 'shell', 'dumpsys', 'activity',
                     '|', 'grep', keyword)
-            text = subprocess.run(cmd, encoding='utf-8',
+            text = subprocess.run(cmd, check=False, encoding='utf-8',
                 capture_output=True).stdout.strip()
             print("res text: ", text)
 
             query = r".*{.*\s.*\s(?P<package_name>.*)/(?P<act_name>[\S\.]*)\s*.*}"
             result = re.search(query, text)
-            
+
             if result is None:
                 print("Cant find current activity.")
                 return "",""
-            
+
             print(result.group("package_name"), result.group("act_name"))
             return result.group("package_name"), result.group("act_name")
-        except Exception as e:
-            print("Err get_cur_activty ", e)
+        except Exception as err:
+            print("Err get_cur_activty ", err)
     return "",""
-    
-def open_app(package_name: str, transport_id: int, ARC_VERSION: ARC_VERSIONS = ARC_VERSIONS.ARC_R):
+
+def open_app(package_name: str, transport_id: int, ArcVersion: ArcVersions = ArcVersions.ARC_R):
+    '''
+        Opens an app using ADB monkey.
+
+        Params:
+            package_name: The name of the package to check crash logs for.
+            transport_id: The transport id of the connected android device.
+            ArcVersion: ArcVersion Enum for the device.
+    '''
     try:
         cmd = ('adb','-t', transport_id, 'shell', 'monkey', '--pct-syskeys', '0', '-p', package_name, '-c', 'android.intent.category.LAUNCHER', '1')
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
@@ -69,29 +90,35 @@ def open_app(package_name: str, transport_id: int, ARC_VERSION: ARC_VERSIONS = A
         t = time()
         while cur_package != package_name and int(time() - t) < MAX_WAIT_FOR_OPEN_APP:
             try:
-                cur_package, act_name = get_cur_activty(transport_id, ARC_VERSION)
-            except Exception as e:
-                print("Err getting cur act", e)
+                cur_package, act_name = get_cur_activty(transport_id, ArcVersion)
+            except Exception as err:
+                print("Err getting cur act", err)
         print(outstr)
 
 
-    except Exception as e:
-        print("Error opening app with monkey", e)
+    except Exception as err:
+        print("Error opening app with monkey", err)
         return False
     return True
 
 def close_app(package_name: str, transport_id: int):
+    '''
+        Opens an app using ADB monkey.
+
+        Params:
+            package_name: The name of the package to check crash logs for.
+            transport_id: The transport id of the connected android device.
+    '''
     try:
         cmd = ('adb', '-t', transport_id, 'shell', 'am', 'force-stop', package_name)
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
                                 capture_output=True).stdout.strip()
         print(f"Closed {package_name}...")
         print(outstr)
-    except Exception as e:
-        print("Error closing app with monkey", e)
+    except Exception as err:
+        print("Error closing app with monkey", err)
         return False
     return True
-
 
 def adb_connect(ip: str):
     '''
@@ -99,7 +126,7 @@ def adb_connect(ip: str):
 
         Params:
             ip: ip_address on local network of device to connect to.
-        
+
         Returns:
             A boolean representing if the connection was successful.
     '''
@@ -108,14 +135,14 @@ def adb_connect(ip: str):
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
                                 capture_output=True).stdout.strip()
         print(outstr)
-    except Exception as e:
-        print("Error connecting to ADB", e)
+    except Exception as err:
+        print("Error connecting to ADB", err)
         return False
     return True
 
 def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: AnyStr) -> Dict:
     '''
-        Formats the Desired Capabilities for Appium Server.    
+        Formats the Desired Capabilities for Appium Server.
     '''
     return {
         'platformName': 'Android',
@@ -131,19 +158,18 @@ def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: An
         "appium:uiautomator2ServerInstallTimeout": 60000
     }
 
-
 def find_transport_id(ip_address)-> str:
     ''' Gets the transport_id from ADB devices command.
 
-        ['192.168.1.113:5555', 'device', 'product:strongbad', 'model:strongbad', 
+        ['192.168.1.113:5555', 'device', 'product:strongbad', 'model:strongbad',
             'device:strongbad_cheets', 'transport_id:1']
 
         Params:
             ip_address: A string representing the name of the device
                 according to ADB devices, typically the ip address.
-        
+
         Returns:
-            A string representing the transport id for the device matching the 
+            A string representing the transport id for the device matching the
                 @ip_adress
 
     '''
@@ -160,11 +186,10 @@ def find_transport_id(ip_address)-> str:
     # If the IP address was not found, return None
     return '-1'
 
-
 def is_emulator(transport_id: str):
     ''' Checks if device is an emulator.
 
-        Params: 
+        Params:
             transport_id: The transport id of the connected android device.
 
         Returns:
@@ -173,59 +198,58 @@ def is_emulator(transport_id: str):
 
     cmd = ('adb','-t', transport_id, 'shell', 'getprop', "ro.build.characteristics")
     try:
-        res = subprocess.run(cmd,  encoding='utf-8', capture_output=True).stdout.strip()
+        res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
         print("Res: ", res)
         return res == "emulator"
-    except Exception as e:
-        print("Failed to check for emualtor", e)
+    except Exception as err:
+        print("Failed to check for emualtor", err)
     return False
+
 def get_arc_version(transport_id: str):
     ''' Gets Android OS version on connected device.
 
-        Params: 
+        Params:
             transport_id: The transport id of the connected android device.
 
         Returns:
-            An ENUM representing the Android Version [P, R] else None if 
-                release if not found from ADB getprop. 
-    
-    
+            An ENUM representing the Android Version [P, R] else None if
+                release if not found from ADB getprop.
+
+
     '''
     cmd = ('adb','-t', transport_id, 'shell', 'getprop', "ro.build.version.release")
     try:
-        res = subprocess.run(cmd,  encoding='utf-8', capture_output=True).stdout.strip()
+        res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
         print("Res: ", res)
         if res == "9":
-            return ARC_VERSIONS.ARC_P
+            return ArcVersions.ARC_P
         elif res == "11":
-            return ARC_VERSIONS.ARC_R
-    except:
-        print("Cannot find Android Version")    
+            return ArcVersions.ARC_R
+    except Exception as err:
+        print("Cannot find Android Version", err)
     return None
-
 
 def get_logs(start_time: str, transport_id: str):
     '''Grabs logs from ADB logcat starting at a specified time.
 
-        Params: 
-            start_time: The formatted string representing the time the app was 
+        Params:
+            start_time: The formatted string representing the time the app was
                 launched/ started.
             transport_id: The transport id of the connected android device.
-        
-        Returns 
+
+        Returns
 
     '''
-    cmd = ('adb', '-t', transport_id, 'logcat', 'time', '-t', start_time)  # 
-    logs =  subprocess.run(cmd, encoding='utf-8',
+    cmd = ('adb', '-t', transport_id, 'logcat', 'time', '-t', start_time)  #
+    logs =  subprocess.run(cmd, check=False, encoding='utf-8',
          capture_output=True).stdout.strip()
     return logs
-
 
 def check_for_win_death(package_name: str, logs: str):
     ''' Searches logs for WIN DEATH record.
 
         12-28 17:48:37.233   153   235 I WindowManager: WIN DEATH: Window{913e5ce u0 com.Psyonix.RL2D/com.epicgames.ue4.GameActivity}
-        
+
         Returns:
             A string representing the failing activity otherwise it returns an empty string.
     '''
@@ -245,7 +269,7 @@ def check_force_remove_record(package_name: str, logs: str):
     ''' Searches logs for Force remove ActivtyRecord.
 
         12-28 17:48:37.254   153  4857 W ActivityManager: Force removing ActivityRecord{f024fcc u0 com.Psyonix.RL2D/com.epicgames.ue4.GameActivity t195}: app died, no saved state
-    
+
         Returns:
             A string representing the failing activity otherwise it returns an empty string.
     '''
@@ -253,8 +277,8 @@ def check_force_remove_record(package_name: str, logs: str):
     force_removed = rf"^\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*W ActivityManager: Force removing ActivityRecord{'{'}.*\s.*\s{package_name}/.*\s.*{'}'}: app died, no saved state$"
     force_removed_pattern = re.compile(force_removed, re.MULTILINE)
     match = force_removed_pattern.search(logs)
-    
-    
+
+
     if match:
         print("match ", match.group(0))
         failed_activity = match.group(0).split("/")[-1][:-1].split(" ")[0]
@@ -262,31 +286,29 @@ def check_force_remove_record(package_name: str, logs: str):
         return failed_activity
     return ""
 
-
 def check_crash(package_name: str, start_time: str, transport_id: str):
     ''' Grabs logcat logs starting at a specified time and check for crash logs.
 
-        Params: 
+        Params:
             package_name: The name of the package to check crash logs for.
-            start_time: The formatted string representing the time the app was 
+            start_time: The formatted string representing the time the app was
                 launched/ started.
             transport_id: The transport id of the connected android device.
 
         Return:
             A string representing the failing activity otherwise it returns an empty string.
-    
+
     '''
     logs = get_logs(start_time, transport_id)
 
     failed_act: str = check_for_win_death(package_name, logs)
     if len(failed_act) > 0:
-        return (CRASH_TYPE.WIN_DEATH, failed_act)
-    
+        return (CrashType.WIN_DEATH, failed_act)
+
     failed_act: str = check_force_remove_record(package_name, logs)
     if len(failed_act) > 0:
-        return (CRASH_TYPE.WIN_DEATH, failed_act)
-    return (CRASH_TYPE.SUCCESS, "")
-    
+        return (CrashType.WIN_DEATH, failed_act)
+    return (CrashType.SUCCESS, "")
 
 def get_start_time():
     '''
@@ -298,29 +320,14 @@ def get_start_time():
         Returns a string in the format "MM-DD HH:MM:SS.ms"
     '''
     return datetime.fromtimestamp(time()).strftime('%m-%d %H:%M:%S.%f')[:-3]
-    
 
 
-
-
-
-
-
-
-
-
+# Ip Address of machien Running Appium Server
 EXECUTOR = 'http://192.168.0.175:4723/wd/hub'
-
-
-
 PLAYSTORE_PACKAGE_NAME = "com.android.vending"
 PLAYSTORE_MAIN_ACT = "com.google.android.finsky.activities.MainActivity"
 
-BAD_PACKAGES = [
-    ['MegaHDFilmes - Series , Filmes e Animes', 'me.filmeshd.mega'],  # App doesnt show on PlayStore...
-]
-
-
+# Labels for YOLOv5
 LOGIN = 'Login Field'
 PASSWORD = 'Password Field'
 CONTINUE = 'Continue'
@@ -609,7 +616,7 @@ PACKAGE_NAMES = [
     ['Word Cookies!', 'com.bitmango.go.wordcookies'],
     ['Floor Plan Creator', 'pl.planmieszkania.android'],
     ['Legión Anime Tema Oscuro', 'aplicaciones.paleta.alterlegionanime'],  # Fialst o send keys
-    ['Adobe Illustrator Draw', 'com.adobe.creativeapps.draw'],  # NA on Pixel 2 
+    ['Adobe Illustrator Draw', 'com.adobe.creativeapps.draw'],  # NA on Pixel 2
     ['aquapark.io', 'com.cassette.aquapark'],
     ['Bridge Race', 'com.Garawell.BridgeRace'],
     ['Jewels Magic: Mystery Match3', 'com.bitmango.go.jewelsmagicmysterymatch3'],

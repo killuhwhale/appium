@@ -12,26 +12,17 @@ from selenium.webdriver.common.actions import interaction
 from selenium.webdriver.common.actions.action_builder import ActionBuilder
 from selenium.webdriver.common.actions.pointer_input import PointerInput
 from time import sleep, time
-from typing import AnyStr, Dict, List
+from typing import List
 
 from objdetector.objdetector import ObjDetector
-from utils.utils import ARC_VERSIONS, CONTINUE, CRASH_TYPE, GOOGLE_AUTH, IMAGE_LABELS, LOGIN, PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, check_crash, close_app, get_cur_activty, get_start_time, open_app
-
-
-''''
-{
-    package_name: {
-        status: [pass | fail] int
-        reason: "error message to produce fail status"
-    }
-}
-
-
-'''
+from utils.utils import (
+    ArcVersions, CONTINUE, CrashType, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
+    PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER,
+    check_crash, close_app, get_cur_activty, get_start_time, open_app)
 
 class ValidationReport:
     '''
-        A simple class to format status report of AppValidator.
+        A simple class to format the status report of AppValidator.
     '''
     PASS = 0
     FAIL = 1
@@ -58,21 +49,26 @@ class ValidationReport:
 
     REPEAT_TIMES = 2*len(COLORS)
 
+    @staticmethod
     def empty_dict():
+        '''
+            Default value for a report key.
+        '''
         return {"empty": 1}
 
     def __init__(self, report_title: str):
         self.report = collections.defaultdict(ValidationReport.empty_dict)
         self.report_title = report_title
-        
-        
 
     def add(self, package_name: str, app_name: str, status: int, reason: str):
         ''' Add report of a pacage if a report DNExist'''
         if "empty" in self.report[package_name]:
             self.report[package_name] = self.status_obj(status, reason, app_name)
-    
+
     def status_obj(self, status: int, reason: str, name: str):
+        ''' Status object containing the result information for each key/
+            package in the report.
+        '''
         return {
             'status': status,
             'reason': reason,
@@ -82,35 +78,38 @@ class ValidationReport:
 
     @staticmethod
     def ascii_footer():
+        ''' Report decoration.'''
         print(ValidationReport.Green)
-        
+
         print('''
-               _  _     _  _     _  _     _   ___ _ _       _       _    _ _           _  _____     _  _     _  _     _  _   
-             _| || |_ _| || |_ _| || |_  | | / (_) | |     | |     | |  | | |         | ||____ |  _| || |_ _| || |_ _| || |_ 
+               _  _     _  _     _  _     _   ___ _ _       _       _    _ _           _  _____     _  _     _  _     _  _
+             _| || |_ _| || |_ _| || |_  | | / (_) | |     | |     | |  | | |         | ||____ |  _| || |_ _| || |_ _| || |_
             |_  __  _|_  __  _|_  __  _| | |/ / _| | |_   _| |__   | |  | | |__   __ _| |    / / |_  __  _|_  __  _|_  __  _|
-             _| || |_ _| || |_ _| || |_  |    \| | | | | | | '_ \  | |/\| | '_ \ / _` | |    \ \  _| || |_ _| || |_ _| || |_ 
+             _| || |_ _| || |_ _| || |_  |    \| | | | | | | '_ \  | |/\| | '_ \ / _` | |    \ \  _| || |_ _| || |_ _| || |_
             |_  __  _|_  __  _|_  __  _| | |\  \ | | | |_| | | | | \  /\  / | | | (_| | |.___/ / |_  __  _|_  __  _|_  __  _|
-              |_||_|   |_||_|   |_||_|   \_| \_/_|_|_|\__,_|_| |_|  \/  \/|_| |_|\__,_|_|\____/    |_||_|   |_||_|   |_||_|                                                                                             
+              |_||_|   |_||_|   |_||_|   \_| \_/_|_|_|\__,_|_| |_|  \/  \/|_| |_|\__,_|_|\____/    |_||_|   |_||_|   |_||_|
         ''')
         print(ValidationReport.RESET)
-    
-    @staticmethod   
+
+    @staticmethod
     def ascii_header():
+        ''' Report decoration.'''
         print(ValidationReport.Green)
-        print(f'''
-              _  _     _  _     _  _    ______                      _       _  _     _  _     _  _   
-            _| || |_ _| || |_ _| || |_  | ___ \                    | |    _| || |_ _| || |_ _| || |_ 
+        print('''
+              _  _     _  _     _  _    ______                      _       _  _     _  _     _  _
+            _| || |_ _| || |_ _| || |_  | ___ \                    | |    _| || |_ _| || |_ _| || |_
            |_  __  _|_  __  _|_  __  _| | |_/ /___ _ __   ___  _ __| |_  |_  __  _|_  __  _|_  __  _|
-            _| || |_ _| || |_ _| || |_  |    // _ \ '_ \ / _ \| '__| __|  _| || |_ _| || |_ _| || |_ 
+            _| || |_ _| || |_ _| || |_  |    // _ \ '_ \ / _ \| '__| __|  _| || |_ _| || |_ _| || |_
            |_  __  _|_  __  _|_  __  _| | |\ \  __/ |_) | (_) | |  | |_  |_  __  _|_  __  _|_  __  _|
-             |_||_|   |_||_|   |_||_|   \_| \_\___| .__/ \___/|_|   \__|   |_||_|   |_||_|   |_||_|  
-                                                | |                                                
-                                                |_|                                                                 
+             |_||_|   |_||_|   |_||_|   \_| \_\___| .__/ \___/|_|   \__|   |_||_|   |_||_|   |_||_|
+                                                | |
+                                                |_|
         ''')
         print(ValidationReport.RESET)
 
     @staticmethod
     def anim_starting():
+        ''' Report decoration.'''
         print("\033[2J")  # clear the screen
         for i in range(ValidationReport.REPEAT_TIMES):
             color = ValidationReport.COLORS[i % 3]
@@ -120,34 +119,38 @@ class ValidationReport:
 
     @staticmethod
     def ascii_starting(color=None):
+        ''' Report decoration.'''
         if color is None:
-            color = self.Green
+            color = ValidationReport.Green
         print(color)
-        print(f'''
-              _  _     _  _     _  _     _____ _             _   _                         _  _     _  _     _  _   
-            _| || |_ _| || |_ _| || |_  /  ___| |           | | (_)                      _| || |_ _| || |_ _| || |_ 
+        print('''
+              _  _     _  _     _  _     _____ _             _   _                         _  _     _  _     _  _
+            _| || |_ _| || |_ _| || |_  /  ___| |           | | (_)                      _| || |_ _| || |_ _| || |_
            |_  __  _|_  __  _|_  __  _| \ `--.| |_ __ _ _ __| |_ _ _ __   __ _          |_  __  _|_  __  _|_  __  _|
-           _| || |_ _| || |_ _| || |_   `--. \ __/ _` | '__| __| | '_ \ / _` |          _| || |_ _| || |_ _| || |_ 
+           _| || |_ _| || |_ _| || |_   `--. \ __/ _` | '__| __| | '_ \ / _` |          _| || |_ _| || |_ _| || |_
           |_  __  _|_  __  _|_  __  _| /\__/ / || (_| | |  | |_| | | | | (_| |  _ _ _  |_  __  _|_  __  _|_  __  _|
-            |_||_|   |_||_|   |_||_|   \____/ \__\__,_|_|   \__|_|_| |_|\__, | (_|_|_)   |_||_|   |_||_|   |_||_|  
-                                                                         __/ |                                     
-                                                                        |___/                                      
+            |_||_|   |_||_|   |_||_|   \____/ \__\__,_|_|   \__|_|_| |_|\__, | (_|_|_)   |_||_|   |_||_|   |_||_|
+                                                                         __/ |
+                                                                        |___/
         ''')
         print(ValidationReport.RESET)
 
     def print_report(self):
+        ''' Prints 'self' report.'''
         ValidationReport.print_reports(self.report)
 
     @staticmethod
     def sorted_name(p: List):
+        ''' Serializable method to use for sorting. '''
         return p[0]
 
     @staticmethod
     def print_reports(report: collections.defaultdict):
+        '''  Prints a given report. '''
         # Sorted by packge name
         ValidationReport.ascii_header()
         for package_name, status_obj in sorted(report.items(), key=ValidationReport.sorted_name):
-            is_good = status_obj['status'] == ValidationReport.PASS 
+            is_good = status_obj['status'] == ValidationReport.PASS
             print(ValidationReport.Blue, end="")
             print(f"{status_obj['name']} ", end="")
             print(ValidationReport.RESET, end="")
@@ -178,31 +181,19 @@ class ValidationReport:
         ValidationReport.ascii_footer()
 
 
-'''
-Problems:
-
-- Playstore will crash randomly....
-
-- we need a strategy to handle this scenario.
-    - Detect PlayStore closed.
-    - Uninstall current app (Possibly has started to download)
-    - Restart search/ discovery/ install process.
-'''
-
 class AppValidator:
-    ''' TODO
-     GetSize
-     - use uiautomator regex to find 73% of 581 MB | KB pattern to get the digits between 'of' and either MB or KB.
-    
+    '''
+        Main class to validate a broken app. Discovers, installs, opens and
+        logs in to apps.
     '''
 
     PICUTRES = "/home/killuh/Pictures"
     def __init__(
-            self, 
-            driver: webdriver.Remote, 
-            package_names: List[List[str]], 
-            transport_id: str, 
-            ARC_VERSION: ARC_VERSIONS, 
+            self,
+            driver: webdriver.Remote,
+            package_names: List[List[str]],
+            transport_id: str,
+            arc_version: ArcVersions,
             ip: str,
         ):
         self.driver = driver
@@ -218,16 +209,16 @@ class AppValidator:
         self.cur_act = None
         self.detector = ObjDetector()
         self.transport_id = transport_id
-        self.ARC_VERSION = ARC_VERSION
-        
+        self.arc_version = arc_version
+
     def check_playstore_invalid(self, package_name) -> bool:
-        ''' Checks if an app's package_name is invalid vai Google playstore URL 
+        ''' Checks if an app's package_name is invalid vai Google playstore URL
             If invalid, returns True
             If valid, returns False
         '''
-        
+
         url = f'https://play.google.com/store/apps/details?id={package_name}'
-        response = requests.get(url)
+        response = requests.get(url, timeout=5)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             error_section = soup.find('div', {'id': 'error-section'})
@@ -237,39 +228,27 @@ class AppValidator:
                 return False
         else:
             return True
-    
+
 
     def is_new_activity(self) -> bool:
         '''
             Calls adb shell dumpsys activity | grep mFocusedWindow
-
-
         '''
-
-        # cmd = ('adb', 'shell', 'dumpsys', 'activity', '|', 'grep', 'mFocusedWindow')
-        # text = subprocess.run(cmd, check=True, encoding='utf-8',
-        #                             capture_output=True).stdout.strip()
-        
-        # # mFocusedWindow=Window{3f50b2f u0 com.netflix.mediaclient/com.netflix.mediaclient.acquisition.screens.signupContainer.SignupNativeActivity}
-        # # Returns "u0 com.netflix.mediaclient/com.netflix.mediaclient.acquisition.screens.signupContainer.SignupNativeActivity"
-        # act_name = re.search(r"=Window{[^ ]* ([^}]*)}", text).group(1)
-
-        package, activity = get_cur_activty(self.transport_id,  self.ARC_VERSION)
+        package, activity = get_cur_activty(self.transport_id,  self.arc_version)
         act_name = f"{package}/{activity}"
-        self.prev_act = self.cur_act  # Update 
+        self.prev_act = self.cur_act  # Update
         self.cur_act = act_name
-
-        # Init 
+        # Init
         if self.prev_act is None:
             self.prev_act = act_name
-
         return self.prev_act != self.cur_act
-        
 
     def get_test_ss(self) -> bool:
         '''
-            Attempts to get SS of device and saves to a location where the object detector is configured to look.
-            This image will be used as the source to detect our buttons and fields.
+            Attempts to get SS of device and saves to a location where the
+                object detector is configured to look.
+            This image will be used as the source to detect our buttons and
+                fields.
         '''
         try:
             self.driver.get_screenshot_as_file(f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/test.png")
@@ -315,7 +294,7 @@ class AppValidator:
 
         # here we have a dict of results from detection
         # Consists of 4 labels
-        # We want to prioritize 
+        # We want to prioritize
             # 1. Click Google Auth
             # 2. Filling out Email and Password
             # 3. Click Continue button to attempt to get to a page with #1 or #2
@@ -369,23 +348,22 @@ class AppValidator:
 
 
     def get_coords(self, btn: List):
-        ''' Given a list of list representing a bounding box's top left & 
+        ''' Given a list of list representing a bounding box's top left &
             bottom right corners, return the mid point as a string to be
             compatible with adb shell input text.
-            
-            Args: 
-                btn = [[x1, y1], [x2, y2]] 
+
+            Args:
+                btn = [[x1, y1], [x2, y2]]
             Returns:
                 (x, y): List[str]
          '''
         x = (btn[0][0] + btn[1][0]) / 2
         y = (btn[0][1] + btn[1][1]) / 2
         return str(int(x)), str(int(y))
-        
-    
+
     def run(self):
         '''
-            Main loop of the Playstore class, starts the cycle of discovering, 
+            Main loop of the Playstore class, starts the cycle of discovering,
             installing, logging in and uninstalling each app from self.package_names.
 
             It ensures that the playstore is open at the beginning and that
@@ -402,16 +380,21 @@ class AppValidator:
                 self.report.add(app_package_name, app_title, ValidationReport.FAIL, error)
                 ERR = True
                 continue
-            
-            if not open_app(app_package_name, self.transport_id, self.ARC_VERSION):
+
+            if not open_app(app_package_name, self.transport_id, self.arc_version):
                 ERR = True
-                # TODO, we can also detect if we actually haev the package installed before just reporting else: Failed to open
                 if self.check_playstore_invalid(app_package_name):
-                    self.report.add(app_package_name, app_title, ValidationReport.FAIL, "App package is invalid, update/ remove from list.")
+                    self.report.add(app_package_name, app_title,
+                        ValidationReport.FAIL,
+                        "App package is invalid, update/ remove from list.")
                 elif not self.is_installed(app_package_name):
-                    self.report.add(app_package_name, app_title, ValidationReport.FAIL, "Failed to open because the package was not installed.")
+                    self.report.add(app_package_name, app_title,
+                        ValidationReport.FAIL,
+                        "Failed to open because the package was not installed.")
                 else:
-                    self.report.add(app_package_name, app_title, ValidationReport.FAIL, "Failed to open")
+                    self.report.add(app_package_name, app_title,
+                        ValidationReport.FAIL,
+                        "Failed to open")
 
             # TODO wait for activity to start intelligently, not just package
             # DEV: Using to scrape the first image of each app. (Will remove)
@@ -419,23 +402,27 @@ class AppValidator:
                 # At this point we have successfully launched the app.
                 # We can check
                 sleep(5) # ANR Period
-                crash_type, crashed_act = check_crash(app_package_name, start_time, self.transport_id)
-                if(not crash_type == CRASH_TYPE.SUCCESS):
-                    self.report.add(app_package_name, app_title, ValidationReport.FAIL, crash_type.value)
+                CrashType, crashed_act = check_crash(app_package_name,
+                                            start_time, self.transport_id)
+                if(not CrashType == CrashType.SUCCESS):
+                    self.report.add(app_package_name, app_title,
+                        ValidationReport.FAIL, CrashType.value)
                     continue
 
                 ###### Image Scraping #####
                 # sleep(8)  # Wait for app to finsh loading the "MainActivity"
                 _app_title = app_title.replace(" ", "_")  # Used to save screenshots of apps during DEV
                 # DEV SS
-                # self.driver.get_screenshot_as_file(f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/test.png")
+                # self.driver.get_screenshot_as_file(
+                #   f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/test.png"
+                # )
                 ###### END  Image Scraping #####
 
-                # TODO, improve open_app to detect failures more robustly.
-                self.report.add(app_package_name, app_title, ValidationReport.PASS, '')  # For now, if app opens without error, we will sayy its successful
-                
-                
-                # TODO Do login, building obj detection            
+                # For now, if app opens without error, we'll report successful
+                self.report.add(app_package_name, app_title,
+                    ValidationReport.PASS, '')
+
+                # TODO Do login, building obj detection
                 login_attemps = 0
                 logged_in = False
                 while not logged_in and login_attemps < 4:
@@ -443,21 +430,21 @@ class AppValidator:
                     # Throws an error and stays in continuous loop....
                     sleep(5)
                     logged_in = self.handle_login()
-                    sleep(2) # Wait 2s, reattempt    
+                    sleep(2) # Wait 2s, reattempt
                     login_attemps += 1
                 if not logged_in:
-                    self.report.add(app_package_name, app_title, ValidationReport.PASS, 'Failed to log in')  
+                    self.report.add(app_package_name, app_title,
+                        ValidationReport.PASS, 'Failed to log in')
 
-            
-                # input("Close app")            
+                # input("Close app")
                 close_app(app_package_name, self.transport_id)
-            
+
                 # Change the orientation to portrait
                 self.driver.orientation = 'PORTRAIT'
-                open_app(PLAYSTORE_PACKAGE_NAME, self.transport_id, self.ARC_VERSION)
-                
-                self.uninstall_app(app_package_name)  # (save space) 
-    
+                open_app(PLAYSTORE_PACKAGE_NAME, self.transport_id, self.arc_version)
+
+                self.uninstall_app(app_package_name)  # (save space)
+
     def tap_screen(self, x:str, y:str):
         try:
             print(f"Tapping ({x},{y})")
@@ -468,8 +455,7 @@ class AppValidator:
             print("Error tapping app", e)
             return False
         return True
-    
-    
+
     def is_open(self, package_name: str) -> bool:
         cmd = ('adb', '-t', self.transport_id, 'shell', 'pidof', package_name)
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
@@ -477,7 +463,7 @@ class AppValidator:
         print(outstr)
         return len(outstr) > 0
 
-    def is_installed(self, package_name: str) -> bool: 
+    def is_installed(self, package_name: str) -> bool:
         """Returns whether package_name is installed.
         Args:
             package_name: A string representing the name of the application to
@@ -488,9 +474,9 @@ class AppValidator:
         cmd = ('adb', '-t', self.transport_id, 'shell', 'pm', 'list', 'packages')
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
             capture_output=True).stdout.strip()
-        full_pkg_regexp = fr'^package:({re.escape(package_name)})$' ## for partial surround like: .*{}.*
+        full_pkg_regexp = fr'^package:({re.escape(package_name)})$'
         regexp = full_pkg_regexp
-        
+
         # IGNORECASE is needed because some package names use uppercase letters.
         matches = re.findall(regexp, outstr, re.MULTILINE | re.IGNORECASE)
         if len(matches) == 0:
@@ -506,9 +492,11 @@ class AppValidator:
 
     def is_installed_UI(self):
         '''
-            Checks for the presence of the Uninstall button indicating that the app has completely finished installing.
+            Checks for the presence of the Uninstall button indicating that the
+                app has completely finished installing.
 
-            Using adb shows that the app is installed well before PlayStore UI says its ready to open.
+            Using adb shows that the app is installed well before PlayStore UI
+                says its ready to open.
         '''
         max_wait = 420  # 7 mins, Large gaming apps may take a while to download.
         content_desc = 'Uninstall'
@@ -516,7 +504,9 @@ class AppValidator:
         t = time()
         while not ready and (time() - t) < max_wait:
             try:
-                content_desc = f'''new UiSelector().className("android.widget.Button").text("Uninstall")'''
+                content_desc = f'''
+                    new UiSelector().className("android.widget.Button").text("Uninstall")
+                '''
                 self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
                 # # Pixel 2
                 print("Searching for uninstall button....")
@@ -528,18 +518,20 @@ class AppValidator:
                 sleep(0.5)
 
             try:
-                self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value="Uninstall")  # implicit wait time here, also
+                self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value="Uninstall")
                 ready = True
             except Exception as e:
                 print("App not ready to open, retrying...")
                 sleep(0.5)
-        return ready            
-    
+        return ready
+
     def needs_purchase(self) -> bool:
         # Pixel 2
         # Chromebook (I think this works with Pixel2 also)
         try:
-            content_desc = f'''new UiSelector().className("android.widget.Button").textMatches(\"\$\d+\.\d+\")'''
+            content_desc = f'''
+                new UiSelector().className("android.widget.Button").textMatches(\"\$\d+\.\d+\")
+            '''
             print("Searching for Button with Price...", content_desc)
             self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
             return True
@@ -551,8 +543,8 @@ class AppValidator:
             self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
             return True
         except Exception as e:
-            return False        
-   
+            return False
+
     def needs_update(self) -> bool:
         '''
             Checks if apps needs an update via the UI on the playstore app details page.
@@ -564,12 +556,12 @@ class AppValidator:
             self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
             return True
         except Exception as e:
-            return False        
+            return False
 
     def uninstall_multiple(self):
         for name in [pack_info[1] for pack_info in self.package_names]:
             self.uninstall_app(name)
-        
+
     def uninstall_app(self, package_name: str):
         '''
             Uninstalls app and waits 40 seconds or so while checking if app is still installed.
@@ -584,7 +576,7 @@ class AppValidator:
             uninstalled = True
         except Exception as e:
             print("Error uninstalling: ", package_name, e)
-        
+
         if uninstalled:
             try:
                 sleep_cycle = 0
@@ -613,62 +605,47 @@ class AppValidator:
 
     def return_error(self, last_step: int, error: str):
         if last_step == 0:
-            self.driver.back() 
+            self.driver.back()
             return [False, f"Failed: {self.steps[0]}"]
         elif last_step == 1:
-            self.driver.back() 
+            self.driver.back()
             return [False, f"Failed: {self.steps[1]}"]
         elif last_step == 2:
-            self.driver.back() 
+            self.driver.back()
             return [False, f"Failed: {self.steps[2]}"]
         elif last_step == 3:
-            self.driver.back() 
-            self.driver.back()  
+            self.driver.back()
+            self.driver.back()
             print(f"Failed: {self.steps[3]} :: {error}")
             return [False, f"Failed: {self.steps[3]} :: {error}"]
 
     def click_playstore_search(self):
         print("Clicking search icon...")
         search_icon = None
-        content_desc = f'''new UiSelector().className("android.widget.TextView").text("Search for apps & games")'''
+        content_desc = f'''
+            new UiSelector().className("android.widget.TextView").text("Search for apps & games")
+        '''
         search_icon = self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
         search_icon.click()
-        # if self.ARC_VERSION == ARC_VERSIONS.ARC_P:
-        #     search_icon = self.driver.find_element(by=AppiumBy.XPATH, value="/hierarchy/android.widget.FrameLayout/android.widget.LinearLayout/android.widget.FrameLayout/android.widget.FrameLayout/android.widget.FrameLayout/androidx.drawerlayout.widget.DrawerLayout/android.widget.FrameLayout/android.widget.FrameLayout[2]/android.widget.FrameLayout/android.view.ViewGroup/android.view.ViewGroup/android.widget.FrameLayout[1]/android.view.ViewGroup/android.widget.ImageView")
-        # elif self.ARC_VERSION == ARC_VERSIONS.ARC_R:
-        #     # ToDo figure out a way to choose or just try each...
-        #     # Helios 
-        #     content_desc = f'''new UiSelector().className("android.widget.TextView").text("Search for apps & games")'''
-        #     self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
-            
-        #     # CoachZ 
-        #     search_icon = self.driver.find_element(by=AppiumBy.XPATH, value='//android.view.View[@content-desc="Search Google Play"]'
-
 
     def send_keys_ADB(self, title: str):
         title_search = self.escape_chars(title)
         print("Searching: ", title_search)
         cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'text', title_search)
-        outstr = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+        subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
         cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'keyevent', ADB_KEYCODE_ENTER)
-        outstr = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+        subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
         sleep(2)
 
     def press_app_icon(self, title: str):
         '''
-        
-        # Sometime the app has a different view on the same device.
-        contentdesc = App: My Boy! - GBA Emulator Fast Emulator Arcade Star rating: 4.6 1,000,000+ downloads $4.99
-        
+            # Sometime the app has a different view on the same device.
+            contentdesc = App: My Boy! - GBA Emulator Fast Emulator Arcade Star rating: 4.6 1,000,000+ downloads $4.99
 
-        Emulator:
-            Image of app or game icon for Roblox
-
-            
+            Emulator:
+                Image of app or game icon for Roblox
         '''
         title_first = title.split(" ")[0]
-        
-        # content_desc = f'''new UiSelector().descriptionMatches(\".*{title_first}.*.*\\n.*\\n.*\\n.*\\n.*\\n.*\\n\");'''
         descs = [
             f'''new UiSelector().descriptionMatches(\".*{title_first}.*\");''', # Pixel 2
             f'''new UiSelector().descriptionMatches(\"App: {title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");''',  # Chromebooks
@@ -686,26 +663,26 @@ class AppValidator:
                         icon.click()
                         sleep(2)
                         return
-                    
+
                     input("Next icon...")
             except Exception as e:
                 pass
         raise("Icon not found!")
-            
+
     def extract_numbers(self, bounds: str):
+        '''
+            Given [882,801][1014,933], return [882,801,1014,933].
+        '''
         return [int(x) for x in re.findall(r'\d+', bounds)]
 
     def click_unknown_install_btn(self, bounds: List[int]):
         print("Bounds", type(bounds), bounds)
         x1, y1, x2, y2 = bounds
-        x = int(x2 * 0.75)  
+        x = int(x2 * 0.75)
         y = (y1 + y2) // 2
         print("Tapping ",x ,y)
         self.tap_screen(str(x), str(y))
         sleep(2)
-
-
-
 
     def install_app_UI(self, install_package_name: str):
         '''
@@ -714,33 +691,22 @@ class AppValidator:
             2. Price
             3. Cancel / Play[Open]
             4. Uninstall / Play[Open]
-        
+
         '''
         already_installed = False  # Potentailly already isntalled
         err = False
         try:
-            # install_BTN = None
-            # if self.ARC_VERSION == ARC_VERSIONS.ARC_P:
-            # elif self.ARC_VERSION == ARC_VERSIONS.ARC_R:
-            #     install_BTN = self.driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value='Install')
-            
-            # Emulator doesnt have a button with text, instead of text, its a view with no text.
-            content_desc = f'''new UiSelector().className("android.widget.Button").text("Install")'''
-            install_BTN = self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
-            print("Clicked forst install button.")
+            content_desc = f'''
+                new UiSelector().className("android.widget.Button").text("Install")
+            '''
+            install_BTN = self.driver.find_element(
+                by=AppiumBy.ANDROID_UIAUTOMATOR,
+                value=content_desc)
             install_BTN.click()
-        
-            
-
-            # TODO Before checking this, we need to check price first......
-            # BReak this method up into at least two different methods....
-        
-            
-        except Exception as e:  # Install btn not found    
+        except Exception as e:  # Install btn not found
             err = True
             print("Failed to find 1st install button on transport id: ", self.transport_id)
             already_installed = self.is_installed(install_package_name)
-
 
         # Error finding/Clicking Install button  amd app is not installed still...
         if err and not already_installed:
@@ -748,44 +714,42 @@ class AppValidator:
             if self.needs_purchase():
                 print("raising needs purchase")
                 raise Exception("Needs purchase")
-            
+
             if self.needs_update():
                 print("raising needs update")
                 raise Exception("Needs update")
-            
 
             # Now, Install and Price, Update are not present,
-            # To get here, we must be looking for a package 
+            # To get here, we must be looking for a package
             # com.abc.foogame
-            # When we search by name, foogame, 
+            # When we search by name, foogame,
             # The app foogame, by com.zyx.foogames is actually showing.
             # So we check if the packge is installed via ADB cmd because this will be a source of truth
             # Therefore, at this point we have an installed app, that doesnt match our targeted package name.
-            # NOTE: On the first run, it will install this package and report as correct....
-
+            # TODO() :NOTE: On the first run, it will install this package and report as correct....
 
             # However, on emualtors, we can still check for the install button since it is not the same as other devices
             # If Install btn not found, PRice or Update not present, check for "Install on more devices" button, if found we are
             #   most liekly on an emulator and we can click install.
-
             try:
-                content_desc = f'''new UiSelector().className("android.widget.Button").descriptionMatches("Install on more devices")'''
-                install_BTN = self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
-                #  [882,801][1014,933]
-                bounds = self.extract_numbers(install_BTN.get_attribute("bounds"))
-                print('Install btn bounds', type(bounds), bounds)
+                content_desc = f'''
+                    new UiSelector().className("android.widget.Button").descriptionMatches("Install on more devices")
+                '''
+                install_BTN = self.driver.find_element(
+                    by=AppiumBy.ANDROID_UIAUTOMATOR,
+                    value=content_desc)
+                bounds = self.extract_numbers(
+                    install_BTN.get_attribute("bounds"))
                 self.click_unknown_install_btn(bounds)
             except:
-                raise Exception(f"Program installed incorrect package, {install_package_name} was not actually installed")
-        
-        
+                raise Exception(
+                    f"Program installed incorrect package,\
+                        {install_package_name} was not actually installed")
+
         # We have successfully clicked an install buttin
         # 1. We wait for it to download. We will catch if its the correct package or not after installation.
         if not self.is_installed_UI():  # Waits up to 7mins to find install button.
-            # If returns False, (after 7mins)
             raise Exception("Failed to install app!!")
-        
-
 
     def discover_and_install(self, title: str, install_package_name: str):
         '''
@@ -794,7 +758,7 @@ class AppValidator:
         try:
             error = None
             last_step = 0  # track last sucessful step to, atleast, report in console.
-            
+
             self.click_playstore_search()
 
             last_step = 1
@@ -806,7 +770,7 @@ class AppValidator:
             # input("Press app icon # 2")
 
             last_step = 3
-            
+
             # input("Step 3, press install")
             self.install_app_UI(install_package_name)
             # input("Step 3, press install")
@@ -820,13 +784,14 @@ class AppValidator:
                 return [True, None]
             else:
                 # Debug
-                print("\n\n", title, install_package_name, "Failed on step: ", last_step, self.steps[last_step])
+                print("\n\n",
+                    title,
+                    install_package_name,
+                    "Failed on step: ",
+                    last_step,
+                    self.steps[last_step])
                 print("Eror:::: ", error)
-                
                 return self.return_error(last_step, error)
-
-
-
 
 
 
