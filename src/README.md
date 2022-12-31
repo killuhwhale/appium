@@ -1,6 +1,6 @@
 Example Output
 
-<img src="https://raw.githubusercontent.com/killuhwhale/appium/main/src/images/readme/playstore_output.png?sanitize=true&raw=true" />
+<img src="https://raw.githubusercontent.com/killuhwhale/appium/main/src/images/readme/demo_output.png?sanitize=true&raw=true" />
 <video src="https://raw.githubusercontent.com/killuhwhale/appium/main/src/images/readme/DEMO_APPIUM.MOV?sanitize=true&raw=true" />
 
 
