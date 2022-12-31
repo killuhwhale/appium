@@ -1,3 +1,4 @@
+from collections import defaultdict
 from multiprocessing import Process, Queue
 import signal
 import sys
@@ -10,7 +11,9 @@ from typing import AnyStr, List, Dict
 from appium import webdriver
 from appium.webdriver.common.appiumby import AppiumBy
 from selenium.common.exceptions import WebDriverException
-from utils.utils import ARC_VERSIONS, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, TOP_500_APPS, adb_connect, android_des_caps, find_transport_id, get_arc_version
+from utils.utils import (
+    ARC_VERSIONS, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, TOP_500_APPS,
+    adb_connect, android_des_caps, find_transport_id, get_arc_version)
 
 
 def validate_task(queue: Queue, packages: List[List[str]], ip: str):
@@ -34,8 +37,8 @@ def validate_task(queue: Queue, packages: List[List[str]], ip: str):
     driver.implicitly_wait(5)
     driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
     
-    validator = AppValidator(driver, packages, transport_id, version)
-    # validator.uninstall_multiple()
+    validator = AppValidator(driver, packages, transport_id, version, ip)
+    validator.uninstall_multiple()
     validator.run()
     print("Putting driver & valdiator")
     driver.quit()
@@ -54,6 +57,7 @@ class MultiprocessTaskRunner:
         self.ips = ips
         self.packages = packages
         self.processes = []
+        self.packages_recvd = defaultdict(list)
 
         signal.signal(signal.SIGINT, self.handle_sigint)
 
@@ -125,6 +129,9 @@ class MultiprocessTaskRunner:
                 rem_packages -= 1
             else:
                 packages_to_test = self.packages[start: end]
+            
+            print(f"Gave {ip} start - end: {start} - {end}")
+            self.packages_recvd[ip] = [start, end]
             start = end
 
             process = Process(target=validate_task, args=(self.queue, packages_to_test, ip ))

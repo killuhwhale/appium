@@ -161,6 +161,24 @@ def find_transport_id(ip_address)-> str:
     return '-1'
 
 
+def is_emulator(transport_id: str):
+    ''' Checks if device is an emulator.
+
+        Params: 
+            transport_id: The transport id of the connected android device.
+
+        Returns:
+            A boolean representing if it's an emulator or not.
+    '''
+
+    cmd = ('adb','-t', transport_id, 'shell', 'getprop', "ro.build.characteristics")
+    try:
+        res = subprocess.run(cmd,  encoding='utf-8', capture_output=True).stdout.strip()
+        print("Res: ", res)
+        return res == "emulator"
+    except Exception as e:
+        print("Failed to check for emualtor", e)
+    return False
 def get_arc_version(transport_id: str):
     ''' Gets Android OS version on connected device.
 
@@ -316,14 +334,14 @@ IMAGE_LABELS = [
 ]
 
 PACKAGE_NAMES = [
-    [ "Rocket League Sideswipe", "com.Psyonix.RL2D"],
-    # ['My Boy! - GBA Emulator', 'com.fastemulator.gba'],  # Purchase required, unable to install...
     # [ "Rocket League Sideswipe", "com.Psyonix.RL2D"],
-    ['Netflix', 'com.netflix.mediaclient'],  # Unable to take SS of app due to protections.
-    # ['Roblox', 'com.roblox.client'],
-    ['YouTube Kids', 'com.google.android.apps.youtube.kids'],
+    ['Roblox', 'com.roblox.client'],
+    ['Garena Free Fire', 'com.dts.freefireth'],
+    ['My Boy! - GBA Emulator', 'com.fastemulator.gba'],  # Purchase required, unable to install...
     ['Messenger', 'com.facebook.orca'],
-    ['Free Fire', 'com.dts.freefireth'],
+    ['Netflix', 'com.netflix.mediaclient'],  # Unable to take SS of app due to protections.
+    ['YouTube Kids', 'com.google.android.apps.youtube.kids'],
+    # ['Messenger', 'com.facebook.orca'],
     ['Gacha Club', 'air.com.lunime.gachaclub'],
     ['Messenger Kids', 'com.facebook.talk'],
     ['Among Us!', 'com.innersloth.spacemafia'],
