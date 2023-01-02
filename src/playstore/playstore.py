@@ -184,7 +184,7 @@ class AppValidator:
     
     '''
 
-    PICUTRES = "/home/killuh/Pictures"
+    PICUTRES = "/Users/ethancox/Pictures/appium_pictures"
     def __init__(self, driver: webdriver.Remote, package_names: List[List[str]], transport_id: str, ARC_VERSION: ARC_VERSIONS):
         self.driver = driver
         self.package_names = package_names  # List of packages to test as [app_title, app_package_name]
@@ -256,7 +256,7 @@ class AppValidator:
             This image will be used as the source to detect our buttons and fields.
         '''
         try:
-            self.driver.get_screenshot_as_file(f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/test.png")
+            self.driver.get_screenshot_as_file(f"/Users/ethancox/Documents/appium/src/notebooks/yolo_images/test_data/images/test.png")
             return True
         except ScreenshotException as e:
             print("App is scured!")
@@ -403,10 +403,13 @@ class AppValidator:
 
 
                 ###### Image Scraping #####
-                # sleep(8)  # Wait for app to finsh loading the "MainActivity"
+                sleep(20)  # Wait for app to finsh loading the "MainActivity"
                 _app_title = app_title.replace(" ", "_")  # Used to save screenshots of apps during DEV
                 # DEV SS
                 # self.driver.get_screenshot_as_file(f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/test.png")
+                location = f"/Users/ethancox/Documents/appium/src/notebooks/yolo_images/train_data/images/{_app_title}.png"
+                print(location)
+                self.driver.get_screenshot_as_file(location)
                 ###### END  Image Scraping #####
 
                 # TODO, improve open_app to detect failures more robustly.
@@ -414,7 +417,7 @@ class AppValidator:
                 
                 
                 # TODO Do login, building obj detection            
-                login_attemps = 0
+                '''login_attemps = 0
                 logged_in = False
                 while not logged_in and login_attemps < 4:
                     # ChromeOS does have mFocusedWindow -> get_cur_activty -> is_new_activity
@@ -424,7 +427,7 @@ class AppValidator:
                     sleep(2) # Wait 2s, reattempt    
                     login_attemps += 1
                 if not logged_in:
-                    self.report.add(app_package_name, app_title, ValidationReport.PASS, 'Failed to log in')  
+                    self.report.add(app_package_name, app_title, ValidationReport.PASS, 'Failed to log in')'''
 
             
                 # input("Close app")            
@@ -532,8 +535,9 @@ class AppValidator:
             return False        
 
     def uninstall_multiple(self):
-        for name in [pack_info[1] for pack_info in self.package_names]:
-            self.uninstall_app(name)
+        for name in [pack_info for pack_info in self.package_names]:
+            print(name)
+            self.uninstall_app(name[1])
         
     def uninstall_app(self, package_name: str):
         '''
@@ -631,12 +635,18 @@ class AppValidator:
         title_first = title.split(" ")[0]
         
         # content_desc = f'''new UiSelector().descriptionMatches(\".*{title_first}.*.*\\n.*\\n.*\\n.*\\n.*\\n.*\\n\");'''
-        descs = [
-            f'''new UiSelector().descriptionMatches(\".*{title_first}.*\");''', # Pixel 2
-            f'''new UiSelector().descriptionMatches(\"App: {title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");''',  # Chromebooks
-            f'''new UiSelector().descriptionMatches(\"{title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");''',
-
-        ]
+        if title_first == 'Google':
+            descs = [
+                f'''new UiSelector().descriptionMatches(\".*{title}.*\");''',  # Pixel 2
+                f'''new UiSelector().descriptionMatches(\"App: {title}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");''', # Chromebooks
+                f'''new UiSelector().descriptionMatches(\"{title}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");'''
+            ]
+        else:
+            descs = [
+                f'''new UiSelector().descriptionMatches(\".*{title_first}.*\");''',  # Pixel 2
+                f'''new UiSelector().descriptionMatches(\"App: {title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");''', # Chromebooks
+                f'''new UiSelector().descriptionMatches(\"{title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");'''
+            ]
         app_icon = None
         for content_desc in descs:
             print("Searhing for app_icon with content desc: ", content_desc)
@@ -725,9 +735,9 @@ class AppValidator:
             self.press_app_icon(title)
 
             last_step = 3
-            input("Step 3, press install")
+            print("Step 3, press install")
             self.install_app_UI(install_package_name)
-            input("Step 3, press install")
+            print("Step 3, press install")
                     
             self.driver.back()  # back to seach results
             self.driver.back()  # back to home page
@@ -741,7 +751,7 @@ class AppValidator:
                 print("\n\n", title, install_package_name, "Failed on step: ", last_step, self.steps[last_step])
                 print("Eror:::: ", error)
                 if last_step == 2:
-                    input('Error')  # Debug
+                    print('Error')  # Debug
                 return self.return_error(last_step, error)
 
 

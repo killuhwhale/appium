@@ -12,6 +12,30 @@ from utils.utils import (
     ARC_VERSIONS, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, TOP_500_APPS, 
     adb_connect, android_des_caps, check_for_win_death, check_force_remove_record,
     find_transport_id, get_arc_version, get_cur_activty, get_start_time, open_app)
+import subprocess
+import re
+
+
+if __name__ == '__main__':
+
+    # Find all the connected devices through adb.
+    cmd = ('adb', 'devices')
+    outstr = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+    ips_re = '(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:5555)'
+    ips = re.findall(ips_re, outstr, re.MULTILINE | re.IGNORECASE)
+    print(ips)
+
+    '''ips = [
+        '192.168.1.238:5555',
+        '192.168.1.113:5555',
+        # '710KPMZ0409387',  # Device connected via USB (Pixel 2)
+
+    ]'''
+
+    # Multiprocessing Runs
+    print(len(TOP_500_APPS))
+    runner = MultiprocessTaskRunner(ips, TOP_500_APPS)
+    runner.run()
 
 
 # Multiprocessing Runs
@@ -29,7 +53,7 @@ from utils.utils import (
 #   Single run
 ###################################
 
-ip = '710KPMZ0409387' # ARC-R
+'''ip = '710KPMZ0409387' # ARC-R
 ip = '192.168.1.238:5555' # ARC-R Helios, Failing on install step ##*#*#*#*#*#**#*##*
 ip = '192.168.1.113:5555' # ARC-P
 
@@ -38,8 +62,8 @@ transport_id = find_transport_id(ip)
 version = get_arc_version(transport_id)
 
 stop = ""
-test_txt = '''
-12-28 17:43:22.474   153   958 I ActivityManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.Psyonix.RL2D/com.epicgames.ue4.SplashActivity} from uid 2000
+''''''test_txt = '''
+'''12-28 17:43:22.474   153   958 I ActivityManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.Psyonix.RL2D/com.epicgames.ue4.SplashActivity} from uid 2000
 12-28 17:43:22.494   153   958 I ActivityManagerInjectorArc: notifyActivityAddedToTask: added to new task. activity=ActivityRecord{dc0b424 u0 com.Psyonix.RL2D/com.epicgames.ue4.SplashActivity t190}
 12-28 17:43:22.497   153   958 I ActivityManagerInjectorArc: notifyActivityAddedToTask: added to new task. activity=ActivityRecord{dc0b424 u0 com.Psyonix.RL2D/com.epicgames.ue4.SplashActivity t190}
 12-28 17:43:23.055  8171  8171 I chatty  : uid=10176(com.Psyonix.RL2D) expire 157 lines
@@ -109,13 +133,13 @@ test_txt = '''
 12-28 17:46:56.122   153  5488 I ActivityManagerInjectorArc: notifyActivityAddedToTask: added to new task. activity=ActivityRecord{9399406 u0 com.Psyonix.RL2D/com.epicgames.ue4.SplashActivity t192}
 
 '''
-while stop != "q":
-    '''
+'''while stop != "q":
+    ''''''
         adb -t 10 logcat | grep -i com.Psyonix.RL2D
         12-28 17:48:37.233   153   235 I WindowManager: WIN DEATH: Window{913e5ce u0 com.Psyonix.RL2D/com.epicgames.ue4.GameActivity}
         12-28 17:48:37.254   153  4857 W ActivityManager: Force removing ActivityRecord{f024fcc u0 com.Psyonix.RL2D/com.epicgames.ue4.GameActivity t195}: app died, no saved state
 
-    '''
+    ''''''
     start_time = get_start_time()
     open_app(TOP_500_APPS[0][1] ,str(transport_id), version)
     sleep(9)
@@ -141,7 +165,7 @@ validator = AppValidator(driver, TOP_500_APPS[:5], transport_id, version)
 # validator.uninstall_multiple()
 validator.run()
 validator.report.print_report()
-driver.quit()
+driver.quit()'''
 
 
 
