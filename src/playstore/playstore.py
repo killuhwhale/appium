@@ -1,4 +1,6 @@
+import __main__
 import collections
+import os
 import re
 import requests
 import subprocess
@@ -250,13 +252,21 @@ class AppValidator:
             This image will be used as the source to detect our buttons and
                 fields.
         '''
+
+        # Removes first empty index and 'main.py' from "/path/to/src/main.py"
+        #    ['', 'path', 'to', 'src', 'main.py']
+        root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
+        root_path = '/'.join(root_path)
+        print("\n\n Saving SS to : ", f"/{root_path}/notebooks/yolo_images/test.png","\n\n")
         try:
-            self.driver.get_screenshot_as_file(f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/test.png")
+            self.driver.get_screenshot_as_file(f"/{root_path}/notebooks/yolo_images/test.png")
             return True
         except ScreenshotException as e:
             print("App is scured!")
         except Exception as e:
             print("Error taking SS: ", e)
+
+        print("Error taking SS: ", root_path)
         return False
 
     def sorted_conf(self, p: List):
