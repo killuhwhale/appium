@@ -6,7 +6,7 @@ from notebooks.yolov5.detect import run
 
 class ObjDetector:
     ''' Interface to custom trained YOLOv5 Object detection model. '''
-    def __init__(self, img_name = "test.png", weights=['notebooks/yolov5/runs/train/exp11/weights/best.pt']):
+    def __init__(self, img_name = "test.png", weights=['notebooks/yolov5/runs/train/exp007/weights/best.pt']):
         self.opt = Namespace(
             agnostic_nms=False,
             augment=False,
