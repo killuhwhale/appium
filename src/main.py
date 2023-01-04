@@ -10,9 +10,9 @@ from utils.utils import (PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME,
 
 ips = [
     # '192.168.1.238:5555',
-    # '192.168.1.113:5555',
     # 'emulator-5554',
-    '710KPMZ0409387',  # Device connected via USB (Pixel 2)
+    # '710KPMZ0409387',  # Device connected via USB (Pixel 2)
+    '192.168.1.113:5555',
 
 ]
 runner = MultiprocessTaskRunner(ips, TOP_500_APPS[0:4])
@@ -22,31 +22,31 @@ runner.run()
 #   Single run
 ###################################
 
-ip = '710KPMZ0409387' # ARC-R
-ip = 'emulator-5554' # ARC-R
-ip = '192.168.1.113:5555' # ARC-P
-ip = '192.168.1.238:5555' # ARC-R Helios, Failing on install step ##*#*#*#*#*#**#*##*
+# ip = '710KPMZ0409387' # ARC-R
+# ip = 'emulator-5554' # ARC-R
+# ip = '192.168.1.113:5555' # ARC-P
+# ip = '192.168.1.238:5555' # ARC-R Helios, Failing on install step ##*#*#*#*#*#**#*##*
 
-res = adb_connect(ip)
-transport_id = find_transport_id(ip)
-version = get_arc_version(transport_id)
+# res = adb_connect(ip)
+# transport_id = find_transport_id(ip)
+# version = get_arc_version(transport_id)
 
-driver = webdriver.Remote(
-    "http://localhost:4723/wd/hub",
-    android_des_caps(
-        ip,
-        PLAYSTORE_PACKAGE_NAME,
-        PLAYSTORE_MAIN_ACT
-    )
-)
-driver.implicitly_wait(5)
-driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
+# driver = webdriver.Remote(
+#     "http://localhost:4723/wd/hub",
+#     android_des_caps(
+#         ip,
+#         PLAYSTORE_PACKAGE_NAME,
+#         PLAYSTORE_MAIN_ACT
+#     )
+# )
+# driver.implicitly_wait(5)
+# driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
 
-validator = AppValidator(driver, TOP_500_APPS[:1], transport_id, version, ip)
-validator.uninstall_multiple()
-validator.run()
-validator.report.print_report()
-driver.quit()
+# validator = AppValidator(driver, TOP_500_APPS[:1], transport_id, version, ip)
+# validator.uninstall_multiple()
+# validator.run()
+# validator.report.print_report()
+# driver.quit()
 
 
 
