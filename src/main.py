@@ -10,9 +10,9 @@ from utils.utils import (PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME,
 
 ips = [
     # '192.168.1.238:5555',
-    # 'emulator-5554',
     # '710KPMZ0409387',  # Device connected via USB (Pixel 2)
-    '192.168.1.113:5555',
+    # '192.168.1.113:5555',
+    'emulator-5554',
 
 ]
 runner = MultiprocessTaskRunner(ips, TOP_500_APPS[0:4])

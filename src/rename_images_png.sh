@@ -6,8 +6,9 @@
 # This script will loop through all .png files in the specified directory, generate a new filename using a
 #  counter that starts at 0 and increases by 1 for each file, and then rename the file.
 
-# chmod +x rename_images_png.sh 
-# ./rename_images_png.sh ~/Pictures/
+# chmod +x rename_images_png.sh
+# Starting renaming png files in given dir starting at given num.
+# ./rename_images_png.sh ~/Pictures/ 69
 
 
 # Make sure a directory is provided as an argument
@@ -21,7 +22,7 @@ fi
 cd "$1"
 
 # Initialize a counter
-counter=0
+counter=$2
 
 # Loop through all .png files in the directory
 for file in *.png

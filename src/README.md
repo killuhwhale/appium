@@ -4,26 +4,78 @@ Example Output
 <video src="https://drive.google.com/open?id=1kztEqXsqcLiEa24NN3vr3_ddeH0D0re4&authuser=0&usp=drive_link" />
 
 
+Prep work for Chromebook:
+- DUT
+    - Install Accounts for testing.
+- Host device
+    - Refer to documentation
+
+
 # Need to test on Chromebook
 Need to understand if devices will have preinstalled accounts
     - Need accounts like testminnie001@gmail.com logged into device
-    - 
 
 Problems:
+    - Figure out a strategy/ design for loggin into apps w/ a variety of accounts.
+
+    Store Packages with accounts.
+
+    APP_CREDS = {
+        package_name: {
+            strat: ['inputFields' | 'GoogleAuthText' | 'GoogleAuthOCR' | "FBAuthText" | "FBAuthOCR" ],
+            accounts: [['email/username/phonenumber', 'password'], [], ...]
+            auth_accounts_text: ['email text'] # This should work for Google, they show Rows with Profile Icon & Email, not exactly sure for FaceBook.
+            auth_accounts_OCR: [ '/path/to/account_icon.png']
+        },
+        com.roblox: {
+            strat: ['inputFields'],
+            accounts: [['testminnie001@gmail.com', 'testminnie123'],]
+            auth_accounts_text: []
+            auth_accounts_OCR: []
+        },
+        com.netflix: {
+            strat: ['Google Auth text'],
+            accounts: []
+            auth_accounts_text: ['testminnie001@gmail.com']
+            auth_accounts_OCR: []
+        }
+        com.anothaone: {
+            strat: ['Google Auth OCR'],
+            accounts: []
+            auth_accounts_text: []
+            auth_accounts_OCR: ['/path/to/profile-icon.png']
+        }
+    }
+
+
+    # For each app we will know the stratgeyt to use.
+    We can then build multiple handle_login() flows to handle each strategy.
+        - We already need to build something to login, so we already need to map accounts to apps for login.
+            - No way around that
+            -
+        - For each app we decide to user input fields or SSO Auth from Google or FaceBook
+
+        - For input field login:
+            - We need a set of email/password strings to use for each app
+        - For SSO:
+            - In order to click the right account
+            - We need a string or an icon to search the screen for.
+                - String: email to use OCR to find location on screen.
+                - Icon: image of account icon to find.
 
 
 
-com.google.android.contacts
-- wont uninstall
-    Makes the beginning uninstall check take a long time
+
+
+
+
+
+    - com.google.android.contacts
+        - wont uninstall
+            Makes the beginning uninstall check take a long time
 
 
 TODO:
-
-
-- Detect 'bad' chars -> ó
-    - Adb shell struggles to send these.
-    - Need to find a solution
 
 Features/ Optimizations:
 - Get size of an app to anticipate download time
@@ -54,5 +106,5 @@ Features/ Optimizations:
 #                                   appPackage: '',
 #                                   action: 'allow',
 # })
-#  mobile: 
+#  mobile:
 

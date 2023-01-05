@@ -15,6 +15,7 @@ from selenium.webdriver.common.actions.action_builder import ActionBuilder
 from selenium.webdriver.common.actions.pointer_input import PointerInput
 from time import sleep, time
 from typing import List
+from keyboard.keyboard import send_text_ime
 
 from objdetector.objdetector import ObjDetector
 from utils.utils import (
@@ -630,6 +631,12 @@ class AppValidator:
             return [False, f"Failed: {self.steps[3]} :: {error}"]
 
     def click_playstore_search(self):
+        ''' Clicks Search Icon
+
+            There is an animation when first opening app and the label is visible at first.
+            This is a possible race conditoon between the driver.implicit_wait && the time it takes for the text to appear.
+
+         '''
         print("Clicking search icon...")
         search_icon = None
         content_desc = f'''
@@ -641,8 +648,11 @@ class AppValidator:
     def send_keys_ADB(self, title: str):
         title_search = self.escape_chars(title)
         print("Searching: ", title_search)
-        cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'text', title_search)
-        subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+        # cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'text', title_search)
+        # subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+
+        send_text_ime(title_search, self.transport_id)
+
         cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'keyevent', ADB_KEYCODE_ENTER)
         subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
         sleep(2)
@@ -769,7 +779,10 @@ class AppValidator:
             error = None
             last_step = 0  # track last sucessful step to, atleast, report in console.
 
+
+            # input("Press search icon # 1")
             self.click_playstore_search()
+            # input("Press search icon # 1")
 
             last_step = 1
             self.send_keys_ADB(title)

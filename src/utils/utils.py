@@ -322,6 +322,20 @@ def get_start_time():
     return datetime.fromtimestamp(time()).strftime('%m-%d %H:%M:%S.%f')[:-3]
 
 
+# TODO test this method to make sure it works..
+# Isn't needed currently, wanted to use to check if ADBKeyboard was alrady installed but reattempting to install and installed package doesn't harm the program.
+def is_package_installed(transport_id: str, package_name: str):
+    ''' Checks if package is installed via ADB. '''
+    # Call the adb shell pm list packages command
+    result = subprocess.run(
+        ['adb', '-t', transport_id, 'shell', 'pm', 'list', 'packages'],
+        check=False, encoding='utf-8', capture_output=True
+    ).stdout.decode('utf-8')
+
+    # Check the output for the package name
+    return package_name in result
+
+
 # Ip Address of machien Running Appium Server
 EXECUTOR = 'http://192.168.0.175:4723/wd/hub'
 PLAYSTORE_PACKAGE_NAME = "com.android.vending"
@@ -342,6 +356,7 @@ IMAGE_LABELS = [
 
 PACKAGE_NAMES = [
     # [ "Rocket League Sideswipe", "com.Psyonix.RL2D"],
+    ['Legión Anime Tema Oscuro', 'aplicaciones.paleta.alterlegionanime'],  # Fialst o send keys
     ['Roblox', 'com.roblox.client'],
     ['Garena Free Fire', 'com.dts.freefireth'],
     ['My Boy! - GBA Emulator', 'com.fastemulator.gba'],  # Purchase required, unable to install...
