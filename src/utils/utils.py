@@ -223,12 +223,21 @@ LOGIN = 'Login Field'
 PASSWORD = 'Password Field'
 CONTINUE = 'Continue'
 GOOGLE_AUTH = 'Google Auth'
+FACEBOOK_AUTH = 'Facebook Auth'
+SIGN_IN = 'Sign In'
 
 IMAGE_LABELS = [
     LOGIN,
     PASSWORD,
     CONTINUE,
     GOOGLE_AUTH,
+    FACEBOOK_AUTH,
+    SIGN_IN
+]
+
+PACKAGE_NAMES = [
+    ['Messenger', 'com.facebook.orca', 'Password', 'testminnie001@gmail.com', 'testminnie123'],
+    ['Tubi TV', 'com.tubitv', 'Google Auth', 'testminnie001@gmail.com']
 ]
 
 #PACKAGE_NAMES = [
@@ -606,8 +615,7 @@ IMAGE_LABELS = [
     ['Google Keep', 'com.google.android.keep'],
     ['Google Maps', 'com.google.android.apps.maps'],
     ['Toontastic 3D', 'com.google.toontastic'],
-    #['Google Chat', 'com.google.android.apps.dynamite'], '''
-PACKAGE_NAMES = [
+    #['Google Chat', 'com.google.android.apps.dynamite'],
     ['Youtube Music', 'com.google.android.apps.youtube.music.pwa'],
     ['Files by Google: Clean up space on your phone', 'com.google.android.apps.nbu.files'],
     ['YouTube Creator Studio', 'com.google.android.apps.youtube.creator'],
@@ -623,7 +631,7 @@ PACKAGE_NAMES = [
     ['Gallery Go by Google Photos', 'com.google.android.apps.photosgo'],
     ['Google My Business', 'com.google.android.apps.vega'],
     ['Google Opinion Rewards', 'com.google.android.apps.paidtasks'],
-]
+]'''
 
 
 TOP_500_APPS = PACKAGE_NAMES[:500]

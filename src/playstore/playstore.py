@@ -15,7 +15,7 @@ from time import sleep, time
 from typing import AnyStr, Dict, List
 
 from objdetector.objdetector import ObjDetector
-from utils.utils import ARC_VERSIONS, CONTINUE, GOOGLE_AUTH, IMAGE_LABELS, LOGIN, PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, close_app, get_cur_activty, open_app
+from utils.utils import ARC_VERSIONS, CONTINUE, GOOGLE_AUTH, FACEBOOK_AUTH, SIGN_IN, IMAGE_LABELS, LOGIN, PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, close_app, get_cur_activty, open_app
 
 
 ''''
@@ -352,6 +352,98 @@ class AppValidator:
                 return False
 
 
+    def handle_password_login(self, login, password):
+
+        self.is_new_activity()  ## Init current activty
+        self.get_test_ss()
+        results = self.detector.detect()
+        if results is None:
+            return False
+
+        actions = 0  # At most, we should take 3 actions on a single page [may not be necessary but is a hard limit to prevent loops.]
+        # Find Email, Password and Login button.
+        LOGIN_ENTERED = False
+        PASSWORD_ENTERED = False
+        CONTINUE_SUBMITTED = False
+        SIGN_IN_SUBMITTED = False
+        tapped = False
+
+        while actions < 8 and not SIGN_IN_SUBMITTED or CONTINUE_SUBMITTED:
+            # input("Start handle login loop....")
+            print("\n\n Activity \n", self.prev_act, "\n", self.cur_act)
+
+            if self.is_new_activity() or tapped:
+                self.get_test_ss()
+                print("\n\n New Activity \n", self.prev_act, "\n", self.cur_act)
+                print("We found a new activity, take new screenshot and run detect again. ")
+                results = self.detector.detect()
+                tapped = False
+            print("results: ", results)
+
+            if LOGIN in results and not LOGIN_ENTERED:
+                # We have A google Auth button presents lets press it
+                results[LOGIN], tapped = self.click_button(results[LOGIN])
+                del results[LOGIN]
+                self.send_keys_ADB(login)
+                actions += 1
+                LOGIN_ENTERED = True
+
+            elif PASSWORD in results and not PASSWORD_ENTERED:
+                # We have A google Auth button presents lets press it
+                results[PASSWORD], tapped = self.click_button(results[PASSWORD])
+                del results[PASSWORD]
+                self.send_keys_ADB(password)
+                actions += 1
+                PASSWORD_ENTERED = True
+
+            elif SIGN_IN in results and not SIGN_IN_SUBMITTED:
+
+                results[SIGN_IN], tapped = self.click_button(results[SIGN_IN])
+                del results[SIGN_IN]
+                actions += 1
+                SIGN_IN_SUBMITTED = True
+
+            else:
+                # No Keys in results
+                return False
+
+    def handle_google_auth(self, email):
+
+        self.is_new_activity()  ## Init current activty
+        self.get_test_ss()
+        results = self.detector.detect()
+        if results is None:
+            return False
+
+        actions = 0  # At most, we should take 3 actions on a single page [may not be necessary but is a hard limit to prevent loops.]
+        # Find Email, Password and Login button.
+        GOOGLE_AUTH_SELECTED = False
+        tapped = False
+
+        while actions < 8 and not GOOGLE_AUTH_SELECTED:
+            # input("Start handle login loop....")
+            print("\n\n Activity \n", self.prev_act, "\n", self.cur_act)
+
+            if self.is_new_activity() or tapped:
+                self.get_test_ss()
+                print("\n\n New Activity \n", self.prev_act, "\n", self.cur_act)
+                print("We found a new activity, take new screenshot and run detect again. ")
+                results = self.detector.detect()
+                tapped = False
+            print("results: ", results)
+
+            if GOOGLE_AUTH in results and not GOOGLE_AUTH_SELECTED:
+
+                results[GOOGLE_AUTH], tapped = self.click_button(results[GOOGLE_AUTH])
+
+                content_desc = f'''new UiSelector().className("android.widget.TextView").text("{email}")'''
+                search_icon = self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+                search_icon.click()
+
+            else:
+                # No Keys in results
+                return False
+
     def get_coords(self, btn: List):
         ''' Given a list of list representing a bounding box's top left & 
             bottom right corners, return the mid point as a string to be
@@ -376,7 +468,19 @@ class AppValidator:
             the device orientation is returned to portrait.
         '''
         self.driver.orientation = 'PORTRAIT'
-        for app_title, app_package_name in self.package_names:
+        for app_info in self.package_names:
+
+            app_title = app_info[0]
+            app_package_name = app_info[1]
+            app_login_type = app_info[2]
+
+            if app_login_type == 'Password':
+                app_login = app_info[3]
+                app_password = app_info[4]
+
+            if app_login_type == 'Google Auth':
+                app_login = app_info[3]
+
             ERR = False
             installed, error = self.discover_and_install(app_title, app_package_name)
 
@@ -403,31 +507,39 @@ class AppValidator:
 
 
                 ###### Image Scraping #####
-                sleep(20)  # Wait for app to finsh loading the "MainActivity"
+                #sleep(20)  # Wait for app to finsh loading the "MainActivity"
                 _app_title = app_title.replace(" ", "_")  # Used to save screenshots of apps during DEV
                 # DEV SS
                 # self.driver.get_screenshot_as_file(f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/test.png")
-                location = f"/Users/ethancox/Documents/appium/src/notebooks/yolo_images/train_data/images/{_app_title}.png"
-                print(location)
-                self.driver.get_screenshot_as_file(location)
+                #location = f"/Users/ethancox/Documents/appium/src/notebooks/yolo_images/train_data/images/{_app_title}.png"
+                #print(location)
+                #self.driver.get_screenshot_as_file(location)
                 ###### END  Image Scraping #####
 
                 # TODO, improve open_app to detect failures more robustly.
                 self.report.add(app_package_name, app_title, ValidationReport.PASS, '')  # For now, if app opens without error, we will sayy its successful
                 
                 
-                # TODO Do login, building obj detection            
-                '''login_attemps = 0
+                # TODO Do login, building obj detection
+                login_attemps = 0
                 logged_in = False
                 while not logged_in and login_attemps < 4:
                     # ChromeOS does have mFocusedWindow -> get_cur_activty -> is_new_activity
                     # Throws an error and stays in continuous loop....
                     sleep(5)
-                    logged_in = self.handle_login()
+                    if app_login_type == 'Password':
+                        logged_in = self.handle_password_login(app_login, app_password)
+
+                    elif app_login_type == 'Google Auth':
+                        logged_in = self.handle_google_auth(app_login)
+
+                    else:
+                        logged_in = self.handle_login()
+
                     sleep(2) # Wait 2s, reattempt    
                     login_attemps += 1
                 if not logged_in:
-                    self.report.add(app_package_name, app_title, ValidationReport.PASS, 'Failed to log in')'''
+                    self.report.add(app_package_name, app_title, ValidationReport.PASS, 'Failed to log in')
 
             
                 # input("Close app")            

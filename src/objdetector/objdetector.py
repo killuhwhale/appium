@@ -5,7 +5,7 @@ from notebooks.yolov5.detect import run
 
 
 class ObjDetector:
-    def __init__(self, img_name = "test.png", weights=['notebooks/yolov5/runs/train/exp11/weights/best.pt']):
+    def __init__(self, img_name = "test.png", weights=['notebooks/yolov5/runs/train/exp12/weights/best.pt']):
         self.opt = Namespace(
             agnostic_nms=False,
             augment=False, 
@@ -24,11 +24,11 @@ class ObjDetector:
             max_det=1000, 
             name='exp', 
             nosave=False, 
-            project=PosixPath('notebooks/yolov5/runs/detect'), 
+            project=PosixPath('notebooks/yolov5/runs/detect'),
             save_conf=False, 
             save_crop=False, 
             save_txt=False, 
-            source=f'notebooks/yolo_images/{img_name}', 
+            source=f'notebooks/yolo_images/test_data/images/{img_name}',
             update=False, 
             vid_stride=1, 
             view_img=False, 
