@@ -92,8 +92,8 @@ def run(
         source = check_file(source)  # download
 
     # Directories
-    save_dir = ""
-    # save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
+    # save_dir = ""
+    save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
     # (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
     # Load model
@@ -152,10 +152,13 @@ def run(
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # im.jpg
             txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
-            s += '%gx%g ' % im.shape[2:]  # print string
+            # s += '%gx%g ' % im.shape[2:]  # print string
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
-            annotator = Annotator(im0, line_width=line_thickness, example=str(names))
+
+            annotator = None
+            if not DEBUG:
+                annotator = Annotator(im0, line_width=line_thickness, example=str(names))
 
             if len(det):
                 # Rescale boxes from img_size to im0 size
@@ -190,13 +193,13 @@ def run(
                     if save_img or save_crop or view_img:  # Add bbox to image
                         c = int(cls)  # integer class
                         _label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-
-                        annotator.box_label(xyxy, _label, color=colors(c, True))
+                        if not DEBUG:
+                            annotator.box_label(xyxy, _label, color=colors(c, True))
                     if save_crop:
                         save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
 
             # Stream results
-            im0 = annotator.result()
+            im0 = None if not DEBUG else annotator.result()
             if view_img:
                 if platform.system() == 'Linux' and p not in windows:
                     windows.append(p)
