@@ -25,7 +25,7 @@ cd "$1"
 counter=$2
 
 # Loop through all .png files in the directory
-for file in *.png
+for file in *.txt
 do
     # Get the current extension
     extension="${file##*.}"

@@ -4,6 +4,7 @@ import os
 import re
 import requests
 import subprocess
+from datetime import datetime
 from appium import webdriver
 from appium.webdriver.common.appiumby import AppiumBy
 from bs4 import BeautifulSoup
@@ -15,11 +16,11 @@ from selenium.webdriver.common.actions.action_builder import ActionBuilder
 from selenium.webdriver.common.actions.pointer_input import PointerInput
 from time import sleep, time
 from typing import List
-from keyboard.keyboard import send_text_ime
+
 
 from objdetector.objdetector import ObjDetector
 from utils.utils import (
-    ArcVersions, CONTINUE, CrashType, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
+    SIGN_IN, ArcVersions, CONTINUE, CrashType, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
     PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER,
     check_crash, close_app, get_cur_activty, get_start_time, open_app)
 
@@ -213,6 +214,7 @@ class AppValidator:
         self.detector = ObjDetector()
         self.transport_id = transport_id
         self.arc_version = arc_version
+        self.ID = f"{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}-{ip.split(':')[0]}"
 
     def check_playstore_invalid(self, package_name) -> bool:
         ''' Checks if an app's package_name is invalid vai Google playstore URL
@@ -223,6 +225,7 @@ class AppValidator:
         url = f'https://play.google.com/store/apps/details?id={package_name}'
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
+            print(response.text)
             soup = BeautifulSoup(response.text, 'html.parser')
             error_section = soup.find('div', {'id': 'error-section'})
             if error_section:
@@ -270,8 +273,39 @@ class AppValidator:
         print("Error taking SS: ", root_path)
         return False
 
+    def get_error_ss(self, err_name: str) -> bool:
+        '''
+            Attempts to get SS of device when an error occures and saves to
+                a given location.
+
+
+
+        '''
+
+        # Removes first empty index and 'main.py' from "/path/to/src/main.py"
+        #    ['', 'path', 'to', 'src', 'main.py']
+        root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
+        root_path = '/'.join(root_path)
+        path = f"/{root_path}/images/errors/{self.ID}"
+        #Create dir
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+        print("\n\n Saving SS to : ", path,"\n\n")
+
+        try:
+            self.driver.get_screenshot_as_file(f"{path}/{err_name}.png")
+            return True
+        except ScreenshotException as e:
+            print("App is scured!")
+        except Exception as e:
+            print("Error taking SS: ", e)
+
+        print("Error taking SS: ", root_path)
+        return False
+
     def sorted_conf(self, p: List):
-        ''' Returns conf value from the list.'''
+        ''' Returns confidence value from the list.'''
         return int(p[2])
 
     def click_button(self, btns: List) -> List:
@@ -318,29 +352,28 @@ class AppValidator:
         while actions < 8 and not CONTINUE_SUBMITTED:
             # input("Start handle login loop....")
             print("\n\n Activity \n", self.prev_act, "\n", self.cur_act )
-
+            input("Pause")
             if self.is_new_activity() or tapped:
                 self.get_test_ss()
                 print("\n\n New Activity \n", self.prev_act, "\n", self.cur_act )
                 print("We found a new activity, take new screenshot and run detect again. ")
                 results = self.detector.detect()
                 tapped = False
+
             print("results: ", results)
             if GOOGLE_AUTH in results:
                 # We have A google Auth button presents lets press it
                 results[GOOGLE_AUTH], tapped = self.click_button(results[GOOGLE_AUTH])
-                # At this point we will consider this a successful test..
+                del results[GOOGLE_AUTH]
                 return True
             elif LOGIN in results and not LOGIN_ENTERED:
-                 # We have A google Auth button presents lets press it
                 results[LOGIN], tapped = self.click_button(results[LOGIN])
                 del results[LOGIN]
-                self.send_keys_ADB("testminnie001@gmail.com")
+                self.send_keys_ADB("testminnie001@gmail.com", False)
                 actions += 1
                 LOGIN_ENTERED = True
 
             elif PASSWORD in results and not PASSWORD_ENTERED:
-                 # We have A google Auth button presents lets press it
                 results[PASSWORD], tapped = self.click_button(results[PASSWORD])
                 del results[PASSWORD]
                 self.send_keys_ADB("testminnie123")
@@ -348,8 +381,14 @@ class AppValidator:
                 PASSWORD_ENTERED = True
             elif CONTINUE in results:
                 # TODO Remove the button once we click it, so we dont keep clicking the same element.
-                # We have A google Auth button presents lets press it
                 results[CONTINUE], tapped = self.click_button(results[CONTINUE])
+                del results[CONTINUE]
+                actions += 1
+                if LOGIN_ENTERED and PASSWORD_ENTERED:
+                    CONTINUE_SUBMITTED = True
+            elif SIGN_IN in results:
+                results[SIGN_IN], tapped = self.click_button(results[SIGN_IN])
+                del results[SIGN_IN]
                 actions += 1
                 if LOGIN_ENTERED and PASSWORD_ENTERED:
                     CONTINUE_SUBMITTED = True
@@ -645,17 +684,20 @@ class AppValidator:
         search_icon = self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
         search_icon.click()
 
-    def send_keys_ADB(self, title: str):
-        title_search = self.escape_chars(title)
-        print("Searching: ", title_search)
+    def send_keys_ADB(self, title: str, submit=True):
+        content_desc = f'''
+            new UiSelector().className("android.widget.EditText")
+        '''
+        search_edit_text = self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+        # search_edit_text.send_keys('\u270C  😸 ')
+        search_edit_text.send_keys(title)
+        # Old send text, unable to send unicode
         # cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'text', title_search)
         # subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
-
-        send_text_ime(title_search, self.transport_id)
-
-        cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'keyevent', ADB_KEYCODE_ENTER)
-        subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
-        sleep(2)
+        if submit:
+            cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'keyevent', ADB_KEYCODE_ENTER)
+            subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+        sleep(2)  # Wait for search results
 
     def press_app_icon(self, title: str):
         '''
@@ -680,11 +722,14 @@ class AppValidator:
                     print("Icons:", icon.location, icon.id, icon.get_attribute("content-desc"))
                     if "Image" in icon.get_attribute('content-desc') or \
                         title_first in icon.get_attribute("content-desc"):
+                        print("Clicked: ", icon.id, icon.get_attribute("content-desc"))
+                        # input("Clicking app icon...")
+
                         icon.click()
                         sleep(2)
                         return
 
-                    input("Next icon...")
+                    # input("Next icon...")
             except Exception as e:
                 pass
         raise("Icon not found!")
@@ -806,6 +851,8 @@ class AppValidator:
             if error is None:
                 return [True, None]
             else:
+
+                self.get_error_ss(f"{title}_{self.steps[last_step].replace(' ','_')}")
                 # Debug
                 print("\n\n",
                     title,

@@ -346,18 +346,25 @@ LOGIN = 'Login Field'
 PASSWORD = 'Password Field'
 CONTINUE = 'Continue'
 GOOGLE_AUTH = 'Google Auth'
+FB_ATUH = 'Facebook Auth'
+SIGN_IN = 'Sign In'
+
 
 IMAGE_LABELS = [
     LOGIN,
     PASSWORD,
     CONTINUE,
     GOOGLE_AUTH,
+    FB_ATUH,
+    SIGN_IN
 ]
 
 PACKAGE_NAMES = [
     # [ "Rocket League Sideswipe", "com.Psyonix.RL2D"],
-    ['Legión Anime Tema Oscuro', 'aplicaciones.paleta.alterlegionanime'],  # Fialst o send keys
     ['Roblox', 'com.roblox.client'],
+    ['Showmax', 'com.showmax.app'],  # NA in region
+    ['Epic Seven', 'com.stove.epic7.google'], #  Failed send keys
+    ['Legión Anime Tema Oscuro', 'aplicaciones.paleta.alterlegionanime'],  # Fialst o send keys
     ['Garena Free Fire', 'com.dts.freefireth'],
     ['My Boy! - GBA Emulator', 'com.fastemulator.gba'],  # Purchase required, unable to install...
     ['Messenger', 'com.facebook.orca'],
@@ -512,7 +519,7 @@ PACKAGE_NAMES = [
     ['Hollywood Story', 'org.nanobit.hollywood'],
     ['hayu', 'com.upst.hayu'],
     ['NPO', 'nl.uitzendinggemist'],
-    ['V – Real-time celeb broadcasting app', 'com.naver.vapp'],
+    ['V - Real-time celeb broadcasting app', 'com.naver.vapp'],
     ['Cash Frenzy', 'slots.pcg.casino.games.free.android'],
     ['Crayola Scribble Scrubbie Pets', 'com.crayolallc.crayola_scribble_scrubbie_pets'],
     ['SALTO, TV & streaming illimités dans une seule app', 'fr.salto.app'],
@@ -630,7 +637,7 @@ PACKAGE_NAMES = [
     # ['FreeCell', 'com.hapogames.FreeCell'],  # Invalid package name
     ['Word Cookies!', 'com.bitmango.go.wordcookies'],
     ['Floor Plan Creator', 'pl.planmieszkania.android'],
-    ['Legión Anime Tema Oscuro', 'aplicaciones.paleta.alterlegionanime'],  # Fialst o send keys
+    ['Legión Anime Tema Oscuro', 'aplicaciones.paleta.alterlegionanime'],
     ['Adobe Illustrator Draw', 'com.adobe.creativeapps.draw'],  # NA on Pixel 2
     ['aquapark.io', 'com.cassette.aquapark'],
     ['Bridge Race', 'com.Garawell.BridgeRace'],
@@ -734,8 +741,7 @@ PACKAGE_NAMES = [
     ['Youtube Music', 'com.google.android.apps.youtube.music.pwa'],
     ['Files by Google: Clean up space on your phone', 'com.google.android.apps.nbu.files'],
     ['YouTube Creator Studio', 'com.google.android.apps.youtube.creator'],
-    ['"Youtube Music'],
-    ['(Google Play Music)"', 'com.google.android.music'],
+    ['Google Play Music', 'com.google.android.music'],
     ['Google Tasks: Any Task Any Goal. Get Things Done', 'com.google.android.apps.tasks'],
     ['Chrome Remote Desktop', 'com.google.chromeremotedesktop'],
     ['Google PDF Viewer', 'com.google.android.apps.pdfviewer'],

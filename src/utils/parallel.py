@@ -7,7 +7,7 @@ from time import sleep
 
 from typing import List
 from appium import webdriver
-from keyboard.keyboard import install_keyboard, send_text_ime
+
 
 from utils.utils import (
     PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT,
@@ -25,7 +25,7 @@ def validate_task(queue: Queue, packages: List[List[str]], ip: str):
 
     transport_id = find_transport_id(ip)
     version = get_arc_version(transport_id)
-    install_keyboard(transport_id)
+
     driver = webdriver.Remote(
         "http://localhost:4723/wd/hub",
         android_des_caps(
