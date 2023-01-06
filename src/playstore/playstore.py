@@ -436,6 +436,7 @@ class AppValidator:
         self.driver.orientation = 'PORTRAIT'
         for app_title, app_package_name in self.package_names:
             start_time = get_start_time()
+            self.start_time = start_time
             ERR = False
             installed, error = self.discover_and_install(app_title, app_package_name)
             # installed, error = True, False # Successful
@@ -586,6 +587,8 @@ class AppValidator:
                 ready = True
             except Exception as e:
                 self.dprint("App not ready to open, retrying...")
+                if t > max_wait * 0.25:
+                    self.check_playstore_crash()
                 sleep(0.5)
         return ready
 
@@ -698,7 +701,13 @@ class AppValidator:
         search_icon = self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
         search_icon.click()
 
-    def search_palystore(self, title: str, submit=True):
+    def check_playstore_crash(self):
+        # 01-05 22:08:57.546   129   820 I WindowManager: WIN DEATH: Window{afca274 u0 com.android.vending/com.google.android.finsky.activities.MainActivity}
+        CrashType, crashed_act = check_crash(PLAYSTORE_PACKAGE_NAME, self.start_time,self.transport_id)
+        if(not CrashType == CrashType.SUCCESS):
+            self.dprint("PlayStore crashed ", CrashType.value)
+
+    def search_playstore(self, title: str, submit=True):
         content_desc = f'''
             new UiSelector().className("android.widget.EditText")
         '''
@@ -842,6 +851,8 @@ class AppValidator:
         if not self.is_installed_UI():  # Waits up to 7mins to find install button.
             raise Exception("Failed to install app!!")
 
+
+
     def discover_and_install(self, title: str, install_package_name: str):
         '''
          A method to search Google Playstore for an app and install via the Playstore UI.
@@ -854,19 +865,23 @@ class AppValidator:
             # input("Press search icon # 1")
             self.click_playstore_search()
             # input("Press search icon # 1")
+            self.check_playstore_crash()
 
             last_step = 1
-            self.search_palystore(title)
+            self.search_playstore(title)
+            self.check_playstore_crash()
 
             # input("Press app icon # 2")
             last_step = 2
             self.press_app_icon(title)
+            self.check_playstore_crash()
             # input("Press app icon # 2")
 
             last_step = 3
 
             # input("Step 3, press install")
             self.install_app_UI(install_package_name)
+            self.check_playstore_crash()
             # input("Step 3, press install")
 
             self.driver.back()  # back to seach results
