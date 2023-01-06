@@ -371,7 +371,7 @@ class AppValidator:
                 results = self.detector.detect()
                 tapped = False
 
-            self.dprint("results: ", results)
+            self.dprint(f"Action : {actions} -- results: ", results)
             if GOOGLE_AUTH in results:
                 # We have A google Auth button presents lets press it
                 results[GOOGLE_AUTH], tapped = self.click_button(results[GOOGLE_AUTH])

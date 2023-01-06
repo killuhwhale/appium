@@ -50,6 +50,7 @@ from notebooks.yolov5.utils.general import (LOGGER, Profile, check_file, check_i
 from notebooks.yolov5.utils.plots import Annotator, colors, save_one_box
 from notebooks.yolov5.utils.torch_utils import select_device, smart_inference_mode
 
+DEBUG = False
 
 @smart_inference_mode()
 def run(
@@ -154,7 +155,7 @@ def run(
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
-            
+
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
@@ -163,7 +164,7 @@ def run(
                 for c in det[:, 5].unique():
                     n = (det[:, 5] == c).sum()  # detections per class
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
-                
+
 
 
                 # Write results
@@ -173,22 +174,22 @@ def run(
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                         line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
                         # ret_results = ('%g ' * len(line)).rstrip() % line + '\n'
-                        
+
                         c = int(cls)  # integer class
                         label = None if hide_labels else names[c]
                         p1, p2 = (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3]))
-                        print("All labels: ", names)
-                        print("Wite results: label: bounding boxes: ", label ,p1, p2)
+                        # print("All labels: ", names)
+                        # print("Wite results: label: bounding boxes: ", label ,p1, p2)
                         ret_results[label].append((p1,p2, conf))
 
-                        # ret_results = line 
+                        # ret_results = line
                         # with open(f'{txt_path}.txt', 'a') as f:
                         #     f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
                     if save_img or save_crop or view_img:  # Add bbox to image
                         c = int(cls)  # integer class
                         _label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                        
+
                         annotator.box_label(xyxy, _label, color=colors(c, True))
                     if save_crop:
                         save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
@@ -206,7 +207,9 @@ def run(
             # Save results (image with detections)
             if save_img:
                 if dataset.mode == 'image':
-                    cv2.imwrite(save_path, im0)
+                    if DEBUG:
+                        cv2.imwrite(save_path, im0)
+
                 else:  # 'video' or 'stream'
                     if vid_path[i] != save_path:  # new video
                         vid_path[i] = save_path
