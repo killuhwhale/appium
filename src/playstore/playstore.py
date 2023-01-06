@@ -211,9 +211,11 @@ class AppValidator:
         ]
         self.prev_act = None
         self.cur_act = None
-        self.detector = ObjDetector()
+        self.test_img = f"{self.ip}_test.png"
+        self.detector = ObjDetector(self.test_img)
         self.transport_id = transport_id
         self.arc_version = arc_version
+        self.ip = ip
         self.ID = f"{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}-{ip.split(':')[0]}"
 
     def check_playstore_invalid(self, package_name) -> bool:
@@ -263,7 +265,7 @@ class AppValidator:
         root_path = '/'.join(root_path)
         print("\n\n Saving SS to : ", f"/{root_path}/notebooks/yolo_images/test.png","\n\n")
         try:
-            self.driver.get_screenshot_as_file(f"/{root_path}/notebooks/yolo_images/test.png")
+            self.driver.get_screenshot_as_file(f"/{root_path}/notebooks/yolo_images/{self.test_img}")
             return True
         except ScreenshotException as e:
             print("App is scured!")
