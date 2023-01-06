@@ -211,11 +211,10 @@ class AppValidator:
         ]
         self.prev_act = None
         self.cur_act = None
-        self.test_img = f"{self.ip}_test.png"
+        self.test_img = f"{ip}_test.png"
         self.detector = ObjDetector(self.test_img)
         self.transport_id = transport_id
         self.arc_version = arc_version
-        self.ip = ip
         self.ID = f"{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}-{ip.split(':')[0]}"
 
     def check_playstore_invalid(self, package_name) -> bool:
