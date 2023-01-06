@@ -360,7 +360,8 @@ class AppValidator:
         PASSWORD_ENTERED = False
         CONTINUE_SUBMITTED = False
         tapped = False
-        while actions < 4 and not CONTINUE_SUBMITTED:
+        total_actions = 0
+        while actions < 4 and not CONTINUE_SUBMITTED and total_actions < 6:
             # input("Start handle login loop....")
             self.dprint("\n\n Activity \n", self.prev_act, "\n", self.cur_act )
             # input("Pause")
@@ -406,6 +407,8 @@ class AppValidator:
             else:
                 # No Keys in results
                 return False
+            total_actions += 1
+            self.dprint(f"\n\n Total Actions: {total_actions}  \n\n ")
 
 
     def get_coords(self, btn: List):
