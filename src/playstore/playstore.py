@@ -352,7 +352,7 @@ class AppValidator:
         while actions < 8 and not CONTINUE_SUBMITTED:
             # input("Start handle login loop....")
             print("\n\n Activity \n", self.prev_act, "\n", self.cur_act )
-            input("Pause")
+            # input("Pause")
             if self.is_new_activity() or tapped:
                 self.get_test_ss()
                 print("\n\n New Activity \n", self.prev_act, "\n", self.cur_act )

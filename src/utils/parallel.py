@@ -21,6 +21,8 @@ def validate_task(queue: Queue, packages: List[List[str]], ip: str):
     '''
 
     if not adb_connect(ip):
+        driver.quit()
+        queue.put({})
         return
 
     transport_id = find_transport_id(ip)
