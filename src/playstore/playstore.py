@@ -434,81 +434,90 @@ class AppValidator:
             the device orientation is returned to portrait.
         '''
         self.driver.orientation = 'PORTRAIT'
-        for app_title, app_package_name in self.package_names:
-            start_time = get_start_time()
-            self.start_time = start_time
-            ERR = False
-            installed, error = self.discover_and_install(app_title, app_package_name)
-            # installed, error = True, False # Successful
-            self.dprint(f"Installed? {installed}   err: {error}")
-            if not installed and not error is None:
-                self.report.add(app_package_name, app_title, ValidationReport.FAIL, error)
-                ERR = True
-                continue
+        i = 0
+        while i < len(self.package_names):
+            app_title, app_package_name = self.package_names[i]
 
-            if not open_app(app_package_name, self.transport_id, self.arc_version):
-                ERR = True
-                if self.check_playstore_invalid(app_package_name):
-                    self.report.add(app_package_name, app_title,
-                        ValidationReport.FAIL,
-                        "App package is invalid, update/ remove from list.")
-                elif not self.is_installed(app_package_name):
-                    self.report.add(app_package_name, app_title,
-                        ValidationReport.FAIL,
-                        "Failed to open because the package was not installed.")
-                else:
-                    self.report.add(app_package_name, app_title,
-                        ValidationReport.FAIL,
-                        "Failed to open")
+        # for app_title, app_package_name in self.package_names:
 
-            # TODO wait for activity to start intelligently, not just package
-            # DEV: Using to scrape the first image of each app. (Will remove)
-            if not ERR:
-                # At this point we have successfully launched the app.
-                # We can check
-                sleep(5) # ANR Period
-                CrashType, crashed_act = check_crash(app_package_name,
-                                            start_time, self.transport_id)
-                if(not CrashType == CrashType.SUCCESS):
-                    self.report.add(app_package_name, app_title,
-                        ValidationReport.FAIL, CrashType.value)
+            # TODO Put all the below code in a new method
+            # If the playstore crashes, propgate the error all the way upp
+            # Then we will catch that error, and try again
+
+            # TO change to a while loop so we can retry at least once.
+            try:
+
+                start_time = get_start_time()
+                self.start_time = start_time
+                ERR = False
+                installed, error = self.discover_and_install(app_title, app_package_name)
+                # installed, error = True, False # Successful
+                self.dprint(f"Installed? {installed}   err: {error}")
+                if not installed and not error is None:
+                    self.report.add(app_package_name, app_title, ValidationReport.FAIL, error)
+                    ERR = True
                     continue
 
-                ###### Image Scraping #####
-                # sleep(8)  # Wait for app to finsh loading the "MainActivity"
-                _app_title = app_title.replace(" ", "_")  # Used to save screenshots of apps during DEV
-                # DEV SS
-                # self.driver.get_screenshot_as_file(
-                #   f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/test.png"
-                # )
-                ###### END  Image Scraping #####
+                if not open_app(app_package_name, self.transport_id, self.arc_version):
+                    ERR = True
+                    if self.check_playstore_invalid(app_package_name):
+                        self.report.add(app_package_name, app_title,
+                            ValidationReport.FAIL,
+                            "App package is invalid, update/ remove from list.")
+                    elif not self.is_installed(app_package_name):
+                        self.report.add(app_package_name, app_title,
+                            ValidationReport.FAIL,
+                            "Failed to open because the package was not installed.")
+                    else:
+                        self.report.add(app_package_name, app_title,
+                            ValidationReport.FAIL,
+                            "Failed to open")
 
-                # For now, if app opens without error, we'll report successful
-                self.report.add(app_package_name, app_title,
-                    ValidationReport.PASS, '')
+                if not ERR:
+                    # TODO wait for activity to start intelligently, not just package
+                    # At this point we have successfully launched the app.
+                    # We can check
+                    sleep(5) # ANR Period
+                    CrashType, crashed_act = check_crash(app_package_name,
+                                                start_time, self.transport_id)
+                    if(not CrashType == CrashType.SUCCESS):
+                        self.report.add(app_package_name, app_title,
+                            ValidationReport.FAIL, CrashType.value)
+                        continue
 
-                logged_in = self.handle_login()
-                # # Login Loopp in in handle  login
-                # login_attemps = 0
-                # logged_in = False
-                # while not logged_in and login_attemps < 4:
-                #     # ChromeOS does have mFocusedWindow -> get_cur_activty -> is_new_activity
-                #     # Throws an error and stays in continuous loop....
-                #     sleep(5)
-                #     sleep(2) # Wait 2s, reattempt
-                #     login_attemps += 1
-                if not logged_in:
+                    ###### Image Scraping #########################################################
+                    #
+                    # sleep(8)  # Wait for app to finsh loading the "MainActivity"
+                    _app_title = app_title.replace(" ", "_")  # Used to save screenshots of apps during DEV
+                    # DEV SS
+                    # self.driver.get_screenshot_as_file(
+                    #   f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/test.png"
+                    # )
+                    #
+                    ###### END  Image Scraping ############################################################
+
+                    # For now, if app opens without error, we'll report successful
                     self.report.add(app_package_name, app_title,
-                        ValidationReport.PASS, 'Failed to log in')
+                        ValidationReport.PASS, '')
 
-                # input("Close app")
-                close_app(app_package_name, self.transport_id)
+                    logged_in = self.handle_login()
 
-                # Change the orientation to portrait
-                self.driver.orientation = 'PORTRAIT'
-                open_app(PLAYSTORE_PACKAGE_NAME, self.transport_id, self.arc_version)
+                    if not logged_in:
+                        self.report.add(app_package_name, app_title,
+                            ValidationReport.PASS, 'Failed to log in')
 
-                self.uninstall_app(app_package_name)  # (save space)
+                    # input("Close app")
+                    close_app(app_package_name, self.transport_id)
+
+                    # Change the orientation to portrait
+                    self.driver.orientation = 'PORTRAIT'
+                    open_app(PLAYSTORE_PACKAGE_NAME, self.transport_id, self.arc_version)
+
+                    self.uninstall_app(app_package_name)  # (save space)
+                    i += 1
+            except Exception as error:
+                if error == "PLAYSTORECRASH":
+                    self.dprint("restart this attemp!")
 
     def tap_screen(self, x:str, y:str):
         try:
@@ -706,6 +715,8 @@ class AppValidator:
         CrashType, crashed_act = check_crash(PLAYSTORE_PACKAGE_NAME, self.start_time,self.transport_id)
         if(not CrashType == CrashType.SUCCESS):
             self.dprint("PlayStore crashed ", CrashType.value)
+            self.driver.reset()  # Reopen app
+            raise("PLAYSTORECRASH")
 
     def search_playstore(self, title: str, submit=True):
         content_desc = f'''
@@ -891,6 +902,8 @@ class AppValidator:
         finally:
             if error is None:
                 return [True, None]
+            elif error == "PLAYSTORECRASH":
+                raise error
             else:
 
                 self.get_error_ss(f"{title}_{self.steps[last_step].replace(' ','_')}")
