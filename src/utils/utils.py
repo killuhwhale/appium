@@ -362,15 +362,15 @@ IMAGE_LABELS = [
 PACKAGE_NAMES = [
     # [ "Rocket League Sideswipe", "com.Psyonix.RL2D"],
     ['Roblox', 'com.roblox.client'],
-    ['Showmax', 'com.showmax.app'],  # NA in region
-    ['Epic Seven', 'com.stove.epic7.google'], #  Failed send keys
-    ['Legión Anime Tema Oscuro', 'aplicaciones.paleta.alterlegionanime'],  # Fialst o send keys
-    ['Garena Free Fire', 'com.dts.freefireth'],
-    ['My Boy! - GBA Emulator', 'com.fastemulator.gba'],  # Purchase required, unable to install...
-    ['Messenger', 'com.facebook.orca'],
+    # ['Showmax', 'com.showmax.app'],  # NA in region
+    # ['Epic Seven', 'com.stove.epic7.google'], #  Failed send keys
+    # ['Legión Anime Tema Oscuro', 'aplicaciones.paleta.alterlegionanime'],  # Fialst o send keys
+    # ['Garena Free Fire', 'com.dts.freefireth'],
+    # ['My Boy! - GBA Emulator', 'com.fastemulator.gba'],  # Purchase required, unable to install...
+    # ['Messenger', 'com.facebook.orca'],
     ['Netflix', 'com.netflix.mediaclient'],  # Unable to take SS of app due to protections.
     ['YouTube Kids', 'com.google.android.apps.youtube.kids'],
-    # ['Messenger', 'com.facebook.orca'],
+    ['Messenger', 'com.facebook.orca'],
     ['Gacha Club', 'air.com.lunime.gachaclub'],
     ['Messenger Kids', 'com.facebook.talk'],
     ['Among Us!', 'com.innersloth.spacemafia'],

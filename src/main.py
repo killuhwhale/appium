@@ -18,7 +18,7 @@ ips = [
     '192.168.1.128:5555',  # Kevin ARM ARC-p
 
 ]
-runner = MultiprocessTaskRunner(ips, TOP_500_APPS[0:4])
+runner = MultiprocessTaskRunner(ips, TOP_500_APPS)
 runner.run()
 
 ###################################
