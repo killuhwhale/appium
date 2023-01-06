@@ -487,16 +487,16 @@ class AppValidator:
                 self.report.add(app_package_name, app_title,
                     ValidationReport.PASS, '')
 
-                # TODO Do login, building obj detection
-                login_attemps = 0
-                logged_in = False
-                while not logged_in and login_attemps < 4:
-                    # ChromeOS does have mFocusedWindow -> get_cur_activty -> is_new_activity
-                    # Throws an error and stays in continuous loop....
-                    sleep(5)
-                    logged_in = self.handle_login()
-                    sleep(2) # Wait 2s, reattempt
-                    login_attemps += 1
+                logged_in = self.handle_login()
+                # # Login Loopp in in handle  login
+                # login_attemps = 0
+                # logged_in = False
+                # while not logged_in and login_attemps < 4:
+                #     # ChromeOS does have mFocusedWindow -> get_cur_activty -> is_new_activity
+                #     # Throws an error and stays in continuous loop....
+                #     sleep(5)
+                #     sleep(2) # Wait 2s, reattempt
+                #     login_attemps += 1
                 if not logged_in:
                     self.report.add(app_package_name, app_title,
                         ValidationReport.PASS, 'Failed to log in')
