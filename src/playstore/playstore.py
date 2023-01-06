@@ -218,10 +218,10 @@ class AppValidator:
         self.arc_version = arc_version
         self.ID = f"{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}-{ip.split(':')[0]}"
 
-    def dprint(self, text: str):
+    def dprint(self, *args):
         color = self.report.COLORS[self.instance_num % len(self.report.COLORS)]
         print(color,end="")
-        print(text,end="")
+        print(*args,end="")
         print(color,end="")
         print(self.report.RESET)
 
@@ -359,7 +359,7 @@ class AppValidator:
         PASSWORD_ENTERED = False
         CONTINUE_SUBMITTED = False
         tapped = False
-        while actions < 8 and not CONTINUE_SUBMITTED:
+        while actions < 4 and not CONTINUE_SUBMITTED:
             # input("Start handle login loop....")
             self.dprint("\n\n Activity \n", self.prev_act, "\n", self.cur_act )
             # input("Pause")
