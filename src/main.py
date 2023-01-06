@@ -4,22 +4,24 @@ from appium import webdriver
 from playstore.playstore import AppValidator
 from utils.parallel import MultiprocessTaskRunner
 from utils.utils import (PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME,
-    TOP_500_APPS, adb_connect, android_des_caps, find_transport_id, get_arc_version)
+    TOP_500_APPS, adb_connect, android_des_caps, find_transport_id, get_arc_version, lazy_start_appium_server)
 
+
+lazy_start_appium_server()
 
 # Multiprocessing Runs
 
-ips = [
-    # '710KPMZ0409387',  # Device connected via USB (Pixel 2)
-    # 'emulator-5554',
-    '192.168.1.238:5555',  # Helios x86 intel ARC-R   RED,
-    '192.168.1.113:5555', # CoachZ snapdragon ARC-P   Green,
-    '192.168.1.248:5555', # Morphius AMD ARC-P        Yellow,
-    '192.168.1.128:5555',  # Kevin ARM ARC-p          Blue,
+# ips = [
+#     # '710KPMZ0409387',  # Device connected via USB (Pixel 2)
+#     # 'emulator-5554',
+#     '192.168.1.238:5555',  # Helios x86 intel ARC-R   RED,
+#     '192.168.1.113:5555', # CoachZ snapdragon ARC-P   Green,
+#     '192.168.1.248:5555', # Morphius AMD ARC-P        Yellow,
+#     '192.168.1.128:5555',  # Kevin ARM ARC-p          Blue,
 
-]
-runner = MultiprocessTaskRunner(ips, TOP_500_APPS )
-runner.run()
+# ]
+# runner = MultiprocessTaskRunner(ips, TOP_500_APPS )
+# runner.run()
 
 ###################################
 #   Single run

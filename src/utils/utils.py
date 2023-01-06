@@ -1,4 +1,6 @@
+import __main__
 from datetime import datetime
+import os
 import re
 import subprocess
 from enum import Enum
@@ -334,6 +336,22 @@ def is_package_installed(transport_id: str, package_name: str):
 
     # Check the output for the package name
     return package_name in result
+
+
+
+def lazy_start_appium_server():
+    ''' Runs bash script to download AppiumServer.AppImage
+        if its not already downloaded and starts it.
+
+     '''
+    root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
+    root_path = '/'.join(root_path)
+    path = f"/{root_path}/appium/server.AppImage"
+    print("desty path: ", path)
+    cmd = ("bash", "../dl_inst_app_server.sh", path)
+    res = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+    print(res)
+
 
 
 # Ip Address of machien Running Appium Server

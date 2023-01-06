@@ -2,3 +2,4 @@
 .vscode
 notebooks/yolov5/runs
 images/errors/*
+appium/
