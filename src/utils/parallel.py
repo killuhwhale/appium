@@ -15,13 +15,12 @@ from utils.utils import (
 from playstore.playstore import AppValidator, ValidationReport
 
 
-def validate_task(queue: Queue, packages: List[List[str]], ip: str):
+def validate_task(queue: Queue, packages: List[List[str]], ip: str, instance_num: int):
     '''
         A single task to validate apps on a given device.
     '''
 
     if not adb_connect(ip):
-        driver.quit()
         queue.put({})
         return
 
@@ -38,7 +37,7 @@ def validate_task(queue: Queue, packages: List[List[str]], ip: str):
     )
     driver.implicitly_wait(5)
     driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
-    validator = AppValidator(driver, packages, transport_id, version, ip)
+    validator = AppValidator(driver, packages, transport_id, version, ip, instance_num)
     validator.uninstall_multiple()
     validator.run()
     print("Putting driver & valdiator")

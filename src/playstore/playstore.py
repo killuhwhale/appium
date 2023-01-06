@@ -216,10 +216,11 @@ class AppValidator:
         self.detector = ObjDetector(self.test_img)
         self.transport_id = transport_id
         self.arc_version = arc_version
+        self.instance_num = instance_num
         self.ID = f"{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}-{ip.split(':')[0]}"
 
     def dprint(self, *args):
-        color = self.report.COLORS[self.instance_num % len(self.report.COLORS)]
+        color = self.report.COLORS[2:][self.instance_num % len(self.report.COLORS)]
         print(color,end="")
         print(*args,end="")
         print(color,end="")
