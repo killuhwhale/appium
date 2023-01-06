@@ -117,7 +117,7 @@ class MultiprocessTaskRunner:
         num_packages_ea = total_packages // len(self.ips)
         rem_packages = total_packages % len(self.ips)
         start = 0
-        for ip in self.ips:
+        for i, ip in enumerate(self.ips):
             end = start + num_packages_ea
             if rem_packages > 0:
                 end += 1
@@ -130,6 +130,6 @@ class MultiprocessTaskRunner:
             self.packages_recvd[ip] = [start, end]
             start = end
 
-            process = Process(target=validate_task, args=(self.queue, packages_to_test, ip ))
+            process = Process(target=validate_task, args=(self.queue, packages_to_test, ip, i))
             process.start()
             self.processes.append(process)
