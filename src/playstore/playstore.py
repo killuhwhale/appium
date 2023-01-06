@@ -698,7 +698,7 @@ class AppValidator:
         search_icon = self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
         search_icon.click()
 
-    def send_keys_ADB(self, title: str, submit=True):
+    def search_palystore(self, title: str, submit=True):
         content_desc = f'''
             new UiSelector().className("android.widget.EditText")
         '''
@@ -708,6 +708,18 @@ class AppValidator:
         # Old send text, unable to send unicode
         # cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'text', title_search)
         # subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+        if submit:
+            cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'keyevent', ADB_KEYCODE_ENTER)
+            subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+        sleep(2)  # Wait for search results
+
+    def send_keys_ADB(self, title: str, submit=True):
+        content_desc = f'''
+            new UiSelector().className("android.widget.EditText")
+        '''
+        title_search = self.escape_chars(title)
+        cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'text', title_search)
+        subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
         if submit:
             cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'keyevent', ADB_KEYCODE_ENTER)
             subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
@@ -844,7 +856,7 @@ class AppValidator:
             # input("Press search icon # 1")
 
             last_step = 1
-            self.send_keys_ADB(title)
+            self.search_palystore(title)
 
             # input("Press app icon # 2")
             last_step = 2
