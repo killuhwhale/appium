@@ -8,7 +8,10 @@ Prep work for Chromebook:
 - DUT
     - Install Accounts for testing.
 - Host device
-    - Refer to documentation
+    - Setup environment
+        - bash ins_and_stu.sh
+        - bash setup.sh
+    - python3 main.py 192.168.0.143:5555 [ips]
 
 
 # Need to test on Chromebook

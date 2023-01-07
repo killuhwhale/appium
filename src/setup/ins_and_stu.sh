@@ -1,6 +1,6 @@
 #!/user/bin/bash
 
-sudo apt install default-jre
+sudo apt -y install default-jre
 
 RED="\033[31m"
 Black="\033[30m"
