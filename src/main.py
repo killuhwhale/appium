@@ -22,8 +22,8 @@ ips = [
     '192.168.1.113:5555', # CoachZ snapdragon ARC-P   Green,
 
 ]
-runner = MultiprocessTaskRunner(ips, TOP_500_APPS[:1] )
-runner.run()
+# runner = MultiprocessTaskRunner(ips, TOP_500_APPS[:1] )
+# runner.run()
 
 
 ###################################

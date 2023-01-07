@@ -346,6 +346,15 @@ def stop_appium_server():
 
 def lazy_start_appium_server():
     ''' Attempts to start Appium server. '''
+    root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
+    root_path = '/'.join(root_path)
+    path = f"/{root_path}/appium/server.AppImage"
+    print("desty path: ", path)
+
+
+    cmd = ["bash", "../recombine_app_image.sh", path]
+    res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
+
     print("Starting Server")
 
     try:
