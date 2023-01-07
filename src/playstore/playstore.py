@@ -498,15 +498,32 @@ class AppValidator:
                     #
                     ###### END  Image Scraping ############################################################
 
-                    # For now, if app opens without error, we'll report successful
-                    self.report.add(app_package_name, app_title,
-                        ValidationReport.PASS, '')
 
-                    logged_in = self.handle_login()
+
+                    login_attemps = 0
+                    logged_in = False
+                    while not logged_in and login_attemps < 4:
+                        sleep(2)
+
+                        CrashType, crashed_act = check_crash(app_package_name,
+                                                start_time, self.transport_id)
+                        if(not CrashType == CrashType.SUCCESS):
+                            self.report.add(app_package_name, app_title,
+                                ValidationReport.FAIL, CrashType.value)
+                            continue
+
+                        logged_in = self.handle_login()
+
+                        sleep(2) # Wait 2s, reattempt
+                        login_attemps += 1
 
                     if not logged_in:
                         self.report.add(app_package_name, app_title,
                             ValidationReport.PASS, 'Failed to log in')
+                    else:
+                        # For now, if app opens without error, we'll report successful
+                        self.report.add(app_package_name, app_title,
+                            ValidationReport.PASS, '')
 
                     # input("Close app")
                     close_app(app_package_name, self.transport_id)
