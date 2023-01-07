@@ -336,7 +336,7 @@ class AppValidator:
         return btns, tapped
 
 
-    def handle_login(self) -> bool:
+    def handle_login(self, login_entered: bool, password_entered:bool ) -> bool:
         '''
             On a given page we will look at it and perform an action, if there is one .
         '''
@@ -357,12 +357,17 @@ class AppValidator:
             # 3. Click Continue button to attempt to get to a page with #1 or #2
         actions = 0 # At most, we should take 3 actions on a single page [may not be necessary but is a hard limit to prevent loops.]
         # Find Email, Password and Login button.
-        LOGIN_ENTERED = False
-        PASSWORD_ENTERED = False
+
+
         CONTINUE_SUBMITTED = False
         tapped = False
         total_actions = 0
         while actions < 4 and not CONTINUE_SUBMITTED and total_actions < 6:
+
+
+            if CONTINUE_SUBMITTED and login_entered and password_entered:
+                return True, True, True
+
             # input("Start handle login loop....")
             self.dprint("\n\n Activity \n", self.prev_act, "\n", self.cur_act )
             # input("Pause")
@@ -379,38 +384,38 @@ class AppValidator:
                 results[GOOGLE_AUTH], tapped = self.click_button(results[GOOGLE_AUTH])
                 del results[GOOGLE_AUTH]
                 return True
-            elif LOGIN in results and not LOGIN_ENTERED:
+            elif LOGIN in results and not login_entered:
                 results[LOGIN], tapped = self.click_button(results[LOGIN])
                 del results[LOGIN]
                 self.send_keys_ADB("testminnie001@gmail.com", False)
                 actions += 1
-                LOGIN_ENTERED = True
+                login_entered = True
 
-            elif PASSWORD in results and not PASSWORD_ENTERED:
+            elif PASSWORD in results and not password_entered:
                 results[PASSWORD], tapped = self.click_button(results[PASSWORD])
                 del results[PASSWORD]
                 self.send_keys_ADB("testminnie123")
                 actions += 1
-                PASSWORD_ENTERED = True
+                password_entered = True
             elif CONTINUE in results:
                 # TODO Remove the button once we click it, so we dont keep clicking the same element.
                 results[CONTINUE], tapped = self.click_button(results[CONTINUE])
                 del results[CONTINUE]
                 actions += 1
-                if LOGIN_ENTERED and PASSWORD_ENTERED:
+                if login_entered and password_entered:
                     CONTINUE_SUBMITTED = True
             elif SIGN_IN in results:
                 results[SIGN_IN], tapped = self.click_button(results[SIGN_IN])
                 del results[SIGN_IN]
                 actions += 1
-                if LOGIN_ENTERED and PASSWORD_ENTERED:
+                if login_entered and password_entered:
                     CONTINUE_SUBMITTED = True
             # else:
             #     # No Keys in results
             #     return False
             total_actions += 1
             self.dprint(f"\n\n Total Actions: {total_actions}  \n\n ")
-        return False
+        return False, login_entered, password_entered
 
 
     def get_coords(self, btn: List):
@@ -502,6 +507,9 @@ class AppValidator:
 
                     login_attemps = 0
                     logged_in = False
+                    login_entered = False
+                    password_entered = False
+                    # parameterize email & password so thgey cary over ea round
                     while not logged_in and login_attemps < 4:
                         sleep(2)
 
@@ -512,7 +520,7 @@ class AppValidator:
                                 ValidationReport.FAIL, CrashType.value)
                             continue
 
-                        logged_in = self.handle_login()
+                        logged_in, login_entered, password_entered = self.handle_login(login_entered, password_entered)
 
                         sleep(2) # Wait 2s, reattempt
                         login_attemps += 1
