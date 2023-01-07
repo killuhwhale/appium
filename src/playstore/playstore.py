@@ -405,11 +405,12 @@ class AppValidator:
                 actions += 1
                 if LOGIN_ENTERED and PASSWORD_ENTERED:
                     CONTINUE_SUBMITTED = True
-            else:
-                # No Keys in results
-                return False
+            # else:
+            #     # No Keys in results
+            #     return False
             total_actions += 1
             self.dprint(f"\n\n Total Actions: {total_actions}  \n\n ")
+        return False
 
 
     def get_coords(self, btn: List):

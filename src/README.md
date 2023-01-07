@@ -11,7 +11,8 @@ Prep work for Chromebook:
     - Setup environment
         - bash ins_and_stu.sh
         - bash setup.sh
-    - python3 main.py 192.168.0.143:5555 [ips]
+    - python3 main.py [ips]
+    - python3 main.py python3 main.py 192.168.1.113:5555 192.168.1.238:5555 192.168.1.248:5555
 
 
 # Need to test on Chromebook

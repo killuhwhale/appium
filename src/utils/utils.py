@@ -352,10 +352,9 @@ def lazy_start_appium_server():
     print("desty path: ", path)
 
 
-    print("Cehcking app image: ")
+    print("Checking app image: ")
     cmd = ["sh", "recombine_app_image.sh", path]
     res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
-    print("Res", res)
     print("Starting Server")
 
     try:

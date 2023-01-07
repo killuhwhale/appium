@@ -18,10 +18,13 @@ sudo apt -y install libnss3-dev libgdk-pixbuf2.0-dev libgtk-3-dev libxss-dev
 
 num_files=$(ls -1a $NVM_DIR | wc -l)
 key_len=${#NVM_DIR}
-echo -e "\n\n $Green Checking NODE ENV: ($num_files) - ($key_len) $RESET \n\n"
+npm=$(which npm)
+npm_len=${#npm}
+echo -e "\n\n $Green Checking NODE ENV: ($num_files) - ($key_len) - ($npm_len) $RESET \n\n"
 
 
-if [ $num_files -gt 0 -a $key_len -gt 0 ]; then
+
+if [ $num_files -gt 0 -a $key_len -gt 0 -a npm_len -gt 0 ]; then
   # If nvm is installed, print "Installed"
   echo -e "\n\n $Blue Node Installed $RESET \n\n"
 else
@@ -57,7 +60,7 @@ bash append_to_bashrc.sh "export PATH=\$PATH:\$JAVA_HOME" "/home/$USER/.bashrc"
 
 if [ ! -e "/home/$USER/appium" ]; then
     echo -e "\n\n $Green Cloning repo & setting up env... $RESET \n\n"
-    sudo apt-get -y install python3-venv
+    sudo apt-get install python3-venv
     git clone https://github.com/killuhwhale/appium.git
     cd appium
     python3 -m venv .
@@ -68,7 +71,10 @@ else
     echo -e "\n\n $Yellow Source env already setup... $RESET \n\n"
     cd appium/src
 fi
-echo -e "\n\n $Cyan Finished! Run: \n\t $RESET $Red exec bash $RESET \n\n"
+echo -e "\n\n $Yellow Finished! When installing NVM and NPM for the first time,"
+echo -e "\t we need to reset the env to finish the install "
+
+echo -e "\n\n $Yellow Run the following and then rerun this script. \n\t $RESET $Red exec bash $RESET \n\n"
 
 echo -e "\n\n $Cyan Also don't forget to activate venv:: \n\t $RESET $Red source appium/bin/activate $RESET \n\n"
 
