@@ -1,3 +1,4 @@
+from appium.webdriver.appium_service import AppiumService
 import __main__
 from datetime import datetime
 import os
@@ -337,21 +338,24 @@ def is_package_installed(transport_id: str, package_name: str):
     # Check the output for the package name
     return package_name in result
 
+def stop_appium_server():
+    ''' Stops the Appium Server running on port 4723'''
+    cmd = ["kill", "$(lsof -t -i :4723)"]
+    res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
 
 
 def lazy_start_appium_server():
-    ''' Runs bash script to download AppiumServer.AppImage
-        if its not already downloaded and starts it.
+    ''' Attempts to start Appium server. '''
+    print("Starting Server")
 
-     '''
-    root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
-    root_path = '/'.join(root_path)
-    path = f"/{root_path}/appium/server.AppImage"
-    print("desty path: ", path)
-    cmd = ("bash", "../dl_inst_app_server.sh", path)
-    res = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
-    print(res)
-
+    try:
+        service = AppiumService()
+        service.start(args=['--address', '0.0.0.0', '-p', str(4723), '--base-path', '/wd/hub'])
+    except Exception as error:
+        print(error)
+        stop_appium_server()
+        service = AppiumService()
+        service.start(args=['--address', '0.0.0.0', '-p', str(4723), '--base-path', '/wd/hub'])
 
 
 # Ip Address of machien Running Appium Server

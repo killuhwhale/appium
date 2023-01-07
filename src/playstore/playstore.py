@@ -202,6 +202,7 @@ class AppValidator:
             instance_num: int= 0
         ):
         self.driver = driver
+        self.ip = ip
         self.package_names = package_names  # List of packages to test as [app_title, app_package_name]
         self.report = ValidationReport(ip)
         self.steps = [
@@ -222,7 +223,7 @@ class AppValidator:
     def dprint(self, *args):
         color = self.report.COLORS[2:][self.instance_num % len(self.report.COLORS)]
         print(color,end="")
-        print(*args,end="")
+        print(f"{self.ip} - ", *args, end="")
         print(color,end="")
         print(self.report.RESET)
 

@@ -1,1 +1,0 @@
-Appium Server AppImage will live here.
