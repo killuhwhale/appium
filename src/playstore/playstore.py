@@ -463,6 +463,7 @@ class AppValidator:
                 if not installed and not error is None:
                     self.report.add(app_package_name, app_title, ValidationReport.FAIL, error)
                     ERR = True
+                    i += 1
                     continue
 
                 if not open_app(app_package_name, self.transport_id, self.arc_version):
@@ -518,12 +519,22 @@ class AppValidator:
                         if(not CrashType == CrashType.SUCCESS):
                             self.report.add(app_package_name, app_title,
                                 ValidationReport.FAIL, CrashType.value)
+                                i += 1
                             continue
 
                         logged_in, login_entered, password_entered = self.handle_login(login_entered, password_entered)
 
                         sleep(2) # Wait 2s, reattempt
                         login_attemps += 1
+
+                    # Check for crash once more after login attempts.
+                    CrashType, crashed_act = check_crash(app_package_name,
+                                                start_time, self.transport_id)
+                    if(not CrashType == CrashType.SUCCESS):
+                        self.report.add(app_package_name, app_title,
+                            ValidationReport.FAIL, CrashType.value)
+                        i += 1
+                        continue
 
                     if not logged_in:
                         self.report.add(app_package_name, app_title,
