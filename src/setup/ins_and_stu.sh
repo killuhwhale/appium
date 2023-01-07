@@ -2,12 +2,24 @@
 
 sudo apt install default-jre
 
+RED="\033[31m"
+Black="\033[30m"
+Green="\033[32m"
+Yellow="\033[33m"
+Blue="\033[34m"
+Purple="\033[35m"
+Cyan="\033[36m"
+White="\033[37m"
+RESET="\033[0m"
+
+
+
 if [ -e "/opt/android-studio" ]
 then
     # The file exists
-    echo "Android studio already installed."
+    echo -e "\n\n $Green Android studio already installed. $RESET \n\n"
 else
-    echo "Fetching Android Studio"
+    echo -e "\n\n $Green Fetching Android Studio. $RESET \n\n"
 
     # Link from studio website
     # curl https://redirector.gvt1.com/edgedl/android
@@ -27,19 +39,16 @@ else
     #    | grep -o --regexp='https.\*com')
     STUDIO=$(curl $AS_DL_URL | grep -o --regexp='https.*com')
 
-    echo "Downloading from: $STUDIO..."
-    echo "Downloading Android Studio for Chrome."
+    echo -e "\n\n $Purple Downloading from: $STUDIO... $RESET \n\n"
+    echo -e "\n\n $Purple Downloading Android Studio for Chrome. $RESET \n\n"
     curl -o studio.deb -L $STUDIO
 
-    echo "Installing Android Studio for Chrome."
-
+    echo -e "\n\n $Yellow Installing Android Studio for Chrome.. $RESET \n\n"
     sudo dpkg -i  studio.deb
-
-    echo "Done downloading and installing Android Studio"
 
     sudo rm studio.deb
 
-    echo "Search for app: Android Studio"
+    echo -e "\n\n $Green Opening Android Studio. $RESET \n\n"
 
     bash /opt/android-studio/bin/studio.sh
 
