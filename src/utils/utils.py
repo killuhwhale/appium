@@ -352,17 +352,19 @@ def lazy_start_appium_server():
     print("desty path: ", path)
 
 
-    cmd = ["bash", "../recombine_app_image.sh", path]
+    print("Cehcking app image: ")
+    cmd = ["sh", "recombine_app_image.sh", path]
     res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
-
+    print("Res", res)
     print("Starting Server")
 
     try:
         service = AppiumService()
         service.start(args=['--address', '0.0.0.0', '-p', str(4723), '--base-path', '/wd/hub'])
     except Exception as error:
-        print(error)
+        print(str(error)[:50])
         stop_appium_server()
+        print('Restarting appium server')
         service = AppiumService()
         service.start(args=['--address', '0.0.0.0', '-p', str(4723), '--base-path', '/wd/hub'])
 
