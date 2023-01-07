@@ -20,7 +20,7 @@ from typing import List
 
 from objdetector.objdetector import ObjDetector
 from utils.utils import (
-    SIGN_IN, ArcVersions, CONTINUE, CrashType, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
+    ADB_KEYCODE_DEL, SIGN_IN, ArcVersions, CONTINUE, CrashType, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
     PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER,
     check_crash, close_app, get_cur_activty, get_start_time, open_app)
 
@@ -761,10 +761,13 @@ class AppValidator:
         sleep(2)  # Wait for search results
 
     def send_keys_ADB(self, title: str, submit=True):
-        content_desc = f'''
-            new UiSelector().className("android.widget.EditText")
-        '''
         title_search = self.escape_chars(title)
+
+
+        for _ in range(60):
+            cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'keyevent', ADB_KEYCODE_DEL)
+            subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+
         cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'text', title_search)
         subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
         if submit:
