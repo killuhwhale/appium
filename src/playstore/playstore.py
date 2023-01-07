@@ -775,7 +775,7 @@ class AppValidator:
         title_search = self.escape_chars(title)
 
 
-        for _ in range(60):
+        for _ in range(len("testminnie001@gmail.com") + 5):
             cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'keyevent', ADB_KEYCODE_DEL)
             subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
 
