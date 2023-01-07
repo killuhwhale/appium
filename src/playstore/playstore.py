@@ -519,7 +519,7 @@ class AppValidator:
                         if(not CrashType == CrashType.SUCCESS):
                             self.report.add(app_package_name, app_title,
                                 ValidationReport.FAIL, CrashType.value)
-                                i += 1
+                            i += 1
                             continue
 
                         logged_in, login_entered, password_entered = self.handle_login(login_entered, password_entered)
