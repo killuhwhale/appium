@@ -1,5 +1,6 @@
 #!/user/bin/bash
 
+sudo apt install default-jre
 
 if [ -e "/opt/android-studio" ]
 then

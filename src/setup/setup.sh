@@ -1,7 +1,7 @@
 # echo "password" | sudo -S myscript.sh
 # Install Java
-sudo apt install default-jre
-sudo apt install libnss3-dev libgdk-pixbuf2.0-dev libgtk-3-dev libxss-dev
+sudo apt -y install default-jre
+sudo apt -y install libnss3-dev libgdk-pixbuf2.0-dev libgtk-3-dev libxss-dev
 
 # Setup Node environment
 
@@ -44,6 +44,3 @@ if [ ! -e "/home/$USER/appium" ]; then
 else
     cd appium/src
 fi
-
-
-python3 main.py
