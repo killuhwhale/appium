@@ -24,7 +24,6 @@ if __name__ == "__main__":
         ]
     print("ips: ", ips)
 
-    # TODO we still need a way to actually start the server
     lazy_start_appium_server()
 
     runner = MultiprocessTaskRunner(ips, TOP_500_APPS[:1] )
