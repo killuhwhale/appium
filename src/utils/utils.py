@@ -4,6 +4,8 @@ import subprocess
 from enum import Enum
 from time import strftime, time, localtime
 from typing import AnyStr, Dict, List
+from appium import webdriver
+from appium.webdriver.common.appiumby import AppiumBy
 
 
 # ARC_VERSIONS
@@ -50,7 +52,7 @@ def get_cur_activty(transport_id: str, ARC_VERSION: ARC_VERSIONS = ARC_VERSIONS.
             print("Err get_cur_activty ", e)
     return "",""
     
-def open_app(package_name: str, transport_id: int, ARC_VERSION: ARC_VERSIONS = ARC_VERSIONS.ARC_R):
+def open_app(driver: webdriver, package_name: str, transport_id: int, ARC_VERSION: ARC_VERSIONS = ARC_VERSIONS.ARC_R):
     try:
         cmd = ('adb','-t', transport_id, 'shell', 'monkey', '--pct-syskeys', '0', '-p', package_name, '-c', 'android.intent.category.LAUNCHER', '1')
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
@@ -64,6 +66,13 @@ def open_app(package_name: str, transport_id: int, ARC_VERSION: ARC_VERSIONS = A
         while cur_package != package_name and int(time() - t) < MAX_WAIT_FOR_OPEN_APP:
             try:
                 cur_package, act_name = get_cur_activty(transport_id, ARC_VERSION)
+
+                # Check if a permissions activity is open.
+                if driver.current_activity == 'com.android.permissioncontroller.permission.ui.GrantPermissionsActivity':
+                    content_desc = f'''new UiSelector().className("android.widget.Button").text("Allow")'''
+                    allow_button = driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+                    allow_button.click()
+
             except Exception as e:
                 print("Err getting cur act", e)
         print(outstr)
@@ -236,7 +245,15 @@ IMAGE_LABELS = [
 ]
 
 PACKAGE_NAMES = [
+    [ "Rocket League Sideswipe", "com.Psyonix.RL2D", "Password", "testminnie001@gmail.com", "testminnie123"],
+#['Netflix', 'com.netflix.mediaclient', 'Password', 'testminnie003@gmail.com', 'Testminnie123'],
+    ['Roblox', 'com.roblox.client', 'Password', 'testminnie001@gmail.com', 'Testminnie123456'],
+    ['YouTube Kids', 'com.google.android.apps.youtube.kids', 'Google Auth', 'testminnie001@gmail.com'],
     ['Messenger', 'com.facebook.orca', 'Password', 'testminnie001@gmail.com', 'testminnie123'],
+    ['Free Fire', 'com.dts.freefireth', 'None'],
+#['Gacha Club', 'air.com.lunime.gachaclub', 'None'],
+    ['Messenger Kids', 'com.facebook.talk', 'Password', 'testminnie001@gmail.com', 'testminnie123'],
+    ['Among Us!', 'com.innersloth.spacemafia', 'None'],
     ['Tubi TV', 'com.tubitv', 'Google Auth', 'testminnie001@gmail.com']
 ]
 

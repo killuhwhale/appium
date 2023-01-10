@@ -8,16 +8,16 @@
 
 
 # Train/val/test sets as 1) dir: path/to/imgs, 2) file: path/to/imgs.txt, or 3) list: [path/to/imgs1, path/to/imgs2, ..]
-path: ../yolo_images/train_data/  # dataset root dir
-train: images  # train images (relative to 'path') 128 images
-val: images  # val images (relative to 'path') 128 images
-test: #test_data/images # test images (optional)
+path: ../yolo_images/  # dataset root dir
+train: train/images
+val: valid/images
+test: test/images
 
 # Classes
 names:
   0: Continue
-  1: Login Field
-  2: Password Field
-  3: Google Auth
-  4: Facebook Auth
-  5: Sign In
+  1: Facebook Auth
+  2: Google Auth
+  3: Login Field
+  4: Password Field
+

@@ -28,7 +28,7 @@ class ObjDetector:
             save_conf=False, 
             save_crop=False, 
             save_txt=False, 
-            source=f'notebooks/yolo_images/test_data/images/{img_name}',
+            source=f'notebooks/yolo_images/test/images/{img_name}',
             update=False, 
             vid_stride=1, 
             view_img=False, 

@@ -34,6 +34,7 @@ if __name__ == '__main__':
 
     # Multiprocessing Runs
     print(len(TOP_500_APPS))
+    print(TOP_500_APPS[0])
     runner = MultiprocessTaskRunner(ips, TOP_500_APPS)
     runner.run()
 

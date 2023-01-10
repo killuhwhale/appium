@@ -256,7 +256,7 @@ class AppValidator:
             This image will be used as the source to detect our buttons and fields.
         '''
         try:
-            self.driver.get_screenshot_as_file(f"/Users/ethancox/Documents/appium/src/notebooks/yolo_images/test_data/images/test.png")
+            self.driver.get_screenshot_as_file(f"/Users/ethancox/Documents/appium/src/notebooks/yolo_images/test/images/test.png")
             return True
         except ScreenshotException as e:
             print("App is scured!")
@@ -388,7 +388,7 @@ class AppValidator:
                 actions += 1
                 LOGIN_ENTERED = True
 
-            elif PASSWORD in results and not PASSWORD_ENTERED:
+            if PASSWORD in results and not PASSWORD_ENTERED:
                 # We have A google Auth button presents lets press it
                 results[PASSWORD], tapped = self.click_button(results[PASSWORD])
                 del results[PASSWORD]
@@ -396,12 +396,20 @@ class AppValidator:
                 actions += 1
                 PASSWORD_ENTERED = True
 
-            elif SIGN_IN in results and not SIGN_IN_SUBMITTED:
+            if SIGN_IN in results and not SIGN_IN_SUBMITTED:
 
                 results[SIGN_IN], tapped = self.click_button(results[SIGN_IN])
                 del results[SIGN_IN]
                 actions += 1
                 SIGN_IN_SUBMITTED = True
+
+            if CONTINUE in results:
+                # TODO Remove the button once we click it, so we dont keep clicking the same element.
+                # We have A google Auth button presents lets press it
+                results[CONTINUE], tapped = self.click_button(results[CONTINUE])
+                actions += 1
+                if LOGIN_ENTERED and PASSWORD_ENTERED:
+                    CONTINUE_SUBMITTED = True
 
             else:
                 # No Keys in results
@@ -417,7 +425,10 @@ class AppValidator:
 
         actions = 0  # At most, we should take 3 actions on a single page [may not be necessary but is a hard limit to prevent loops.]
         # Find Email, Password and Login button.
+        LOGIN_ENTERED = False
+        PASSWORD_ENTERED = False
         GOOGLE_AUTH_SELECTED = False
+        CONTINUE_SUBMITTED = False
         tapped = False
 
         while actions < 8 and not GOOGLE_AUTH_SELECTED:
@@ -439,6 +450,15 @@ class AppValidator:
                 content_desc = f'''new UiSelector().className("android.widget.TextView").text("{email}")'''
                 search_icon = self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
                 search_icon.click()
+                return True
+
+            if CONTINUE in results:
+                # TODO Remove the button once we click it, so we dont keep clicking the same element.
+                # We have A google Auth button presents lets press it
+                results[CONTINUE], tapped = self.click_button(results[CONTINUE])
+                actions += 1
+                if LOGIN_ENTERED and PASSWORD_ENTERED:
+                    CONTINUE_SUBMITTED = True
 
             else:
                 # No Keys in results
@@ -489,7 +509,7 @@ class AppValidator:
                 ERR = True
                 continue
             
-            if not open_app(app_package_name, self.transport_id, self.ARC_VERSION):
+            if not open_app(self.driver, app_package_name, self.transport_id, self.ARC_VERSION):
                 ERR = True
                 # TODO, we can also detect if we actually haev the package installed before just reporting else: Failed to open
                 if self.check_playstore_invalid(app_package_name):
@@ -519,7 +539,6 @@ class AppValidator:
                 # TODO, improve open_app to detect failures more robustly.
                 self.report.add(app_package_name, app_title, ValidationReport.PASS, '')  # For now, if app opens without error, we will sayy its successful
                 
-                
                 # TODO Do login, building obj detection
                 login_attemps = 0
                 logged_in = False
@@ -527,7 +546,12 @@ class AppValidator:
                     # ChromeOS does have mFocusedWindow -> get_cur_activty -> is_new_activity
                     # Throws an error and stays in continuous loop....
                     sleep(5)
-                    if app_login_type == 'Password':
+
+                    if app_login_type == 'None':
+                        self.is_new_activity()
+                        break
+
+                    elif app_login_type == 'Password':
                         logged_in = self.handle_password_login(app_login, app_password)
 
                     elif app_login_type == 'Google Auth':
@@ -538,6 +562,7 @@ class AppValidator:
 
                     sleep(2) # Wait 2s, reattempt    
                     login_attemps += 1
+
                 if not logged_in:
                     self.report.add(app_package_name, app_title, ValidationReport.PASS, 'Failed to log in')
 
