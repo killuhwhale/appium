@@ -1,0 +1,1 @@
+Temproay APK storage to store Manifest and parse Version Code.

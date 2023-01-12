@@ -19,7 +19,26 @@ Prep work for Chromebook:
 Need to understand if devices will have preinstalled accounts
     - Need accounts like testminnie001@gmail.com logged into device
 
+
+Improve model
+App version
+Manifest DL
+Identify Android vs PWA & AMAC-e
+Games vs App - Surface View check
+Log each step of testing instead of just reporting failures.
+
+
 Problems:
+
+
+    Credentails:
+        - Make a small toool to easily seach for creds that arent filled in.
+        - Allow testers to search quickly
+            - If a tester is testing an app, they shoudl search the tool
+                - If they are testing an app and its on the list of unfilled creds
+                    - Allow tester to add creds
+
+
     - Figure out a strategy/ design for loggin into apps w/ a variety of accounts.
 
     Store Packages with accounts.

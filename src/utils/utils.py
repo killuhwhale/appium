@@ -1,5 +1,6 @@
 from appium.webdriver.appium_service import AppiumService
 import __main__
+from appium import webdriver
 from datetime import datetime
 import os
 import re
@@ -7,6 +8,7 @@ import subprocess
 from enum import Enum
 from time import time
 from typing import AnyStr, Dict, List
+import cv2
 
 
 class ArcVersions(Enum):
@@ -325,16 +327,13 @@ def get_start_time():
     return datetime.fromtimestamp(time()).strftime('%m-%d %H:%M:%S.%f')[:-3]
 
 
-# TODO test this method to make sure it works..
-# Isn't needed currently, wanted to use to check if ADBKeyboard was alrady installed but reattempting to install and installed package doesn't harm the program.
 def is_package_installed(transport_id: str, package_name: str):
     ''' Checks if package is installed via ADB. '''
     # Call the adb shell pm list packages command
     result = subprocess.run(
         ['adb', '-t', transport_id, 'shell', 'pm', 'list', 'packages'],
         check=False, encoding='utf-8', capture_output=True
-    ).stdout.decode('utf-8')
-
+    ).stdout.strip()
     # Check the output for the package name
     return package_name in result
 
@@ -343,6 +342,11 @@ def stop_appium_server():
     cmd = ["kill", "$(lsof -t -i :4723)"]
     res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
 
+
+def get_root_path():
+    root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
+    root_path = '/'.join(root_path)
+    return f"/{root_path}"
 
 def lazy_start_appium_server():
     ''' Attempts to start Appium server. '''
@@ -361,12 +365,292 @@ def lazy_start_appium_server():
         service = AppiumService()
         service.start(args=['--address', '0.0.0.0', '-p', str(4723), '--base-path', '/wd/hub'])
     except Exception as error:
-        print(str(error)[:50])
+        print("Error starting appium server", str(error)[:50])
         stop_appium_server()
         print('Restarting appium server')
         service = AppiumService()
         service.start(args=['--address', '0.0.0.0', '-p', str(4723), '--base-path', '/wd/hub'])
 
+
+'''
+Two problems
+
+
+1. Getting screen shot with window titles
+2. Detecting image.
+3. Yolo obj detection
+
+'''
+
+
+
+def find_template(large_img, small_img, method=cv2.TM_CCOEFF_NORMED):
+    method = cv2.TM_SQDIFF_NORMED
+    # Read the images
+    large_img = cv2.imread(large_img)
+    small_img = cv2.imread(small_img)
+
+    # Convert images to grayscale
+    gray_large_img = cv2.cvtColor(large_img, cv2.COLOR_BGR2GRAY)
+    gray_small_img = cv2.cvtColor(small_img, cv2.COLOR_BGR2GRAY)
+
+    # Apply template matching
+    result = cv2.matchTemplate(gray_large_img, gray_small_img, method)
+
+    # Use the cv2.minMaxLoc() function to find the coordinates of the best match
+    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+    print("Min/ max", min_val, max_val)
+    # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
+    if method in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
+        top_left = min_loc
+    else:
+        top_left = max_loc
+
+    # Draw a rectangle around the matched region
+    bottom_right = (top_left[0] + small_img.shape[1], top_left[1] + small_img.shape[0])
+    cv2.rectangle(large_img, top_left, bottom_right, (0, 0, 255), 2)
+
+    # Show the final image
+    cv2.imshow('Matched Image', large_img)
+    # cv2.imshow('Matched Image', gray_large_img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
+
+'''
+Apk Analyzer - AMAC-e
+ ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] id=window_session_id=8 flg=0x10200000 cmp=sk.styk.martin.apkanalyzer/.ui.main.MainActivity} from uid 1000
+
+
+
+'''
+
+
+# Identify Android vs PWA & AMAC-e
+def check_amace(driver, package_name: str) -> bool:
+    # Grab screenshot of device
+    # Look for AMAC-e image.
+    names = ['amace_phone', 'amace_tablet', 'amace_resize']
+    root_path = get_root_path()
+    ss_path = f"{root_path}/apks/{package_name}/test.png"
+    does_exist = file_exists(ss_path)
+
+    print("Checking AMAC-e", ss_path[:100])
+    ss = driver.get_screenshot_as_file(ss_path)
+    for name in names:
+        amace_icon_path = f"{get_root_path()}/images/templates/{name}.png"
+        find_template(ss_path, amace_icon_path)
+    return False
+
+
+'''
+    1. Pull APK from device
+    2. Store APK in /apks/package_name
+    3. Run aapt commands
+        - 1. Store Manifest in memory
+        - 2. Parse for version_name
+        - 3. Save Manifest in apks/package_name
+
+
+'''
+
+
+def create_dir_if_not_exists(directory):
+    print("Create dir if not exist", directory)
+    if not os.path.exists(directory):
+        print("Creating dir: ", directory)
+        os.makedirs(directory)
+
+def file_exists(directory):
+    return os.path.exists(directory)
+
+def gather_app_info(transport_id: str, package_name: str):
+    has_apk = get_apk(transport_id, package_name)
+    manifest = download_manifest(package_name)
+    print(manifest[:200])
+    app_info = get_app_info(manifest)
+    return app_info
+
+def get_apk(transport_id: str, package_name: str) -> bool:
+    ''' Grabs the APK from device.
+
+        adb shell pm path package_name
+
+        package:/data/app/~~-TjCwRkZEFass6mjqTzMtg==/com.netflix.mediaclient-mPHhWQM2xwIJco8coL6OYg==/base.apk
+        # package:/data/app/~~-TjCwRkZEFass6mjqTzMtg==/com.netflix.mediaclient-mPHhWQM2xwIJco8coL6OYg==/split_config.en.apk
+        # package:/data/app/~~-TjCwRkZEFass6mjqTzMtg==/com.netflix.mediaclient-mPHhWQM2xwIJco8coL6OYg==/split_config.mdpi.apk
+        # package:/data/app/~~-TjCwRkZEFass6mjqTzMtg==/com.netflix.mediaclient-mPHhWQM2xwIJco8coL6OYg==/split_config.x86_64.apk
+
+        JUST NEED BASE APK FOR MAIN INFO
+
+        Grabs APK via ADB PULL /path/to/apk
+        and stores it in /apks/<package_name>
+
+        Returns True when APK is in required location. False otherwise.
+    '''
+    print("Gettign APK ", package_name)
+
+    if not is_package_installed(transport_id, package_name):
+        return False
+
+    root_path = get_root_path()
+    dl_dir = f"{root_path}/apks/{package_name}"
+    create_dir_if_not_exists(dl_dir)
+
+    does_exist = file_exists(f"{root_path}/apks/{package_name}/base.apk")
+    if does_exist:
+        return True
+
+    cmd = ('adb', '-t', transport_id, 'shell', 'pm', 'path', package_name )
+    print("File exists ", does_exist)
+    outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+                                capture_output=True).stdout.strip()
+    apk_path = None
+    for line in outstr.split("\n"):
+        if 'base.apk' in line:
+            apk_path = line[len("package:"):]
+
+    print(f"Found apk path: {apk_path}")
+
+
+
+    print("Pulling APK: ", package_name)
+
+    cmd = ('adb', '-t', transport_id, 'pull', apk_path, dl_dir )
+    outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+                                capture_output=True).stdout.strip()
+
+    return True
+
+
+def get_aapt_version():
+    '''
+        Returns path of the latest version of aapt installed on host device.
+    '''
+    android_home = os.environ.get("ANDROID_HOME")
+    # aapt = f"{android_home}/build-tools/*/aapt"
+    aapt = f"{android_home}/build-tools/"
+    items = os.listdir(aapt)
+
+    # Iterate over the items
+    for item in items[::-1]:
+        return  os.path.join(aapt, item, "aapt")
+    return ""
+
+# App version
+def get_app_info(manifest_text: str)  -> dict:
+    ''' Grabs the App version from ...
+    '''
+
+    info_line = manifest_text.split("\n")[0]
+    # Define the regular expression pattern
+    pattern = r"name='(?P<name>.*?)' versionCode='(?P<versionCode>.*?)' versionName='(?P<versionName>.*?)' compileSdkVersion='(?P<compileSdkVersion>.*?)' compileSdkVersionCodename='(?P<compileSdkVersionCodename>.*?)'"
+
+    # Search for the pattern in the string
+    match = re.search(pattern, info_line)
+
+    # Extract the groups
+    if match:
+        info = {
+            'name': match.group("name"),
+            'versionCode': match.group("versionCode"),
+            'versionName': match.group("versionName"),
+            'compileSdkVersion': match.group("compileSdkVersion"),
+            'compileSdkVersionCodename': match.group("compileSdkVersionCodename")
+        }
+
+        # print(f'Match found!  {info}')
+        return info
+    else:
+        print("No match found.")
+
+
+
+
+    return dict()
+
+# Manifest DL
+def download_manifest(package_name: str):
+    ''' Grabs the APK Manifest from ...  '''
+    # /Android/Sdk/tools/bin/apkanalyzer manifest print /path/to/app.apk
+#     N: android=http://schemas.android.com/apk/res/android
+#   E: manifest (line=0)
+#     A: android:versionCode(0x0101021b)=(type 0x10)0xc49f
+#     A: android:versionName(0x0101021c)="8.52.2 build 14 50335" (Raw: "8.52.2 build 14 50335")
+      # Need to download APK tho....
+    # aapt dump badging my.apk | sed -n "s/.*versionName='\([^']*\).*/\1/p"
+    # ./aapt2 dump xmltree --file AndroidManifest.xml /home/killuh/Downloads/com.netflix.mediaclient_8.52.2\ build\ 14\ 50335.apk
+    # ./aapt dump xmltree /home/killuh/Downloads/com.netflix.mediaclient_8.52.2\ build\ 14\ 50335.apk AndroidManifest.xml
+    # ./aapt dump xmltree app.apk AndroidManifest.xml
+
+
+    aapt = get_aapt_version()
+    root_path = get_root_path()
+    manifest_path = f"{root_path}/apks/{package_name}/manifest.txt"
+    apk_path = f"{root_path}/apks/{package_name}/base.apk"
+
+    if file_exists(manifest_path):
+        with open(manifest_path, 'r', encoding='utf-8') as f:
+            return f.read()
+
+    cmd = (aapt, "dump", "badging", apk_path)
+    manifest = subprocess.run(cmd, check=True, encoding='utf-8',
+                                capture_output=True).stdout.strip()
+
+    with open(manifest_path, 'w', encoding='utf-8') as f:
+        f.write(manifest)
+
+    return manifest
+
+
+# Games vs App - Surface View check
+def has_surface_name(transport_id: str, package_name: str) -> str:
+    """
+    Returns the surface name for a given package name.
+    Args:
+        package_name: A string representing the name of the application to
+            be targeted.
+    Returns:
+        A string representing a surface name of the package name.
+    """
+    pattern_with_surface = rf"""^SurfaceView\s*-\s*
+                        (?P<package>{package_name})     # Package name
+                        /[\w.#]*$"""                    # Surface window
+
+    re_surface = re.compile(pattern_with_surface, re.MULTILINE | re.IGNORECASE | re.VERBOSE)
+    cmd = ('adb', '-t', transport_id, 'shell', 'dumpsys', 'SurfaceFlinger', '--list')
+    surfaces_list = subprocess.run(cmd, check=True, encoding='utf-8',
+                                    capture_output=True).stdout.strip()
+
+    last = None
+    for match in re_surface.finditer(surfaces_list):
+        last = match
+    if last:
+        if package_name != last.group('package'):
+            # return (f'Surface not found for package {package_name}. '
+            #                 'Please ensure the app is running.')
+            return False
+
+        # UE4 games have at least two SurfaceView surfaces. The one
+        # that seems to in the foreground is the last one.
+        # return last.group()
+        return True
+
+
+    pattern_without_surface = rf"""^(?P<package>{package_name})/[\w.#]*$"""
+    re_without_surface = re.compile(
+        pattern_without_surface, re.MULTILINE | re.IGNORECASE | re.VERBOSE)
+    # Fallback: SurfaceView was not found.
+    matches_without_surface = re_without_surface.search(
+        surfaces_list)
+    if matches_without_surface:
+        if package_name != matches_without_surface.group('package'):
+            return False
+            # return (f'Surface not found for package {package_name}. '
+            #                 'Please ensure the app is running.')
+        # return matches_without_surface.group()
+        return True
 
 # Ip Address of machien Running Appium Server
 EXECUTOR = 'http://192.168.0.175:4723/wd/hub'
@@ -393,6 +677,7 @@ IMAGE_LABELS = [
 
 PACKAGE_NAMES = [
     # [ "Rocket League Sideswipe", "com.Psyonix.RL2D"],
+    ['Apk Analyzer', 'sk.styk.martin.apkanalyzer'],
     ['Roblox', 'com.roblox.client'],
     # ['Showmax', 'com.showmax.app'],  # NA in region
     # ['Epic Seven', 'com.stove.epic7.google'], #  Failed send keys

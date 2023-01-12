@@ -21,8 +21,8 @@ from typing import List
 from objdetector.objdetector import ObjDetector
 from utils.utils import (
     ADB_KEYCODE_DEL, SIGN_IN, ArcVersions, CONTINUE, CrashType, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
-    PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER,
-    check_crash, close_app, get_cur_activty, get_start_time, open_app)
+    PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, check_amace,
+    check_crash, close_app, gather_app_info, get_cur_activty, get_start_time, has_surface_name, open_app)
 
 class ValidationReport:
     '''
@@ -237,7 +237,7 @@ class AppValidator:
         url = f'https://play.google.com/store/apps/details?id={package_name}'
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
-            self.dprint(response.text)
+            # self.dprint(response.text)
             soup = BeautifulSoup(response.text, 'html.parser')
             error_section = soup.find('div', {'id': 'error-section'})
             if error_section:
@@ -442,8 +442,9 @@ class AppValidator:
         '''
         self.driver.orientation = 'PORTRAIT'
         i = 0
-        while i < len(self.package_names):
-            app_title, app_package_name = self.package_names[i]
+        for app_title, app_package_name in self.package_names:
+        # while i < len(self.package_names):
+        #     app_title, app_package_name = self.package_names[i]
 
         # for app_title, app_package_name in self.package_names:
 
@@ -457,8 +458,8 @@ class AppValidator:
                 start_time = get_start_time()
                 self.start_time = start_time
                 ERR = False
-                installed, error = self.discover_and_install(app_title, app_package_name)
-                # installed, error = True, False # Successful
+                # installed, error = self.discover_and_install(app_title, app_package_name)
+                installed, error = True, False # Successful
                 self.dprint(f"Installed? {installed}   err: {error}")
                 if not installed and not error is None:
                     self.report.add(app_package_name, app_title, ValidationReport.FAIL, error)
@@ -480,18 +481,43 @@ class AppValidator:
                         self.report.add(app_package_name, app_title,
                             ValidationReport.FAIL,
                             "Failed to open")
+                    print("Failed", self.report.report[app_package_name]['reason'])
+
 
                 if not ERR:
                     # TODO wait for activity to start intelligently, not just package
                     # At this point we have successfully launched the app.
                     # We can check
+                    self.dprint("Sleeping...")
                     sleep(5) # ANR Period
                     CrashType, crashed_act = check_crash(app_package_name,
                                                 start_time, self.transport_id)
                     if(not CrashType == CrashType.SUCCESS):
                         self.report.add(app_package_name, app_title,
                             ValidationReport.FAIL, CrashType.value)
+                        self.dprint("App crashed!")
+                        i += 1
                         continue
+                    self.dprint("Done Sleeping checking stuff")
+
+
+
+
+
+
+
+                    # App is now open, check types PWA/ AMAC_E, Game
+                    try:
+                        gather_app_info(self.transport_id, app_package_name)
+                        has_surface = has_surface_name(self.transport_id, app_package_name)
+                        if has_surface:
+                            sleep(4)
+                        is_amace = check_amace(self.driver, app_package_name)
+                        self.dprint(f"Is AMACe : {is_amace}   Has Surface: {has_surface}")
+
+                    except Exception as error:
+                        self.dprint("Failed", error)
+
 
                     ###### Image Scraping #########################################################
                     #
@@ -544,15 +570,16 @@ class AppValidator:
                         self.report.add(app_package_name, app_title,
                             ValidationReport.PASS, '')
 
-                    # input("Close app")
-                    close_app(app_package_name, self.transport_id)
+                # input("Close app")
+                close_app(app_package_name, self.transport_id)
+                # self.uninstall_app(app_package_name)  # (save space)
+                # Change the orientation to portrait
 
-                    # Change the orientation to portrait
-                    self.driver.orientation = 'PORTRAIT'
-                    open_app(PLAYSTORE_PACKAGE_NAME, self.transport_id, self.arc_version)
+                open_app(PLAYSTORE_PACKAGE_NAME, self.transport_id, self.arc_version)
+                self.driver.orientation = 'PORTRAIT'
 
-                    self.uninstall_app(app_package_name)  # (save space)
-                    i += 1
+
+                i += 1  # For now, use as regular loop, but we can move to onoly inc when successful and retry on failed attempts...
             except Exception as error:
                 if error == "PLAYSTORECRASH":
                     self.dprint("restart this attemp!")
