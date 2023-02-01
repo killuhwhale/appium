@@ -60,7 +60,7 @@ bash append_to_bashrc.sh "export PATH=\$PATH:\$JAVA_HOME" "/home/$USER/.bashrc"
 
 if [ ! -e "/home/$USER/appium" ]; then
     echo -e "\n\n $Green Cloning repo & setting up env... $RESET \n\n"
-    sudo apt-get install python3-venv
+    sudo apt-get -y install python3-venv
     git clone https://github.com/killuhwhale/appium.git
     cd appium
     python3 -m venv .

@@ -417,6 +417,44 @@ class AppValidator:
             self.dprint(f"\n\n Total Actions: {total_actions}  \n\n ")
         return False, login_entered, password_entered
 
+    def attempt_login(self, app_title: str, app_package_name: str):
+        login_attemps = 0
+        logged_in = False
+        login_entered = False
+        password_entered = False
+        # parameterize email & password so thgey cary over ea round
+        while not logged_in and login_attemps < 4:
+            sleep(2)
+
+            CrashType, crashed_act = check_crash(app_package_name,
+                                    self.start_time, self.transport_id)
+            if(not CrashType == CrashType.SUCCESS):
+                self.report.add(app_package_name, app_title,
+                    ValidationReport.FAIL, CrashType.value)
+                break
+
+            logged_in, login_entered, password_entered = self.handle_login(login_entered, password_entered)
+
+            sleep(2) # Wait 2s, reattempt
+            login_attemps += 1
+
+        # Check for crash once more after login attempts.
+        CrashType, crashed_act = check_crash(app_package_name,
+                                    self.start_time, self.transport_id)
+        if(not CrashType == CrashType.SUCCESS):
+            self.report.add(app_package_name, app_title,
+                ValidationReport.FAIL, CrashType.value)
+            return False
+
+        if not logged_in:
+            self.report.add(app_package_name, app_title,
+                ValidationReport.PASS, 'Failed to log in')
+            return False
+        else:
+            # For now, if app opens without error, we'll report successful
+            self.report.add(app_package_name, app_title,
+                ValidationReport.PASS, 'Logged in (sorta)')
+        return True
 
     def get_coords(self, btn: List):
         ''' Given a list of list representing a bounding box's top left &
@@ -432,6 +470,37 @@ class AppValidator:
         y = (btn[0][1] + btn[1][1]) / 2
         return str(int(x)), str(int(y))
 
+    def check_AMACe_PWA_GAME(self, app_package_name: str) -> List[bool]:
+        ''' TODO() Finish implementation... '''
+        # App is now open, check types PWA/ AMAC_E, Game
+        is_amace, is_pwa, is_game = False, False, False
+        try:
+            gather_app_info(self.transport_id, app_package_name)
+            has_surface = has_surface_name(self.transport_id, app_package_name)
+            if has_surface:
+                sleep(4)
+            is_amace = check_amace(self.driver, app_package_name)
+            self.dprint(f"Is AMACe : {is_amace}   Has Surface: {has_surface}")
+
+        except Exception as error:
+            self.dprint("Failed", error)
+        return [is_amace, is_pwa, is_game]
+
+    def scrape_dev_test_image(self, app_title: str):
+        sleep(8)  # Wait for app to finsh loading the "MainActivity"
+        _app_title = app_title.replace(" ", "_")  # Used to save screenshots of apps during DEV
+        # DEV SS
+        self.driver.get_screenshot_as_file(
+          f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/test.png"
+        )
+
+    def cleanup_run(self, app_package_name: str):
+        close_app(app_package_name, self.transport_id)
+        self.uninstall_app(app_package_name)  # (save space)
+        # Change the orientation to portrait
+        open_app(PLAYSTORE_PACKAGE_NAME, self.transport_id, self.arc_version)
+        self.driver.orientation = 'PORTRAIT'
+
     def run(self):
         '''
             Main loop of the Playstore class, starts the cycle of discovering,
@@ -441,34 +510,20 @@ class AppValidator:
             the device orientation is returned to portrait.
         '''
         self.driver.orientation = 'PORTRAIT'
-        i = 0
         for app_title, app_package_name in self.package_names:
-        # while i < len(self.package_names):
-        #     app_title, app_package_name = self.package_names[i]
-
-        # for app_title, app_package_name in self.package_names:
-
-            # TODO Put all the below code in a new method
-            # If the playstore crashes, propgate the error all the way upp
-            # Then we will catch that error, and try again
-
-            # TO change to a while loop so we can retry at least once.
             try:
 
-                start_time = get_start_time()
-                self.start_time = start_time
-                ERR = False
-                # installed, error = self.discover_and_install(app_title, app_package_name)
-                installed, error = True, False # Successful
+                self.start_time = get_start_time()
+                installed, error = self.discover_and_install(app_title, app_package_name)
+                # installed, error = True, False # Successful
                 self.dprint(f"Installed? {installed}   err: {error}")
+
                 if not installed and not error is None:
                     self.report.add(app_package_name, app_title, ValidationReport.FAIL, error)
-                    ERR = True
-                    i += 1
+                    self.cleanup_run(app_package_name)
                     continue
 
                 if not open_app(app_package_name, self.transport_id, self.arc_version):
-                    ERR = True
                     if self.check_playstore_invalid(app_package_name):
                         self.report.add(app_package_name, app_title,
                             ValidationReport.FAIL,
@@ -482,104 +537,27 @@ class AppValidator:
                             ValidationReport.FAIL,
                             "Failed to open")
                     print("Failed", self.report.report[app_package_name]['reason'])
+                    self.cleanup_run(app_package_name)
+                    continue
 
+                # TODO wait for activity to start intelligently, not just package
+                # At this point we have successfully launched the app.
+                self.dprint("Waiting for app to start/ load...")
+                sleep(5) # ANR Period
+                CrashType, crashed_act = check_crash(app_package_name,
+                                            self.start_time, self.transport_id)
+                if(not CrashType == CrashType.SUCCESS):
+                    self.report.add(app_package_name, app_title,
+                        ValidationReport.FAIL, CrashType.value)
+                    self.cleanup_run(app_package_name)
+                    continue
 
-                if not ERR:
-                    # TODO wait for activity to start intelligently, not just package
-                    # At this point we have successfully launched the app.
-                    # We can check
-                    self.dprint("Sleeping...")
-                    sleep(5) # ANR Period
-                    CrashType, crashed_act = check_crash(app_package_name,
-                                                start_time, self.transport_id)
-                    if(not CrashType == CrashType.SUCCESS):
-                        self.report.add(app_package_name, app_title,
-                            ValidationReport.FAIL, CrashType.value)
-                        self.dprint("App crashed!")
-                        i += 1
-                        continue
-                    self.dprint("Done Sleeping checking stuff")
+                # self.scrape_dev_test_image(app_title)
 
+                # is_amace, is_pwa, is_game = self.check_AMACe_PWA_GAME(app_package_name)
+                # logged_in = self.attempt_login(app_title, app_package_name)
 
-
-
-
-
-
-                    # App is now open, check types PWA/ AMAC_E, Game
-                    try:
-                        gather_app_info(self.transport_id, app_package_name)
-                        has_surface = has_surface_name(self.transport_id, app_package_name)
-                        if has_surface:
-                            sleep(4)
-                        is_amace = check_amace(self.driver, app_package_name)
-                        self.dprint(f"Is AMACe : {is_amace}   Has Surface: {has_surface}")
-
-                    except Exception as error:
-                        self.dprint("Failed", error)
-
-
-                    ###### Image Scraping #########################################################
-                    #
-                    # sleep(8)  # Wait for app to finsh loading the "MainActivity"
-                    _app_title = app_title.replace(" ", "_")  # Used to save screenshots of apps during DEV
-                    # DEV SS
-                    # self.driver.get_screenshot_as_file(
-                    #   f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/test.png"
-                    # )
-                    #
-                    ###### END  Image Scraping ############################################################
-
-
-
-                    login_attemps = 0
-                    logged_in = False
-                    login_entered = False
-                    password_entered = False
-                    # parameterize email & password so thgey cary over ea round
-                    while not logged_in and login_attemps < 4:
-                        sleep(2)
-
-                        CrashType, crashed_act = check_crash(app_package_name,
-                                                start_time, self.transport_id)
-                        if(not CrashType == CrashType.SUCCESS):
-                            self.report.add(app_package_name, app_title,
-                                ValidationReport.FAIL, CrashType.value)
-                            i += 1
-                            continue
-
-                        logged_in, login_entered, password_entered = self.handle_login(login_entered, password_entered)
-
-                        sleep(2) # Wait 2s, reattempt
-                        login_attemps += 1
-
-                    # Check for crash once more after login attempts.
-                    CrashType, crashed_act = check_crash(app_package_name,
-                                                start_time, self.transport_id)
-                    if(not CrashType == CrashType.SUCCESS):
-                        self.report.add(app_package_name, app_title,
-                            ValidationReport.FAIL, CrashType.value)
-                        i += 1
-                        continue
-
-                    if not logged_in:
-                        self.report.add(app_package_name, app_title,
-                            ValidationReport.PASS, 'Failed to log in')
-                    else:
-                        # For now, if app opens without error, we'll report successful
-                        self.report.add(app_package_name, app_title,
-                            ValidationReport.PASS, '')
-
-                # input("Close app")
-                close_app(app_package_name, self.transport_id)
-                # self.uninstall_app(app_package_name)  # (save space)
-                # Change the orientation to portrait
-
-                open_app(PLAYSTORE_PACKAGE_NAME, self.transport_id, self.arc_version)
-                self.driver.orientation = 'PORTRAIT'
-
-
-                i += 1  # For now, use as regular loop, but we can move to onoly inc when successful and retry on failed attempts...
+                self.cleanup_run(app_package_name)
             except Exception as error:
                 if error == "PLAYSTORECRASH":
                     self.dprint("restart this attemp!")
@@ -777,10 +755,10 @@ class AppValidator:
 
     def check_playstore_crash(self):
         # 01-05 22:08:57.546   129   820 I WindowManager: WIN DEATH: Window{afca274 u0 com.android.vending/com.google.android.finsky.activities.MainActivity}
-        CrashType, crashed_act = check_crash(PLAYSTORE_PACKAGE_NAME, self.start_time,self.transport_id)
+        CrashType, crashed_act = check_crash(PLAYSTORE_PACKAGE_NAME, self.start_time, self.transport_id)
         if(not CrashType == CrashType.SUCCESS):
             self.dprint("PlayStore crashed ", CrashType.value)
-            self.driver.reset()  # Reopen app
+            # self.driver.reset()  # Reopen app
             raise("PLAYSTORECRASH")
 
     def search_playstore(self, title: str, submit=True):
@@ -944,23 +922,23 @@ class AppValidator:
             # input("Press search icon # 1")
             self.click_playstore_search()
             # input("Press search icon # 1")
-            self.check_playstore_crash()
+            # self.check_playstore_crash()
 
             last_step = 1
             self.search_playstore(title)
-            self.check_playstore_crash()
+            # self.check_playstore_crash()
 
             # input("Press app icon # 2")
             last_step = 2
             self.press_app_icon(title)
-            self.check_playstore_crash()
+            # self.check_playstore_crash()
             # input("Press app icon # 2")
 
             last_step = 3
 
             # input("Step 3, press install")
             self.install_app_UI(install_package_name)
-            self.check_playstore_crash()
+            # self.check_playstore_crash()
             # input("Step 3, press install")
 
             self.driver.back()  # back to seach results

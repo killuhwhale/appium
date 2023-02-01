@@ -350,26 +350,12 @@ def get_root_path():
 
 def lazy_start_appium_server():
     ''' Attempts to start Appium server. '''
-    root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
-    root_path = '/'.join(root_path)
-    path = f"/{root_path}/appium/server.AppImage"
-    print("desty path: ", path)
-
-
-    print("Checking app image: ")
-    cmd = ["sh", "recombine_app_image.sh", path]
-    res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
     print("Starting Server")
-
     try:
         service = AppiumService()
         service.start(args=['--address', '0.0.0.0', '-p', str(4723), '--base-path', '/wd/hub'])
     except Exception as error:
         print("Error starting appium server", str(error)[:50])
-        stop_appium_server()
-        print('Restarting appium server')
-        service = AppiumService()
-        service.start(args=['--address', '0.0.0.0', '-p', str(4723), '--base-path', '/wd/hub'])
 
 
 '''
@@ -677,7 +663,7 @@ IMAGE_LABELS = [
 
 PACKAGE_NAMES = [
     # [ "Rocket League Sideswipe", "com.Psyonix.RL2D"],
-    ['Apk Analyzer', 'sk.styk.martin.apkanalyzer'],
+    # ['Apk Analyzer', 'sk.styk.martin.apkanalyzer'],
     ['Roblox', 'com.roblox.client'],
     # ['Showmax', 'com.showmax.app'],  # NA in region
     # ['Epic Seven', 'com.stove.epic7.google'], #  Failed send keys
