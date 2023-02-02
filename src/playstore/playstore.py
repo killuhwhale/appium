@@ -853,12 +853,15 @@ class AppValidator:
         already_installed = False  # Potentailly already isntalled
         err = False
         try:
+            input("About to search for 1st install")
             content_desc = f'''
-                new UiSelector().className("android.widget.Button").text("Install")
+                new UiSelector().className("android.view.View").text("Install")
             '''
+            # install_BTN = self.driver.find_element(
+            #     by=AppiumBy.ANDROID_UIAUTOMATOR,
+            #     value=content_desc)
             install_BTN = self.driver.find_element(
-                by=AppiumBy.ANDROID_UIAUTOMATOR,
-                value=content_desc)
+                by=AppiumBy.ACCESSIBILITY_ID, value="Install")
             install_BTN.click()
         except Exception as e:  # Install btn not found
             err = True

@@ -1,6 +1,5 @@
 from appium.webdriver.appium_service import AppiumService
 import __main__
-from appium import webdriver
 from datetime import datetime
 import os
 import re
@@ -337,8 +336,9 @@ def is_package_installed(transport_id: str, package_name: str):
     # Check the output for the package name
     return package_name in result
 
-def stop_appium_server():
+def stop_appium_server(service: AppiumService):
     ''' Stops the Appium Server running on port 4723'''
+    service.stop()
     cmd = ["kill", "$(lsof -t -i :4723)"]
     res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
 
@@ -354,9 +354,15 @@ def lazy_start_appium_server():
     try:
         service = AppiumService()
         service.start(args=['--address', '0.0.0.0', '-p', str(4723), '--base-path', '/wd/hub'])
+        # For some reason, interacting with service before returning has prevented random errors like:
+        # Failed to establish a new connection: [Errno 111] Connection refused
+        # Remote end closed
+        while not service.is_listening or not service.is_running:
+            print("Waiting for appium service to listen...")
+        return service
     except Exception as error:
         print("Error starting appium server", str(error)[:50])
-
+    return None
 
 '''
 Two problems
@@ -404,16 +410,24 @@ def find_template(large_img, small_img, method=cv2.TM_CCOEFF_NORMED):
 
 
 
-'''
-Apk Analyzer - AMAC-e
- ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] id=window_session_id=8 flg=0x10200000 cmp=sk.styk.martin.apkanalyzer/.ui.main.MainActivity} from uid 1000
+# '''
+# Apk Analyzer - AMAC-e
+#  ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] id=window_session_id=8 flg=0x10200000 cmp=sk.styk.martin.apkanalyzer/.ui.main.MainActivity} from uid 1000
 
 
 
-'''
+# '''
+def create_dir_if_not_exists(directory):
+    print("Create dir if not exist", directory)
+    if not os.path.exists(directory):
+        print("Creating dir: ", directory)
+        os.makedirs(directory)
+
+def file_exists(directory):
+    return os.path.exists(directory)
 
 
-# Identify Android vs PWA & AMAC-e
+# # Identify Android vs PWA & AMAC-e
 def check_amace(driver, package_name: str) -> bool:
     # Grab screenshot of device
     # Look for AMAC-e image.
@@ -430,28 +444,23 @@ def check_amace(driver, package_name: str) -> bool:
     return False
 
 
-'''
-    1. Pull APK from device
-    2. Store APK in /apks/package_name
-    3. Run aapt commands
-        - 1. Store Manifest in memory
-        - 2. Parse for version_name
-        - 3. Save Manifest in apks/package_name
+# '''
+#     1. Pull APK from device
+#     2. Store APK in /apks/package_name
+#     3. Run aapt commands
+#         - 1. Store Manifest in memory
+#         - 2. Parse for version_name
+#         - 3. Save Manifest in apks/package_name
 
 
-'''
+# '''
 
 
-def create_dir_if_not_exists(directory):
-    print("Create dir if not exist", directory)
-    if not os.path.exists(directory):
-        print("Creating dir: ", directory)
-        os.makedirs(directory)
-
-def file_exists(directory):
-    return os.path.exists(directory)
 
 def gather_app_info(transport_id: str, package_name: str):
+    '''
+    Downloads APK & manifest from App and extracts information from Manifest.
+    '''
     has_apk = get_apk(transport_id, package_name)
     manifest = download_manifest(package_name)
     print(manifest[:200])
@@ -560,11 +569,11 @@ def get_app_info(manifest_text: str)  -> dict:
 def download_manifest(package_name: str):
     ''' Grabs the APK Manifest from ...  '''
     # /Android/Sdk/tools/bin/apkanalyzer manifest print /path/to/app.apk
-#     N: android=http://schemas.android.com/apk/res/android
-#   E: manifest (line=0)
-#     A: android:versionCode(0x0101021b)=(type 0x10)0xc49f
-#     A: android:versionName(0x0101021c)="8.52.2 build 14 50335" (Raw: "8.52.2 build 14 50335")
-      # Need to download APK tho....
+    #     N: android=http://schemas.android.com/apk/res/android
+    #   E: manifest (line=0)
+    #     A: android:versionCode(0x0101021b)=(type 0x10)0xc49f
+    #     A: android:versionName(0x0101021c)="8.52.2 build 14 50335" (Raw: "8.52.2 build 14 50335")
+    # Need to download APK tho....
     # aapt dump badging my.apk | sed -n "s/.*versionName='\([^']*\).*/\1/p"
     # ./aapt2 dump xmltree --file AndroidManifest.xml /home/killuh/Downloads/com.netflix.mediaclient_8.52.2\ build\ 14\ 50335.apk
     # ./aapt dump xmltree /home/killuh/Downloads/com.netflix.mediaclient_8.52.2\ build\ 14\ 50335.apk AndroidManifest.xml
