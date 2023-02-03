@@ -11,7 +11,7 @@ from appium import webdriver
 
 from utils.utils import (
     PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT,
-    adb_connect, android_des_caps, find_transport_id, get_arc_version)
+    adb_connect, android_des_caps, find_transport_id, get_arc_version, get_device_name, is_emulator)
 from playstore.playstore import AppValidator, ValidationReport
 
 
@@ -26,6 +26,8 @@ def validate_task(queue: Queue, packages: List[List[str]], ip: str, instance_num
 
     transport_id = find_transport_id(ip)
     version = get_arc_version(transport_id)
+    is_emu = is_emulator(transport_id)
+    device_name = get_device_name(transport_id)
 
     driver = webdriver.Remote(
         "http://localhost:4723/wd/hub",
@@ -37,7 +39,7 @@ def validate_task(queue: Queue, packages: List[List[str]], ip: str, instance_num
     )
     driver.implicitly_wait(5)
     driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
-    validator = AppValidator(driver, packages, transport_id, version, ip, instance_num)
+    validator = AppValidator(driver, packages, transport_id, version, ip, instance_num, is_emu, device_name)
     validator.uninstall_multiple()
     validator.run()
     print("Putting driver & valdiator")

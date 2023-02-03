@@ -25,6 +25,21 @@ class CrashType(Enum):
     WIN_DEATH = "Win Death"
     FORCE_RM_ACT_RECORD = "Force removed ActivityRecord"
 
+class DEVICES(Enum):
+    '''
+        Enumeration for the result when checking if a program crashed.
+    '''
+    KEVIN = "kevin"
+    COACHZ = "coachz"
+    EVE = "eve"
+    HELIOS = "helios"
+    TAIMEN = "taimen"
+    CAROLINE = "caroline"
+    KOHAKU = "kohaku"
+    KRANE = "krane"
+
+
+
 def get_cur_activty(transport_id: str, ArcVersion: ArcVersions = ArcVersions.ARC_R) -> List[str]:
     '''
         Gets the current activity running in the foreground.
@@ -203,7 +218,6 @@ def is_emulator(transport_id: str):
     cmd = ('adb','-t', transport_id, 'shell', 'getprop', "ro.build.characteristics")
     try:
         res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
-        print("Res: ", res)
         return res == "emulator"
     except Exception as err:
         print("Failed to check for emualtor", err)
@@ -224,7 +238,31 @@ def get_arc_version(transport_id: str):
     cmd = ('adb','-t', transport_id, 'shell', 'getprop', "ro.build.version.release")
     try:
         res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
-        print("Res: ", res)
+        # print("Arc version: ", res)
+        if res == "9":
+            return ArcVersions.ARC_P
+        elif res == "11":
+            return ArcVersions.ARC_R
+    except Exception as err:
+        print("Cannot find Android Version", err)
+    return None
+
+def get_device_name(transport_id: str):
+    ''' Gets name of connected device.
+
+        Params:
+            transport_id: The transport id of the connected android device.
+
+        Returns:
+            An ENUM representing the Android Version [P, R] else None if
+                release if not found from ADB getprop.
+
+
+    '''
+    cmd = ('adb','-t', transport_id, 'shell', 'getprop', "ro.product.board")
+    try:
+        res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
+        # print("Device name: ", res)
         if res == "9":
             return ArcVersions.ARC_P
         elif res == "11":
@@ -361,7 +399,7 @@ def lazy_start_appium_server():
             print("Waiting for appium service to listen...")
         return service
     except Exception as error:
-        print("Error starting appium server", str(error)[:50])
+        print("Error starting appium server", str(error))
     return None
 
 '''

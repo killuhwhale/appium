@@ -6,7 +6,7 @@ from playstore.playstore import AppValidator
 from utils.parallel import MultiprocessTaskRunner
 from utils.utils import (PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME,
     TOP_500_APPS, adb_connect, android_des_caps,
-    find_transport_id, get_arc_version,
+    find_transport_id, get_arc_version, get_device_name, is_emulator,
     lazy_start_appium_server, stop_appium_server, check_amace, gather_app_info )
 
 # Starts Appium Server.
@@ -37,16 +37,23 @@ if __name__ == "__main__":
     #   Single run
     ###################################
 
-    # ip = '710KPMZ0409387' # ARC-R
-    # ip = '192.168.1.238:5555' # ARC-R Helios, Failing on install step ##*#*#*#*#*#**#*##*
+    # ip = '192.168.1.113:5555' # ARC-P CoachZ
+    # ip = '192.168.1.128:5555' # ARC-P Kevin ARM 32-bit
+    # ip = '192.168.1.125:5555' # ARC-R Eve
     # ip = 'emulator-5554' # ARC-R
-    ip = '192.168.1.113:5555' # ARC-P
+    # ip = '710KPMZ0409387' # ARC-R Pixel 2
+    # ip = '192.168.1.149:5555' # ARC-P Caroline,
+    # ip = '192.168.1.248:5555' # ARC-R Morphius,
+    # ip = '192.168.1.:5555' # ARC-P Krane,
+    # ip = '192.168.1.137:5555' # ARC-R Kohaku,
+    ip = '192.168.1.238:5555' # ARC-R Helios,
 
     res = adb_connect(ip)
     transport_id = find_transport_id(ip)
     version = get_arc_version(transport_id)
-
     service = lazy_start_appium_server()
+    is_emu = is_emulator(transport_id)
+    device_name = get_device_name(transport_id)
 
     print("Creating driver...")
     driver = webdriver.Remote(
@@ -61,7 +68,7 @@ if __name__ == "__main__":
     driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
 
 
-    validator = AppValidator(driver, TOP_500_APPS[:1], transport_id, version, ip)
+    validator = AppValidator(driver, TOP_500_APPS[3:50], transport_id, version, ip, is_emu, device_name)
     validator.uninstall_multiple()
     validator.run()
     validator.report.print_report()

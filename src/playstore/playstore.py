@@ -20,7 +20,7 @@ from typing import List
 
 from objdetector.objdetector import ObjDetector
 from utils.utils import (
-    ADB_KEYCODE_DEL, SIGN_IN, ArcVersions, CONTINUE, CrashType, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
+    ADB_KEYCODE_DEL, DEVICES, SIGN_IN, ArcVersions, CONTINUE, CrashType, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
     PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, check_amace,
     check_crash, close_app, gather_app_info, get_cur_activty, get_start_time, has_surface_name, open_app)
 
@@ -199,6 +199,8 @@ class AppValidator:
             transport_id: str,
             arc_version: ArcVersions,
             ip: str,
+            is_emu: bool,
+            device_name: str,
             instance_num: int= 0
         ):
         self.driver = driver
@@ -217,8 +219,11 @@ class AppValidator:
         self.detector = ObjDetector(self.test_img)
         self.transport_id = transport_id
         self.arc_version = arc_version
+        self.is_emu = is_emu
+        self.device_name = device_name
         self.instance_num = instance_num
         self.ID = f"{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}-{ip.split(':')[0]}"
+        self.dev_ss_count = 0
 
     def dprint(self, *args):
         color = self.report.COLORS[2:][self.instance_num % len(self.report.COLORS)]
@@ -309,7 +314,7 @@ class AppValidator:
             self.driver.get_screenshot_as_file(f"{path}/{err_name}.png")
             return True
         except ScreenshotException as e:
-            self.dprint("App is scured!")
+            self.dprint("App is scured! No error SS taken")
         except Exception as e:
             self.dprint("Error taking SS: ", e)
 
@@ -486,13 +491,14 @@ class AppValidator:
             self.dprint("Failed", error)
         return [is_amace, is_pwa, is_game]
 
-    def scrape_dev_test_image(self, app_title: str):
-        sleep(8)  # Wait for app to finsh loading the "MainActivity"
-        _app_title = app_title.replace(" ", "_")  # Used to save screenshots of apps during DEV
-        # DEV SS
-        self.driver.get_screenshot_as_file(
-          f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/test.png"
-        )
+    def scrape_dev_test_image(self):
+        try:
+            self.driver.get_screenshot_as_file(
+            f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/scraped_images/{self.dev_ss_count}.png"
+            )
+            self.dev_ss_count += 1
+        except Exception as error:
+            print("Error w/ dev ss: ", error)
 
     def cleanup_run(self, app_package_name: str):
         close_app(app_package_name, self.transport_id)
@@ -552,11 +558,23 @@ class AppValidator:
                     self.cleanup_run(app_package_name)
                     continue
 
-                # self.scrape_dev_test_image(app_title)
+                # self.scrape_dev_test_image()
 
                 # is_amace, is_pwa, is_game = self.check_AMACe_PWA_GAME(app_package_name)
-                # logged_in = self.attempt_login(app_title, app_package_name)
+                info = gather_app_info(self.transport_id, app_package_name)
+                print(f"App {info=}")
 
+                ans = ''
+                while not (ans == 'q'):
+                    ans = input("Take your screen shots bro...")
+                    print(f"{ans=}, {(not ans == 'q')}")
+                    if not (ans == 'q'):
+                        print("Taking SS")
+                        self.scrape_dev_test_image()
+                    else:
+                        print("Hahahah fuck you i guess")
+
+                print("Cleaning up")
                 self.cleanup_run(app_package_name)
             except Exception as error:
                 if error == "PLAYSTORECRASH":
@@ -853,19 +871,39 @@ class AppValidator:
         already_installed = False  # Potentailly already isntalled
         err = False
         try:
-            input("About to search for 1st install")
-            content_desc = f'''
-                new UiSelector().className("android.view.View").text("Install")
-            '''
-            # install_BTN = self.driver.find_element(
-            #     by=AppiumBy.ANDROID_UIAUTOMATOR,
-            #     value=content_desc)
-            install_BTN = self.driver.find_element(
-                by=AppiumBy.ACCESSIBILITY_ID, value="Install")
-            install_BTN.click()
+            # input("About to search for 1st install")
+            if self.is_emu:
+                content_desc = f'''
+                    new UiSelector().className("android.widget.Button").descriptionMatches("Install on more devices")
+                '''
+                print(f"Looking at {content_desc=}")
+                install_BTN = self.driver.find_element(
+                    by=AppiumBy.ANDROID_UIAUTOMATOR,
+                    value=content_desc)
+                bounds = self.extract_numbers(
+                    install_BTN.get_attribute("bounds"))
+                self.click_unknown_install_btn(bounds)
+            elif not self.device_name == DEVICES.HELIOS:
+                # ARC_P CoachZ -> find_element(by=AppiumBy.ACCESSIBILITY_ID, value="Install")
+                print(f"Looking at ACCESSIBILITY_ID, value=Install")
+                install_BTN = self.driver.find_element(
+                    by=AppiumBy.ACCESSIBILITY_ID, value="Install")
+                install_BTN.click()
+            else:
+                # ARC_R Helios -> driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value='''new UiSelector().className("android.widget.View").text("Install")''')
+                content_desc = f'''
+                    new UiSelector().className("android.widget.Button").text("Install")
+                '''
+                print(f"Looking at {content_desc=}")
+                install_BTN = self.driver.find_element(
+                    by=AppiumBy.ANDROID_UIAUTOMATOR,
+                    value=content_desc)
+                install_BTN.click()
+
+
         except Exception as e:  # Install btn not found
             err = True
-            self.dprint("Failed to find 1st install button on transport id: ", self.transport_id)
+            self.dprint("Failed to find install button on transport id: ", self.transport_id)
             already_installed = self.is_installed(install_package_name)
 
         # Error finding/Clicking Install button  amd app is not installed still...
@@ -891,21 +929,9 @@ class AppValidator:
             # However, on emualtors, we can still check for the install button since it is not the same as other devices
             # If Install btn not found, PRice or Update not present, check for "Install on more devices" button, if found we are
             #   most liekly on an emulator and we can click install.
-            try:
-                content_desc = f'''
-                    new UiSelector().className("android.widget.Button").descriptionMatches("Install on more devices")
-                '''
-                install_BTN = self.driver.find_element(
-                    by=AppiumBy.ANDROID_UIAUTOMATOR,
-                    value=content_desc)
-                bounds = self.extract_numbers(
-                    install_BTN.get_attribute("bounds"))
-                self.click_unknown_install_btn(bounds)
-            except:
-                raise Exception(
-                    f"Program installed incorrect package,\
-                        {install_package_name} was not actually installed")
-
+            raise Exception(
+                f"Program installed incorrect package,\
+                    {install_package_name} was not actually installed")
         # We have successfully clicked an install buttin
         # 1. We wait for it to download. We will catch if its the correct package or not after installation.
         if not self.is_installed_UI():  # Waits up to 7mins to find install button.
@@ -925,23 +951,23 @@ class AppValidator:
             # input("Press search icon # 1")
             self.click_playstore_search()
             # input("Press search icon # 1")
-            # self.check_playstore_crash()
+            self.check_playstore_crash()
 
             last_step = 1
             self.search_playstore(title)
-            # self.check_playstore_crash()
+            self.check_playstore_crash()
 
             # input("Press app icon # 2")
             last_step = 2
             self.press_app_icon(title)
-            # self.check_playstore_crash()
+            self.check_playstore_crash()
             # input("Press app icon # 2")
 
             last_step = 3
 
             # input("Step 3, press install")
             self.install_app_UI(install_package_name)
-            # self.check_playstore_crash()
+            self.check_playstore_crash()
             # input("Step 3, press install")
 
             self.driver.back()  # back to seach results
