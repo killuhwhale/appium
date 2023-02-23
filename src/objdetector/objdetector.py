@@ -75,3 +75,6 @@ class ObjDetector:
         except FileNotFoundError as err:
             print("No image to test! ", err)
             return None
+        except Exception as error:
+            print("Obj detect err: ", error)
+            return None

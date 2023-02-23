@@ -13,12 +13,11 @@ train: images  # train images (relative to 'path') 128 images
 val: images  # val images (relative to 'path') 128 images
 test:  # test images (optional)
 
-# Classes
+# Old Classes | Login Field, Password Field, Continue, Google Auth, Facebook Auth, Sign In
+# Classes | 'Close', 'Continue', 'GoogleAuth', 'loginfield', 'passwordfield'
 names:
-  0: Login Field
-  1: Password Field
-  2: Continue
-  3: Google Auth
-  4: Facebook Auth
-  5: Sign In
-
+  0: Close
+  1: Continue
+  2: GoogleAuth
+  3: loginfield
+  4: passwordfield

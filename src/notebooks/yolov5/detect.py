@@ -50,7 +50,10 @@ from notebooks.yolov5.utils.general import (LOGGER, Profile, check_file, check_i
 from notebooks.yolov5.utils.plots import Annotator, colors, save_one_box
 from notebooks.yolov5.utils.torch_utils import select_device, smart_inference_mode
 
-DEBUG = False
+
+# Turns off saving extra data from detection
+# such as image w/ counding boxes from detection
+DEBUG = True
 
 @smart_inference_mode()
 def run(
@@ -62,7 +65,7 @@ def run(
         iou_thres=0.45,  # NMS IOU threshold
         max_det=1000,  # maximum detections per image
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
-        view_img=False,  # show results
+        view_img=True,  # show results
         save_txt=False,  # save results to *.txt
         save_conf=False,  # save confidences in --save-txt labels
         save_crop=False,  # save cropped prediction boxes
@@ -92,9 +95,9 @@ def run(
         source = check_file(source)  # download
 
     # Directories
-    # save_dir = ""
+    save_dir = ""
     save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
-    # (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+    (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
     # Load model
     device = select_device(device)
@@ -157,7 +160,7 @@ def run(
             imc = im0.copy() if save_crop else im0  # for save_crop
 
             annotator = None
-            if not DEBUG:
+            if DEBUG:
                 annotator = Annotator(im0, line_width=line_thickness, example=str(names))
 
             if len(det):
@@ -190,28 +193,30 @@ def run(
                         # with open(f'{txt_path}.txt', 'a') as f:
                         #     f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
-                    if not DEBUG and (save_img or save_crop or view_img):  # Add bbox to image
+                    if DEBUG and (save_img or save_crop or view_img):  # Add bbox to image
                         c = int(cls)  # integer class
                         _label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                        if not DEBUG:
+                        if DEBUG:
                             annotator.box_label(xyxy, _label, color=colors(c, True))
-                    if not DEBUG and save_crop:
+                    if DEBUG and save_crop:
                         save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
 
             # Stream results
             im0 = None if not DEBUG else annotator.result()
-            if view_img:
-                if platform.system() == 'Linux' and p not in windows:
-                    windows.append(p)
-                    cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
-                    cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
-                cv2.imshow(str(p), im0)
-                cv2.waitKey(1)  # 1 millisecond
+            # if view_img:
+            #     if platform.system() == 'Linux' and p not in windows:
+            #         windows.append(p)
+            #         cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
+            #         cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
+            #     cv2.imshow(str(p), im0)
+            #     cv2.waitKey(1)  # 1 millisecond
 
             # Save results (image with detections)
+            print("Saving to: ", save_path)
             if save_img:
                 if dataset.mode == 'image':
                     if DEBUG:
+                        print("Saved to (DEBUG ON): ", save_path)
                         cv2.imwrite(save_path, im0)
 
                 else:  # 'video' or 'stream'

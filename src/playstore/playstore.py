@@ -20,9 +20,9 @@ from typing import List
 
 from objdetector.objdetector import ObjDetector
 from utils.utils import (
-    ADB_KEYCODE_DEL, DEVICES, SIGN_IN, ArcVersions, CONTINUE, CrashType, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
+    ACCOUNTS, ADB_KEYCODE_DEL, DEVICES, SIGN_IN, ArcVersions, CONTINUE, CrashType, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
     PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, check_amace,
-    check_crash, close_app, gather_app_info, get_cur_activty, get_start_time, has_surface_name, open_app)
+    check_crash, close_app, create_dir_if_not_exists, gather_app_info, get_cur_activty, get_root_path, get_start_time, has_surface_name, is_download_in_progress, open_app)
 
 class ValidationReport:
     '''
@@ -54,31 +54,37 @@ class ValidationReport:
     REPEAT_TIMES = 2*len(COLORS)
 
     @staticmethod
-    def empty_dict():
+    def default_dict():
         '''
             Default value for a report key.
         '''
-        return {"empty": 1}
+        return  {
+            'status': -1,
+            'reason': "",
+            'name': "",
+            'report_title': "",
+            'history': [],
+        }
 
     def __init__(self, report_title: str):
-        self.report = collections.defaultdict(ValidationReport.empty_dict)
+        self.report = collections.defaultdict(ValidationReport.default_dict)
         self.report_title = report_title
 
-    def add(self, package_name: str, app_name: str, status: int, reason: str):
-        ''' Add report of a pacage if a report DNExist'''
-        if "empty" in self.report[package_name]:
-            self.report[package_name] = self.status_obj(status, reason, app_name)
+    def create(self, package_name: str, app_name: str):
+        ''' Create a report of a pacage if a report DNExist'''
+        print("Creating new status object!!!!!!!!!!!!!")
+        print(f"Report title: {self.report_title}")
+        if self.report[package_name]['status'] == -1:
+            self.report[package_name]['name'] = app_name
+            self.report[package_name]['report_title'] = self.report_title
+            self.report[package_name]['status'] = 0
 
-    def status_obj(self, status: int, reason: str, name: str):
-        ''' Status object containing the result information for each key/
-            package in the report.
-        '''
-        return {
-            'status': status,
-            'reason': reason,
-            'name': name,
-            'report_title': self.report_title,
-        }
+    def update_status(self, package_name: str, status: int, reason: str):
+        self.report[package_name]['status'] = status
+        self.report[package_name]['reason'] = reason
+
+    def add_history(self,package_name: str, history_msg: str, img_path: str=""):
+        self.report[package_name]['history'].append({'msg':history_msg, 'img': img_path })
 
     @staticmethod
     def ascii_footer():
@@ -149,38 +155,37 @@ class ValidationReport:
         return p[0]
 
     @staticmethod
-    def print_reports(report: collections.defaultdict):
+    def print_reports(report: collections.defaultdict, with_history: bool=False):
         '''  Prints a given report. '''
         # Sorted by packge name
         ValidationReport.ascii_header()
         for package_name, status_obj in sorted(report.items(), key=ValidationReport.sorted_name):
             is_good = status_obj['status'] == ValidationReport.PASS
+            status_color = ValidationReport.Green if is_good else ValidationReport.RED
+            print("Status obj: ", status_obj, status_color, is_good)
             print(ValidationReport.Blue, end="")
             print(f"{status_obj['name']} ", end="")
             print(ValidationReport.RESET, end="")
-            print(f"{package_name} search/install status: ", end="")
-            if is_good:
-                print(ValidationReport.Green, end="")
-                print("PASSED", end="")
-                print(ValidationReport.RESET, end="")
-                print(ValidationReport.Purple, end="")
-                print(f" - [{status_obj['report_title']}]", end="")
-                print(ValidationReport.RESET, end="")
-                if len(status_obj['reason']) > 0:
-                    print("\n\t\t", status_obj['reason'])
-                print(ValidationReport.RESET, end="")
 
-            else:
-                print(ValidationReport.RED, end="")
-                print("FAILED", end="")
+            print(f"{package_name} status: ", end="")
 
-                print(ValidationReport.RESET, end="")
-                print(ValidationReport.Purple, end="")
-                print(f" - [{status_obj['report_title']}]", end="")
-                print(ValidationReport.RESET, end="")
+            print(status_color, end="")
+            print("PASSED" if is_good else "FAILED", end="")
+            print(ValidationReport.RESET, end="")
 
-                print("\n\t\t", status_obj['reason'])
-                print(ValidationReport.RESET, end="")
+            print(ValidationReport.Purple, end="")
+            print(f" - [{status_obj['report_title']}]", end="")
+            print(ValidationReport.RESET, end="")
+
+            if len(status_obj['reason']) > 0:
+                print("\n\t\t", "Status reason: ", status_obj['reason'])
+
+            # Print History
+            print(ValidationReport.Yellow, end="")
+            for hist in status_obj['history']:
+                print("\t", hist['msg'])
+                print("\t\t", f"Img: {hist['img']}")
+            print(ValidationReport.RESET, end="")
             print()
         ValidationReport.ascii_footer()
 
@@ -201,7 +206,8 @@ class AppValidator:
             ip: str,
             is_emu: bool,
             device_name: str,
-            instance_num: int= 0
+            weights: str,
+            instance_num: int= 0,
         ):
         self.driver = driver
         self.ip = ip
@@ -215,15 +221,17 @@ class AppValidator:
         ]
         self.prev_act = None
         self.cur_act = None
-        self.test_img = f"{ip}_test.png"
-        self.detector = ObjDetector(self.test_img)
+        # Filepath that our detector is going to lookat to detect an object from.
+        self.test_img_fp = f"{ip}_test.png"
+        self.weights = weights
+        self.detector = ObjDetector(self.test_img_fp, [self.weights])
         self.transport_id = transport_id
         self.arc_version = arc_version
         self.is_emu = is_emu
         self.device_name = device_name
         self.instance_num = instance_num
         self.ID = f"{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}-{ip.split(':')[0]}"
-        self.dev_ss_count = 0
+        self.dev_ss_count = 280
 
     def dprint(self, *args):
         color = self.report.COLORS[2:][self.instance_num % len(self.report.COLORS)]
@@ -278,9 +286,8 @@ class AppValidator:
         #    ['', 'path', 'to', 'src', 'main.py']
         root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
         root_path = '/'.join(root_path)
-        self.dprint("\n\n Saving SS to : ", f"/{root_path}/notebooks/yolo_images/test.png","\n\n")
         try:
-            self.driver.get_screenshot_as_file(f"/{root_path}/notebooks/yolo_images/{self.test_img}")
+            self.driver.get_screenshot_as_file(f"/{root_path}/notebooks/yolo_images/{self.test_img_fp}")
             return True
         except ScreenshotException as e:
             self.dprint("App is scured!")
@@ -325,6 +332,18 @@ class AppValidator:
         ''' Returns confidence value from the list.'''
         return int(p[2])
 
+    def tap_screen(self, x:str, y:str):
+        try:
+            self.dprint(f"Tapping ({x},{y})")
+            cmd = ('adb','-t', self.transport_id, 'shell', 'input', 'tap', x, y)
+            outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+                                    capture_output=True).stdout.strip()
+        except Exception as e:
+            self.dprint("Error tapping app", e)
+            return False
+        return True
+
+
     def click_button(self, btns: List) -> List:
         '''
             Given a button list [Result from detector], remove the button and Click it
@@ -341,16 +360,27 @@ class AppValidator:
         return btns, tapped
 
 
-    def handle_login(self, login_entered: bool, password_entered:bool ) -> bool:
+    def sleep_while_in_progress(self, app_package_name: str):
+        ''' Sleeps while in progress
+        '''
+        timeout = 60 * 3
+        start = time()
+        while is_download_in_progress(self.transport_id, app_package_name) and time() - start < timeout:
+            print(f"DLinProgress...")
+            sleep(1.5)
+
+    def handle_login(self, login_entered_init: bool, password_entered_init:bool, is_game: bool, app_package_name: str) -> bool:
         '''
             On a given page we will look at it and perform an action, if there is one .
         '''
         # Do
         self.is_new_activity() ## Init current activty
-        self.get_test_ss()
+        if not self.get_test_ss():
+            return False, login_entered, password_entered
         results = self.detector.detect()
+        login_entered, password_entered = login_entered_init, password_entered_init
         if results is None:
-            return False
+            return False, login_entered, password_entered
 
         # While
 
@@ -373,14 +403,14 @@ class AppValidator:
             if CONTINUE_SUBMITTED and login_entered and password_entered:
                 return True, True, True
 
-            # input("Start handle login loop....")
-            self.dprint("\n\n Activity \n", self.prev_act, "\n", self.cur_act )
-            # input("Pause")
-            if self.is_new_activity() or tapped:
-                self.get_test_ss()
-                self.dprint("\n\n New Activity \n", self.prev_act, "\n", self.cur_act )
-                self.dprint("We found a new activity, take new screenshot and run detect again. ")
+            # if self.is_new_activity() or tapped:
+            if self.is_new_activity():
+                if not self.get_test_ss():
+                    return False, login_entered, password_entered
+                self.dprint("\n\n New Activity \n", self.prev_act, "\n", self.cur_act, '\n\n' )
                 results = self.detector.detect()
+                if results is None:
+                    return False, login_entered, password_entered
                 tapped = False
 
             self.dprint(f"Action : {actions} -- results: ", results)
@@ -388,77 +418,100 @@ class AppValidator:
                 # We have A google Auth button presents lets press it
                 results[GOOGLE_AUTH], tapped = self.click_button(results[GOOGLE_AUTH])
                 del results[GOOGLE_AUTH]
-                return True
+                return True, login_entered, password_entered
             elif LOGIN in results and not login_entered:
+                print("Click login        <-------")
                 results[LOGIN], tapped = self.click_button(results[LOGIN])
                 del results[LOGIN]
-                self.send_keys_ADB("testminnie001@gmail.com", False)
+                if app_package_name in ACCOUNTS:
+                    login_val = ACCOUNTS[app_package_name][0]
+                    # self.send_keys_ADB("testminnie000", False)
+                    self.send_keys_ADB(login_val, False, False)
+                    print(f"Send Login - {login_val}        <-------")
+
                 actions += 1
                 login_entered = True
 
             elif PASSWORD in results and not password_entered:
+                print("Click Password        <-------")
                 results[PASSWORD], tapped = self.click_button(results[PASSWORD])
                 del results[PASSWORD]
-                self.send_keys_ADB("testminnie123")
+                if app_package_name in ACCOUNTS:
+                    pass_val = ACCOUNTS[app_package_name][1]
+                    self.send_keys_ADB(pass_val, False, False)
+                    print(f"Send Password - {pass_val}       <-------")
+                    password_entered = True
                 actions += 1
-                password_entered = True
+                sleep(3)
+                if self.is_new_activity():
+                    return True, login_entered, password_entered
             elif CONTINUE in results:
                 # TODO Remove the button once we click it, so we dont keep clicking the same element.
+                print("Click Continue        <-------")
+                input("Click Continue...")
                 results[CONTINUE], tapped = self.click_button(results[CONTINUE])
                 del results[CONTINUE]
                 actions += 1
+
+                print("App is game: ", is_game)
+                if is_game:
+                    sleep(0.600)
+                    self.sleep_while_in_progress(app_package_name)
+
+                print(f"Cont w/ login and password entered {login_entered=} {password_entered=}")
                 if login_entered and password_entered:
-                    CONTINUE_SUBMITTED = True
-            elif SIGN_IN in results:
-                results[SIGN_IN], tapped = self.click_button(results[SIGN_IN])
-                del results[SIGN_IN]
-                actions += 1
-                if login_entered and password_entered:
-                    CONTINUE_SUBMITTED = True
-            # else:
-            #     # No Keys in results
-            #     return False
+                    sleep(5)  # Wait for a possible login to happen
+                    return True, login_entered, password_entered
+
             total_actions += 1
-            self.dprint(f"\n\n Total Actions: {total_actions}  \n\n ")
+            if len(results.keys()) == 0:
+                print("Empty results, grabbing new SS and processing...")
+                sleep(2)
+                # Get a new SS, ir error return
+                if not self.get_test_ss():
+                    return False, login_entered, password_entered
+                results = self.detector.detect()
+            # input("End of login action...")
         return False, login_entered, password_entered
 
-    def attempt_login(self, app_title: str, app_package_name: str):
+    def attempt_login(self, app_title: str, app_package_name: str, is_game: bool):
         login_attemps = 0
         logged_in = False
         login_entered = False
         password_entered = False
-        # parameterize email & password so thgey cary over ea round
         while not logged_in and login_attemps < 4:
-            sleep(2)
-
             CrashType, crashed_act = check_crash(app_package_name,
                                     self.start_time, self.transport_id)
             if(not CrashType == CrashType.SUCCESS):
-                self.report.add(app_package_name, app_title,
-                    ValidationReport.FAIL, CrashType.value)
+                self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
                 break
 
-            logged_in, login_entered, password_entered = self.handle_login(login_entered, password_entered)
+            res = self.handle_login(login_entered,
+                                    password_entered,
+                                    is_game,
+                                    app_package_name)
+            logged_in, login_entered, password_entered = res  # Unpack, looks better
 
-            sleep(2) # Wait 2s, reattempt
+            print(f"\n\n After attempt login: ")
+            print(f"{logged_in=}, {login_entered=}, {password_entered=} \n\n")
+            if logged_in:
+                break
+
             login_attemps += 1
 
         # Check for crash once more after login attempts.
         CrashType, crashed_act = check_crash(app_package_name,
                                     self.start_time, self.transport_id)
         if(not CrashType == CrashType.SUCCESS):
-            self.report.add(app_package_name, app_title,
-                ValidationReport.FAIL, CrashType.value)
+            self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
             return False
 
         if not logged_in:
-            self.report.add(app_package_name, app_title,
-                ValidationReport.PASS, 'Failed to log in')
+            self.report.update_status(app_package_name, ValidationReport.FAIL, 'Failed to log in')
             return False
         else:
             # For now, if app opens without error, we'll report successful
-            self.report.add(app_package_name, app_title,
-                ValidationReport.PASS, 'Logged in (sorta)')
+            self.report.update_status(app_package_name, ValidationReport.PASS, 'Logged in (sorta)')
         return True
 
     def get_coords(self, btn: List):
@@ -480,12 +533,7 @@ class AppValidator:
         # App is now open, check types PWA/ AMAC_E, Game
         is_amace, is_pwa, is_game = False, False, False
         try:
-            gather_app_info(self.transport_id, app_package_name)
-            has_surface = has_surface_name(self.transport_id, app_package_name)
-            if has_surface:
-                sleep(4)
-            is_amace = check_amace(self.driver, app_package_name)
-            self.dprint(f"Is AMACe : {is_amace}   Has Surface: {has_surface}")
+            is_game = has_surface_name(self.transport_id, app_package_name)
 
         except Exception as error:
             self.dprint("Failed", error)
@@ -501,11 +549,38 @@ class AppValidator:
             print("Error w/ dev ss: ", error)
 
     def cleanup_run(self, app_package_name: str):
+        print("Cleaning up")
         close_app(app_package_name, self.transport_id)
-        self.uninstall_app(app_package_name)  # (save space)
-        # Change the orientation to portrait
+        # self.uninstall_app(app_package_name)  # (save space)
+        print("Skipping uninstall")
         open_app(PLAYSTORE_PACKAGE_NAME, self.transport_id, self.arc_version)
         self.driver.orientation = 'PORTRAIT'
+
+    def dev_SS_loop(self):
+        ''' Loop that pauses on input allowing to take multiple screenshots
+                after manually changing app state.
+        '''
+        ans = ''
+        while not (ans == 'q'):
+            ans = input("Take your screen shots bro...")
+            print(f"{ans=}, {(not ans == 'q')}")
+            if not (ans == 'q'):
+                print("Taking SS")
+                self.scrape_dev_test_image()
+            else:
+                print("Quit from SS")
+
+    def update_report_history(self, package_name: str, msg: str):
+        try:
+            num = len(self.report.report[package_name]['history'])
+            path = f"{get_root_path()}/images/history/{self.ip}"
+            create_dir_if_not_exists(path)
+            full_path = f"{path}/{num}.png"
+            self.driver.get_screenshot_as_file(full_path)
+            self.report.add_history(package_name, msg, full_path)
+        except Exception as error:
+            print("Failed to get SS", error)
+            self.report.add_history(package_name, msg)
 
     def run(self):
         '''
@@ -517,6 +592,7 @@ class AppValidator:
         '''
         self.driver.orientation = 'PORTRAIT'
         for app_title, app_package_name in self.package_names:
+            self.report.create(app_package_name, app_title)
             try:
 
                 self.start_time = get_start_time()
@@ -525,26 +601,29 @@ class AppValidator:
                 self.dprint(f"Installed? {installed}   err: {error}")
 
                 if not installed and not error is None:
-                    self.report.add(app_package_name, app_title, ValidationReport.FAIL, error)
+                    self.report.update_status(app_package_name, ValidationReport.FAIL, error)
                     self.cleanup_run(app_package_name)
                     continue
 
+                # TODO, check if last step in disovery knows whether or not the app was installed or not....
+                self.update_report_history(app_package_name, "App discovery and installation successful.")
+
+
                 if not open_app(app_package_name, self.transport_id, self.arc_version):
+                    reason = ''
                     if self.check_playstore_invalid(app_package_name):
-                        self.report.add(app_package_name, app_title,
-                            ValidationReport.FAIL,
-                            "App package is invalid, update/ remove from list.")
+                        reason = "App package is invalid, update/ remove from list."
                     elif not self.is_installed(app_package_name):
-                        self.report.add(app_package_name, app_title,
-                            ValidationReport.FAIL,
-                            "Failed to open because the package was not installed.")
+                        reason = "Failed to open because the package was not installed."
                     else:
-                        self.report.add(app_package_name, app_title,
-                            ValidationReport.FAIL,
-                            "Failed to open")
+                        reason = "Failed to open"
+
+                    self.report.update_status(app_package_name, ValidationReport.FAIL, reason)
                     print("Failed", self.report.report[app_package_name]['reason'])
                     self.cleanup_run(app_package_name)
                     continue
+                self.update_report_history(app_package_name, "App launch successful.")
+
 
                 # TODO wait for activity to start intelligently, not just package
                 # At this point we have successfully launched the app.
@@ -553,43 +632,28 @@ class AppValidator:
                 CrashType, crashed_act = check_crash(app_package_name,
                                             self.start_time, self.transport_id)
                 if(not CrashType == CrashType.SUCCESS):
-                    self.report.add(app_package_name, app_title,
-                        ValidationReport.FAIL, CrashType.value)
+                    self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
                     self.cleanup_run(app_package_name)
                     continue
 
                 # self.scrape_dev_test_image()
+                # self.dev_SS_loop()
 
-                # is_amace, is_pwa, is_game = self.check_AMACe_PWA_GAME(app_package_name)
-                info = gather_app_info(self.transport_id, app_package_name)
-                print(f"App {info=}")
+                is_amace, is_pwa, is_game = self.check_AMACe_PWA_GAME(app_package_name)
+                # info = gather_app_info(self.transport_id, app_package_name)
+                # print(f"App {info=}")
 
-                ans = ''
-                while not (ans == 'q'):
-                    ans = input("Take your screen shots bro...")
-                    print(f"{ans=}, {(not ans == 'q')}")
-                    if not (ans == 'q'):
-                        print("Taking SS")
-                        self.scrape_dev_test_image()
-                    else:
-                        print("Hahahah fuck you i guess")
+                logged_in = self.attempt_login(app_title, app_package_name, is_game)
+                 # Report Final App Status
 
-                print("Cleaning up")
+                print(f"Attempt loging: {logged_in=}")
+
                 self.cleanup_run(app_package_name)
             except Exception as error:
+                print("Error in main RUN: ", error)
                 if error == "PLAYSTORECRASH":
                     self.dprint("restart this attemp!")
 
-    def tap_screen(self, x:str, y:str):
-        try:
-            self.dprint(f"Tapping ({x},{y})")
-            cmd = ('adb','-t', self.transport_id, 'shell', 'input', 'tap', x, y)
-            outstr = subprocess.run(cmd, check=True, encoding='utf-8',
-                                    capture_output=True).stdout.strip()
-        except Exception as e:
-            self.dprint("Error tapping app", e)
-            return False
-        return True
 
     def is_open(self, package_name: str) -> bool:
         cmd = ('adb', '-t', self.transport_id, 'shell', 'pidof', package_name)
@@ -794,20 +858,21 @@ class AppValidator:
             subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
         sleep(2)  # Wait for search results
 
-    def send_keys_ADB(self, title: str, submit=True):
-        title_search = self.escape_chars(title)
+    def send_keys_ADB(self, title: str, submit=True, esc=True):
+        title_search = title
+        if esc:
+            title_search = self.escape_chars(title)
 
+        # for _ in range(len("testminnie001@gmail.com") + 5):
+        #     cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'keyevent', ADB_KEYCODE_DEL)
+        #     subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
 
-        for _ in range(len("testminnie001@gmail.com") + 5):
-            cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'keyevent', ADB_KEYCODE_DEL)
+        for c in title_search:
+            cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'text', c)
             subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
-
-        cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'text', title_search)
-        subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
         if submit:
             cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'keyevent', ADB_KEYCODE_ENTER)
             subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
-        sleep(2)  # Wait for search results
 
     def press_app_icon(self, title: str):
         '''
@@ -846,7 +911,7 @@ class AppValidator:
 
     def extract_numbers(self, bounds: str):
         '''
-            Given [882,801][1014,933], return [882,801,1014,933].
+            Given '[882,801][1014,933]', return [882,801,1014,933].
         '''
         return [int(x) for x in re.findall(r'\d+', bounds)]
 
@@ -857,7 +922,6 @@ class AppValidator:
         y = (y1 + y2) // 2
         self.dprint("Tapping ",x ,y)
         self.tap_screen(str(x), str(y))
-        sleep(2)
 
     def install_app_UI(self, install_package_name: str):
         '''

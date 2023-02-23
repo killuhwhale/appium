@@ -68,12 +68,10 @@ def get_cur_activty(transport_id: str, ArcVersion: ArcVersions = ArcVersions.ARC
                 keyword = "mResumedActivity"
             if ArcVersion == ArcVersions.ARC_R:
                 keyword = "mFocusedWindow"
-            print("Key word ", ArcVersions.ARC_R, ArcVersion,  keyword)
             cmd = ('adb', '-t', transport_id, 'shell', 'dumpsys', 'activity',
                     '|', 'grep', keyword)
             text = subprocess.run(cmd, check=False, encoding='utf-8',
                 capture_output=True).stdout.strip()
-            print("res text: ", text)
 
             query = r".*{.*\s.*\s(?P<package_name>.*)/(?P<act_name>[\S\.]*)\s*.*}"
             result = re.search(query, text)
@@ -495,15 +493,6 @@ def check_amace(driver, package_name: str) -> bool:
 
 
 
-def gather_app_info(transport_id: str, package_name: str):
-    '''
-    Downloads APK & manifest from App and extracts information from Manifest.
-    '''
-    has_apk = get_apk(transport_id, package_name)
-    manifest = download_manifest(package_name)
-    print(manifest[:200])
-    app_info = get_app_info(manifest)
-    return app_info
 
 def get_apk(transport_id: str, package_name: str) -> bool:
     ''' Grabs the APK from device.
@@ -541,20 +530,31 @@ def get_apk(transport_id: str, package_name: str) -> bool:
                                 capture_output=True).stdout.strip()
     apk_path = None
     for line in outstr.split("\n"):
-        if 'base.apk' in line:
+        if 'base.apk' in line and not "asset" in line:
             apk_path = line[len("package:"):]
 
     print(f"Found apk path: {apk_path}")
 
 
 
-    print("Pulling APK: ", package_name)
+    print("Pulling APK: ", package_name, dl_dir)
 
     cmd = ('adb', '-t', transport_id, 'pull', apk_path, dl_dir )
     outstr = subprocess.run(cmd, check=True, encoding='utf-8',
                                 capture_output=True).stdout.strip()
 
     return True
+
+def gather_app_info(transport_id: str, package_name: str):
+    '''
+    Downloads APK & manifest from App and extracts information from Manifest.
+    '''
+    if get_apk(transport_id, package_name):
+        manifest = download_manifest(package_name)
+        print(manifest[:200])
+        app_info = get_app_info(manifest)
+        return app_info
+    return None
 
 
 def get_aapt_version():
@@ -638,52 +638,62 @@ def download_manifest(package_name: str):
 
 
 # Games vs App - Surface View check
+"""
+Returns the surface name for a given package name.
+Args:
+    package_name: A string representing the name of the application to
+        be targeted.
+Returns:
+    A string representing a surface name of the package name.
+"""
 def has_surface_name(transport_id: str, package_name: str) -> str:
-    """
-    Returns the surface name for a given package name.
-    Args:
-        package_name: A string representing the name of the application to
-            be targeted.
-    Returns:
-        A string representing a surface name of the package name.
-    """
-    pattern_with_surface = rf"""^SurfaceView\s*-\s*
-                        (?P<package>{package_name})     # Package name
-                        /[\w.#]*$"""                    # Surface window
-
+    pattern_with_surface = rf"""^SurfaceView\s*-\s*(?P<package>{package_name})/[\w.#]*$"""                    # Surface window
     re_surface = re.compile(pattern_with_surface, re.MULTILINE | re.IGNORECASE | re.VERBOSE)
     cmd = ('adb', '-t', transport_id, 'shell', 'dumpsys', 'SurfaceFlinger', '--list')
-    surfaces_list = subprocess.run(cmd, check=True, encoding='utf-8',
-                                    capture_output=True).stdout.strip()
-
+    surfaces_list = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
     last = None
     for match in re_surface.finditer(surfaces_list):
+        print(f"Found match: ", match)
         last = match
     if last:
         if package_name != last.group('package'):
-            # return (f'Surface not found for package {package_name}. '
-            #                 'Please ensure the app is running.')
             return False
-
         # UE4 games have at least two SurfaceView surfaces. The one
         # that seems to in the foreground is the last one.
         # return last.group()
         return True
 
+    # Some apps will report a surface in use but will not have a SurfaceView.
+    # E.g. Facebook messenger has surfaces views present while the user is on the login screen but it does not report a 'SurfaceView'
 
-    pattern_without_surface = rf"""^(?P<package>{package_name})/[\w.#]*$"""
-    re_without_surface = re.compile(
-        pattern_without_surface, re.MULTILINE | re.IGNORECASE | re.VERBOSE)
-    # Fallback: SurfaceView was not found.
-    matches_without_surface = re_without_surface.search(
-        surfaces_list)
-    if matches_without_surface:
-        if package_name != matches_without_surface.group('package'):
-            return False
-            # return (f'Surface not found for package {package_name}. '
-            #                 'Please ensure the app is running.')
-        # return matches_without_surface.group()
-        return True
+    # pattern_without_surface = rf"""^(?P<package>{package_name})/[\w.#]*$"""
+    # re_without_surface = re.compile(pattern_without_surface, re.MULTILINE | re.IGNORECASE | re.VERBOSE)
+    # # Fallback: SurfaceView was not found.
+    # matches_without_surface = re_without_surface.search(surfaces_list)
+    # if matches_without_surface:
+    #     if package_name != matches_without_surface.group('package'):
+    #         return False
+    #         # return (f'Surface not found for package {package_name}. '
+    #         #                 'Please ensure the app is running.')
+    #     # return matches_without_surface.group()
+    #     return True
+    return False
+
+
+
+def is_download_in_progress(transport_id: str, package_name: str):
+    ''' Runs the command:
+        adb shell dumpsys activity services | grep <package_name>
+        and if anything is returned, then return True as there is a download in progress.
+    '''
+    try:
+        command = f'adb -t {transport_id} shell dumpsys activity services | grep com.google.android.finsky.assetmoduleservice.AssetModuleService:{package_name}'
+        output = subprocess.check_output(command, shell=True).decode('utf-8')
+        return bool(output.strip())
+    except Exception as error:
+        print("Error w/ checking download in progress")
+        print(error)
+    return False
 
 # Ip Address of machien Running Appium Server
 EXECUTOR = 'http://192.168.0.175:4723/wd/hub'
@@ -691,10 +701,10 @@ PLAYSTORE_PACKAGE_NAME = "com.android.vending"
 PLAYSTORE_MAIN_ACT = "com.google.android.finsky.activities.MainActivity"
 
 # Labels for YOLOv5
-LOGIN = 'Login Field'
-PASSWORD = 'Password Field'
+LOGIN = 'loginfield'
+PASSWORD = 'passwordfield'
 CONTINUE = 'Continue'
-GOOGLE_AUTH = 'Google Auth'
+GOOGLE_AUTH = 'GoogleAuth'
 FB_ATUH = 'Facebook Auth'
 SIGN_IN = 'Sign In'
 
@@ -708,6 +718,13 @@ IMAGE_LABELS = [
     SIGN_IN
 ]
 
+
+ACCOUNTS = {
+    'com.roblox.client': ['testminnie000', 'testminnie123'],
+    'com.facebook.orca': ['testminnie001@gmail.com', 'testminnie123'],
+    'com.facebook.talk': ['testminnie001@gmail.com', 'testminnie123'],
+}
+
 PACKAGE_NAMES = [
     # [ "Rocket League Sideswipe", "com.Psyonix.RL2D"],
     # ['Apk Analyzer', 'sk.styk.martin.apkanalyzer'],
@@ -718,14 +735,14 @@ PACKAGE_NAMES = [
     # ['Garena Free Fire', 'com.dts.freefireth'],
     # ['My Boy! - GBA Emulator', 'com.fastemulator.gba'],  # Purchase required, unable to install...
     # ['Messenger', 'com.facebook.orca'],
-    ['Netflix', 'com.netflix.mediaclient'],  # Unable to take SS of app due to protections.
-    ['YouTube Kids', 'com.google.android.apps.youtube.kids'],
     ['Messenger', 'com.facebook.orca'],
-    ['Gacha Club', 'air.com.lunime.gachaclub'],
     ['Messenger Kids', 'com.facebook.talk'],
     ['Among Us!', 'com.innersloth.spacemafia'],
-    ['Gacha Life', 'air.com.lunime.gachalife'],
     ['Tubi TV', 'com.tubitv'],
+    ['Netflix', 'com.netflix.mediaclient'],  # Unable to take SS of app due to protections.
+    ['YouTube Kids', 'com.google.android.apps.youtube.kids'],
+    ['Gacha Club', 'air.com.lunime.gachaclub'],
+    ['Gacha Life', 'air.com.lunime.gachalife'],
     ['Google Classroom', 'com.google.android.apps.classroom'],
     ['Candy Crush Soda Saga', 'com.king.candycrushsodasaga'],
     ['Google Photos', 'com.google.android.apps.photos'],
@@ -763,10 +780,10 @@ PACKAGE_NAMES = [
     ['Magic Jigsaw Puzzles', 'com.bandagames.mpuzzle.gp'],
     ['Solar Smash', 'com.paradyme.solarsmash'],
     ['Jackpot Party Casino', 'com.williamsinteractive.jackpotparty'],
-    ['Subway Surfers', 'com.kiloo.subwaysurf'],
+    ['Subway Surfers', 'com.kiloo.subwaysurf'], ## NOt found on Helios
     ['Episode', 'com.episodeinteractive.android.catalog'],
     ['Block Craft 3D', 'com.fungames.blockcraft'],
-    ['MobilityWare Solitaire', 'com.mobilityware.solitaire'],
+    ['Solitaire - Classic Card Games', 'com.mobilityware.solitaire'],
     ['The Sims FreePlay', 'com.ea.games.simsfreeplay_na'],
     ['ITV Player', 'air.ITVMobilePlayer'],
     ['Family Farm Adventure', 'com.farmadventure.global'],
@@ -778,10 +795,10 @@ PACKAGE_NAMES = [
     ['Guns of Glory', 'com.diandian.gog'],
     ['Bowmasters', 'com.miniclip.bowmasters'],
     ['CW Network', 'com.cw.fullepisodes.android'],
-    ['Zooba', 'com.wildlife.games.battle.royale.free.zooba'],
+    ['Zooba', 'com.wildlife.games.battle.royale.free.zooba'],  ## LAST
     ['Amino: Communities and Chats', 'com.narvii.amino.master'],
-    ['Solitaire Classic', 'com.freegame.solitaire.basic2'],
-    ['Summoners War', 'com.com2us.smon.normal.freefull.google.kr.android.common'],
+    ['Solitaire Classic', 'com.freegame.solitaire.basic2'], # Fails to find correct app in search
+    ['Summoners War', 'com.com2us.smon.normal.freefull.google.kr.android.common'], # Faisl to download extra data but doesnt crash app
     ['Plants vs. Zombies', 'com.ea.game.pvzfree_row'],
     ['Yu-Gi-Oh! Duel Links', 'jp.konami.duellinks'],
     ['Manor Matters', 'com.playrix.manormatters'],
@@ -792,7 +809,7 @@ PACKAGE_NAMES = [
     ['Rokie - Roku Remote', 'com.kraftwerk9.rokie'],
     ['Bubble Witch 3 Saga', 'com.king.bubblewitch3'],
     ['Colorscapes', 'com.artlife.coloringbook'],
-    ['Spider Solitaire', 'at.ner.SolitaireSpider'],
+    ['Spider Solitaire', 'at.ner.SolitaireSpider'], ## App was not installed, TODO look into this
     ['Last Day on Earth: Survival', 'zombie.survival.craft.z'],
     ['My Talking Tom Friends', 'com.outfit7.mytalkingtomfriends'],
     ['War Robots', 'com.pixonic.wwr'],
@@ -803,7 +820,7 @@ PACKAGE_NAMES = [
     ['Xodo PDF Reader & Editor', 'com.xodo.pdf.reader'],
     ['Shadow Fight 3', 'com.nekki.shadowfight3'],
     ['Chrome Browser', 'com.chrome.beta'],
-    ['Audible', 'com.audible.application'],
+    ['Audible', 'com.audible.application'], # Protected sign in 'secure' flag set, cant take ScreenShot
     ['PowerDirector', 'com.cyberlink.powerdirector.DRA140225_01'],
     ['Deezer', 'deezer.android.app'],
     ['Magic Tiles 3', 'com.youmusic.magictiles'],
@@ -825,11 +842,11 @@ PACKAGE_NAMES = [
     ['com.yoku.marumovie', 'com.yoku.marumovie'],
     ['Family Farm Seaside', 'com.funplus.familyfarm'],
     ['World of Tanks Blitz', 'net.wargaming.wot.blitz'],
-    ['eBay', 'com.ebay.mobile'],
+    ['eBay', 'com.ebay.mobile'], # Last
     ['Count Masters - Stickman Clash', 'freeplay.crowdrun.com'],
     ['Gallery: Coloring Book', 'com.beresnevgames.gallerycoloringbook'],
     ['Krita', 'org.krita'],
-    ['Adobe Lightroom', 'com.adobe.lrmobile'],
+    ['Lightroomq', 'com.adobe.lrmobile'],
     ['com.madfut.madfut21', 'com.madfut.madfut21'],
     ['Rummikub', 'com.rummikubfree'],
     ['Chat Master!', 'com.RBSSOFT.HyperMobile'],
@@ -844,8 +861,8 @@ PACKAGE_NAMES = [
     ['Anime Center', 'pro.anioload.animecenter'],
     ['VRV', 'com.ellation.vrv'],
     ['Toca Kitchen 2', 'com.tocaboca.tocakitchen2'],
-    ['Miracle Nikki', 'com.elex.nikkigp'],
-    ['CrossOver on Chrome OS Beta', 'com.codeweavers.cxoffice'],
+    ['Love Nikki-Dress UP Queen', 'com.elex.nikkigp'],
+    # ['CrossOver on Chrome OS Beta', 'com.codeweavers.cxoffice'], # Package not available.
     ['Pocket Mortys', 'com.turner.pocketmorties'],
     ['Wish - Shopping Made Fun', 'com.contextlogic.wish'],
     ['Scary Teacher 3D', 'com.zakg.scaryteacher.hellgame'],
@@ -857,7 +874,7 @@ PACKAGE_NAMES = [
     ['Wonder Merge - Magic Merging and Collecting Games', 'com.cookapps.wonder.merge.dragon.magic.evolution.merging.wondermerge'],
     ['Wood Block Puzzle - Free Classic Block Puzzle Game', 'puzzle.blockpuzzle.cube.relax'],
     ['Hungry Shark Evolution', 'com.fgol.HungrySharkEvolution'],
-    ['Mergical', 'com.fotoable.mergetown'],
+    # ['Mergical', 'com.fotoable.mergetown'],   # Package not found
     ["Diggy's Adventure", 'air.com.pixelfederation.diggy'],
     ['My Talking Angela', 'com.outfit7.mytalkingangelafree'],
     ['The Tribez', 'com.gameinsight.tribez'],
@@ -951,7 +968,7 @@ PACKAGE_NAMES = [
     ['Mahjong', 'com.fenghenda.mahjong'],
     ['Galaxy Attack: Alien Shooter', 'com.alien.shooter.galaxy.attack'],
     ['Madden NFL 21 Mobile Football', 'com.ea.gp.maddennfl21mobile'],
-    ['Bubble Shooter Rainbow - Shoot & Pop Puzzle', 'com.blackout.bubble'],
+    ['Bubble Shooter Rainbow - Shoot & Pop Puzzle', 'com.blackout.bubble'], # LAST
     ['VIDEOMEDIASET', 'it.fabbricadigitale.android.videomediaset'],
     ['Google Earth', 'com.google.earth'],
     ['Viaplay', 'com.viaplay.android'],
@@ -1107,6 +1124,88 @@ PACKAGE_NAMES = [
 
 TOP_500_APPS = PACKAGE_NAMES[:500]
 
+
+''' 100- 150 failure report
+FreeCell Solitaire at.ner.SolitaireFreeCell search/install status: FAILED - [192.168.1.113:5555]
+                 Failed to open because the package was not installed.
+
+Adobe Lightroom com.adobe.lrmobile search/install status: FAILED - [192.168.1.113:5555]
+                 Failed: Click app icon
+
+CrossOver on Chrome OS Beta com.codeweavers.cxoffice search/install status: FAILED - [192.168.1.113:5555]
+                 App package is invalid, update/ remove from list.
+
+Miracle Nikki com.elex.nikkigp search/install status: FAILED - [192.168.1.113:5555]
+                 Failed: Click app icon
+
+Mergical com.fotoable.mergetown search/install status: FAILED - [192.168.1.113:5555]
+                 Failed: Click app icon
+
+com.madfut.madfut21 com.madfut.madfut21 search/install status: FAILED - [192.168.1.113:5555]
+                 Failed: Click app icon
+
+V - Real-time celeb broadcasting app com.naver.vapp search/install status: FAILED - [192.168.1.113:5555]
+                 App package is invalid, update/ remove from list.
+
+hayu com.upst.hayu search/install status: FAILED - [192.168.1.113:5555]
+                 Failed: Click app icon
+
+com.yoku.marumovie com.yoku.marumovie search/install status: FAILED - [192.168.1.113:5555]
+                 Failed: Click app icon
+
+GyaO jp.co.yahoo.gyao.android.app search/install status: FAILED - [192.168.1.113:5555]
+                 Failed: Click app icon
+
+Anime Center pro.anioload.animecenter search/install status: FAILED - [192.168.1.113:5555]
+                 Failed to open because the package was not installed.
+
+
+
+
+
+150-200
+
+Kitchen Frenzy - Chef Master com.biglime.cookingmadness search/install status: FAILED - [192.168.1.113:5555]
+                 Failed to open because the package was not installed.
+
+Spider Solitaire com.cardgame.spider.fishdom search/install status: FAILED - [192.168.1.113:5555]
+                 Failed: Click install button :: Program installed incorrect package,                    com.cardgame.spider.fishdom was not actually installed
+
+DraStic DS Emulator com.dsemu.drastic search/install status: FAILED - [192.168.1.113:5555]
+                 Failed: Click install button :: Needs purchase
+
+My Boy! - GBA Emulator com.fastemulator.gba search/install status: FAILED - [192.168.1.113:5555]
+                 Failed: Click install button :: Needs purchase
+
+Google Slides com.google.android.apps.docs.editors.slides search/install status: FAILED - [192.168.1.113:5555]
+                 Failed: Click install button :: Program installed incorrect package,                    com.google.android.apps.docs.editors.slides was not actually installed
+
+TV d'Orange com.orange.owtv search/install status: FAILED - [192.168.1.113:5555]
+                 Failed to open because the package was not installed.
+
+Heart of Vegas com.productmadness.hovmobile search/install status: FAILED - [192.168.1.113:5555]
+                 Failed: Click search icon
+
+Sketch - Draw & Paint com.sonymobile.sketch search/install status: FAILED - [192.168.1.113:5555]
+                 App package is invalid, update/ remove from list.
+
+U-NEXT jp.unext.mediaplayer search/install status: FAILED - [192.168.1.113:5555]
+                 Failed: Click app icon
+
+Google Earth com.google.earth search/install status: FAILED - [192.168.1.113:5555]
+                 Failed: Click install button :: Program installed incorrect package,                    com.google.earth was not actually installed
+
+Kingdom Rush com.ironhidegames.android.kingdomrush search/install status: FAILED - [192.168.1.113:5555]
+                 Failed: Click install button :: Needs purchase
+
+Grand Theft Auto: San Andreas com.rockstargames.gtasa search/install status: FAILED - [192.168.1.113:5555]
+                 Failed to open because the package was not installed.
+
+Viaplay com.viaplay.android search/install status: FAILED - [192.168.1.113:5555]
+                 Failed: Click app icon
+
+
+'''
 
 ADB_KEYCODE_UNKNOWN = "0"
 ADB_KEYCODE_MENU = "1"

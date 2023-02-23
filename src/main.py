@@ -11,6 +11,13 @@ from utils.utils import (PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME,
 
 # Starts Appium Server.
 # python3 main.py 192.168.1.113:5555 192.168.1.238:5555 192.168.1.248:5555
+
+
+weights = 'notebooks/yolov5/runs/train/exp007/weights/best_309.pt'
+weights = 'notebooks/yolov5/runs/train/exp4/weights/best.pt'  # Lastest RoboFlow Model V1
+weights = 'notebooks/yolov5/runs/train/exp6/weights/best.pt'  # Lastest RoboFlow Model V2
+weights = 'notebooks/yolov5/runs/train/exp7/weights/best.pt'  # Lastest RoboFlow Model V2
+
 if __name__ == "__main__":
     ips = sys.argv[1:]
 
@@ -37,7 +44,6 @@ if __name__ == "__main__":
     #   Single run
     ###################################
 
-    # ip = '192.168.1.113:5555' # ARC-P CoachZ
     # ip = '192.168.1.128:5555' # ARC-P Kevin ARM 32-bit
     # ip = '192.168.1.125:5555' # ARC-R Eve
     # ip = 'emulator-5554' # ARC-R
@@ -46,7 +52,8 @@ if __name__ == "__main__":
     # ip = '192.168.1.248:5555' # ARC-R Morphius,
     # ip = '192.168.1.:5555' # ARC-P Krane,
     # ip = '192.168.1.137:5555' # ARC-R Kohaku,
-    ip = '192.168.1.238:5555' # ARC-R Helios,
+    # ip = '192.168.1.238:5555' # ARC-R Helios,
+    ip = '192.168.1.113:5555' # ARC-P CoachZ
 
     res = adb_connect(ip)
     transport_id = find_transport_id(ip)
@@ -68,7 +75,16 @@ if __name__ == "__main__":
     driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
 
 
-    validator = AppValidator(driver, TOP_500_APPS[3:50], transport_id, version, ip, is_emu, device_name)
+    validator = AppValidator(
+        driver,
+        TOP_500_APPS[1:2],
+        transport_id,
+        version,
+        ip,
+        is_emu,
+        device_name,
+        weights
+        )
     validator.uninstall_multiple()
     validator.run()
     validator.report.print_report()

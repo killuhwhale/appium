@@ -18,12 +18,25 @@ Prep work for Chromebook:
 
 
  - Improve model
+ - Google Auth account selection
  - Log each step of testing instead of just reporting failures - to do
     - Figure out a loggin system.
     - Alredy have a failure logging system. Can extend it to support a detailed desc of what ahppens with each app.
  - Identify Android vs PWA & AMAC-e
     - near impossible  or what?
 
+
+Bugs:
+
+    - Pulling APK:  com.nordvpn.android /home/killuh/ws_p38/appium/src/apks/com.nordvpn.android
+        Error in main RUN:  Command '('/home/killuh/Android/Sdk/build-tools/31.0.0/aapt', 'dump', 'badging', '/home/killuh/ws_p38/appium/src/apks/com.nordvpn.android/base.apk')' returned non-zero exit status 1.
+    - Handle Login
+        - Some apps requrie :
+            - Dropdown Birthday Selections
+            - Age number slider
+
+- ['Summoners War', 'com.com2us.smon.normal.freefull.google.kr.android.common'], # Faisl to download extra data but
+        doesnt crash app
 
 
 # NOTES
