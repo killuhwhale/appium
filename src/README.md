@@ -18,12 +18,21 @@ Prep work for Chromebook:
 
 
  - Improve model
+    -  Possibly scrape same image set from multiple devices w/ varying screen sizes.
+    - Detection that works on Coach-Z does not work as well on HElios
+        - Different screen sizes.
+        - Resizing doesnt seem to help in this case.
+            - Try resizing to CoachZ size? instead of resizing to 640x640
+
+        - CoachZ (2160 1440 native 1200 x 800 @ 100%) = 1200 x 800
+        - Helios (1920 1080 native)                   => resize to -> 1200 x 800
+        - Eve    (2400 1600 native)                   => resize to -> 1200 x 800
+
+
  - Google Auth account selection
- - Log each step of testing instead of just reporting failures - to do
-    - Figure out a loggin system.
-    - Alredy have a failure logging system. Can extend it to support a detailed desc of what ahppens with each app.
- - Identify Android vs PWA & AMAC-e
-    - near impossible  or what?
+
+ - Identify AMAC-e
+    - near impossible or what?
 
 
 Bugs:

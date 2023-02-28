@@ -2,6 +2,7 @@ import __main__
 import collections
 import os
 import re
+import cv2
 import requests
 import subprocess
 from datetime import datetime
@@ -20,9 +21,10 @@ from typing import List
 
 from objdetector.objdetector import ObjDetector
 from utils.utils import (
-    ACCOUNTS, ADB_KEYCODE_DEL, DEVICES, SIGN_IN, ArcVersions, CONTINUE, CrashType, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
-    PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, check_amace,
-    check_crash, close_app, create_dir_if_not_exists, gather_app_info, get_cur_activty, get_root_path, get_start_time, has_surface_name, is_download_in_progress, open_app)
+    ACCOUNTS, ADB_KEYCODE_DEL, DEVICES, SIGN_IN, AppInfo, ArcVersions, CONTINUE, CrashType, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
+    PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, Device, check_amace,
+    check_crash, close_app, create_dir_if_not_exists, get_cur_activty, get_root_path,
+    get_start_time, is_download_in_progress, open_app, save_resized_image, transform_coord_from_resized)
 
 class ValidationReport:
     '''
@@ -201,18 +203,20 @@ class AppValidator:
             self,
             driver: webdriver.Remote,
             package_names: List[List[str]],
-            transport_id: str,
-            arc_version: ArcVersions,
-            ip: str,
-            is_emu: bool,
-            device_name: str,
+            device: Device,
             weights: str,
             instance_num: int= 0,
         ):
         self.driver = driver
-        self.ip = ip
+        self.device = device.info()
+        print(f"{self.device=}")
+        self.ip = self.device['ip']
+        self.transport_id = self.device['transport_id']
+        self.arc_version = self.device['arc_version']
+        self.is_emu = self.device['is_emu']
+        self.device_name = self.device['device_name']
         self.package_names = package_names  # List of packages to test as [app_title, app_package_name]
-        self.report = ValidationReport(ip)
+        self.report = ValidationReport(self.ip)
         self.steps = [
             'Click search icon',
             'Send keys for search',
@@ -222,15 +226,11 @@ class AppValidator:
         self.prev_act = None
         self.cur_act = None
         # Filepath that our detector is going to lookat to detect an object from.
-        self.test_img_fp = f"{ip}_test.png"
+        self.test_img_fp = f"{self.ip}_test.png"
         self.weights = weights
         self.detector = ObjDetector(self.test_img_fp, [self.weights])
-        self.transport_id = transport_id
-        self.arc_version = arc_version
-        self.is_emu = is_emu
-        self.device_name = device_name
+        self.ID = f"{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}-{self.ip.split(':')[0]}"
         self.instance_num = instance_num
-        self.ID = f"{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}-{ip.split(':')[0]}"
         self.dev_ss_count = 280
 
     def dprint(self, *args):
@@ -240,7 +240,86 @@ class AppValidator:
         print(color,end="")
         print(self.report.RESET)
 
+    ##  ADB app management
+    def is_open(self, package_name: str) -> bool:
+        cmd = ('adb', '-t', self.transport_id, 'shell', 'pidof', package_name)
+        outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+                                capture_output=True).stdout.strip()
+        self.dprint(outstr)
+        return len(outstr) > 0
 
+    def is_new_activity(self) -> bool:
+        '''
+            Calls adb shell dumpsys activity | grep mFocusedWindow
+        '''
+        package, activity = get_cur_activty(self.transport_id,  self.arc_version)
+        act_name = f"{package}/{activity}"
+        self.prev_act = self.cur_act  # Update
+        self.cur_act = act_name
+        # Init
+        if self.prev_act is None:
+            self.prev_act = act_name
+        return self.prev_act != self.cur_act
+
+    def is_installed(self, package_name: str) -> bool:
+        """Returns whether package_name is installed.
+        Args:
+            package_name: A string representing the name of the application to
+                be targeted.
+        Returns:
+            A boolean representing if package is installed.
+        """
+        cmd = ('adb', '-t', self.transport_id, 'shell', 'pm', 'list', 'packages')
+        outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+            capture_output=True).stdout.strip()
+        full_pkg_regexp = fr'^package:({re.escape(package_name)})$'
+        regexp = full_pkg_regexp
+
+        # IGNORECASE is needed because some package names use uppercase letters.
+        matches = re.findall(regexp, outstr, re.MULTILINE | re.IGNORECASE)
+        if len(matches) == 0:
+            self.dprint(f'No installed package matches "{package_name}"')
+            return False
+        if len(matches) > 1:
+            self.dprint(f'More than one package matches "{package_name}":')
+            for p in matches:
+                self.dprint(f' - {p}')
+            return False
+        self.dprint(f'Found package name: "{matches[0]}"')
+        return True
+
+    def uninstall_app(self, package_name: str):
+        '''
+            Uninstalls app and waits 40 seconds or so while checking if app is still installed.
+            Returns True once app is fianlly unisntalled.
+            Returns False if it takes too long to unisntall or some other unexpected error.
+        '''
+        uninstalled = False
+        try:
+            cmd = ( 'adb', '-t', self.transport_id, 'uninstall', package_name)
+            outstr = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+            sleep(5)
+            uninstalled = True
+        except Exception as e:
+            self.dprint("Error uninstalling: ", package_name, e)
+
+        if uninstalled:
+            try:
+                sleep_cycle = 0
+                while self.is_installed(package_name) and sleep_cycle <= 20:
+                    sleep(2)
+                    self.dprint("Sleeping.... zzz")
+                    sleep_cycle += 1
+                self.dprint(f"Took roughly {5 + sleep_cycle * 2} seconds.")
+            except Exception as e:
+                self.dprint("Error checking is installed after uninstall: ", package_name, e)
+
+    def uninstall_multiple(self):
+        for name in [pack_info[1] for pack_info in self.package_names]:
+            self.uninstall_app(name)
+
+
+    ##  Http Get
     def check_playstore_invalid(self, package_name) -> bool:
         ''' Checks if an app's package_name is invalid vai Google playstore URL
             If invalid, returns True
@@ -261,18 +340,67 @@ class AppValidator:
             return True
 
 
-    def is_new_activity(self) -> bool:
+    ##  Buttons
+    def sorted_conf(self, p: List):
+        ''' Returns confidence value from the list.'''
+        return int(p[2])
+
+    def tap_screen(self, x:str, y:str):
+        try:
+            self.dprint(f"Tapping ({x},{y})")
+            cmd = ('adb','-t', self.transport_id, 'shell', 'input', 'tap', x, y)
+            outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+                                    capture_output=True).stdout.strip()
+        except Exception as e:
+            self.dprint("Error tapping app", e)
+            return False
+        return True
+
+    def click_button(self, btns: List) -> List:
         '''
-            Calls adb shell dumpsys activity | grep mFocusedWindow
+            Given a button list [Result from ObjDetector], remove the button and click it.
+
+            Returns the remaining buttons.
         '''
-        package, activity = get_cur_activty(self.transport_id,  self.arc_version)
-        act_name = f"{package}/{activity}"
-        self.prev_act = self.cur_act  # Update
-        self.cur_act = act_name
-        # Init
-        if self.prev_act is None:
-            self.prev_act = act_name
-        return self.prev_act != self.cur_act
+        btns = sorted(btns, key=self.sorted_conf)  # Sorted by confidence
+        self.dprint("Btns: ",btns )
+        tapped = False
+        if(len(btns) >= 1):
+            btn = btns.pop()
+            self.tap_screen(*self.get_coords(btn))
+            tapped = True
+        return btns, tapped
+
+    def get_coords(self, btn: List):
+        ''' Given a list of list representing a bounding box's top left &
+            bottom right corners, return the mid point as a string to be
+            compatible with adb shell input text.
+
+            Args:
+                btn = [[x1, y1], [x2, y2]]
+            Returns:
+                (x, y): List[str]
+         '''
+        x = (btn[0][0] + btn[1][0]) / 2
+        y = (btn[0][1] + btn[1][1]) / 2
+
+        coords = transform_coord_from_resized(
+            (self.device['wxh']),
+            (1200, 800),
+            (int(x), int(y))
+        )
+        return str(int(coords[0])), str(int(coords[1]))
+
+
+    ##  Images/ Reporting
+    def scrape_dev_test_image(self):
+        try:
+            self.driver.get_screenshot_as_file(
+            f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/scraped_images/{self.dev_ss_count}.png"
+            )
+            self.dev_ss_count += 1
+        except Exception as error:
+            print("Error w/ dev ss: ", error)
 
     def get_test_ss(self) -> bool:
         '''
@@ -287,7 +415,10 @@ class AppValidator:
         root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
         root_path = '/'.join(root_path)
         try:
-            self.driver.get_screenshot_as_file(f"/{root_path}/notebooks/yolo_images/{self.test_img_fp}")
+            # self.driver.get_screenshot_as_file(f"/{root_path}/notebooks/yolo_images/{self.test_img_fp}")
+            png_bytes = self.driver.get_screenshot_as_png()
+            save_resized_image(png_bytes, (1200,800), f"/{root_path}/notebooks/yolo_images/{self.test_img_fp}")
+
             return True
         except ScreenshotException as e:
             self.dprint("App is scured!")
@@ -328,40 +459,108 @@ class AppValidator:
         self.dprint("Error taking SS: ", root_path)
         return False
 
-    def sorted_conf(self, p: List):
-        ''' Returns confidence value from the list.'''
-        return int(p[2])
+    def dev_SS_loop(self):
+        ''' Loop that pauses on input allowing to take multiple screenshots
+                after manually changing app state.
+        '''
+        ans = ''
+        while not (ans == 'q'):
+            ans = input("Take your screen shots bro...")
+            print(f"{ans=}, {(not ans == 'q')}")
+            if not (ans == 'q'):
+                print("Taking SS")
+                self.scrape_dev_test_image()
+            else:
+                print("Quit from SS")
 
-    def tap_screen(self, x:str, y:str):
+
+    ##  Reporting
+    def update_report_history(self, package_name: str, msg: str):
+        '''
+            Updates Validation report for the given package_name.
+
+            This will add a history message and take a screenshot to document
+            the testing process of an app.
+
+            Args:
+                msg: A message to commit to history.
+        '''
         try:
-            self.dprint(f"Tapping ({x},{y})")
-            cmd = ('adb','-t', self.transport_id, 'shell', 'input', 'tap', x, y)
-            outstr = subprocess.run(cmd, check=True, encoding='utf-8',
-                                    capture_output=True).stdout.strip()
-        except Exception as e:
-            self.dprint("Error tapping app", e)
-            return False
-        return True
+            num = len(self.report.report[package_name]['history'])
+            path = f"{get_root_path()}/images/history/{self.ip}"
+            create_dir_if_not_exists(path)
+            full_path = f"{path}/{num}.png"
+            self.driver.get_screenshot_as_file(full_path)
+            self.report.add_history(package_name, msg, full_path)
+        except Exception as error:
+            print("Failed to get SS", error)
+            self.report.add_history(package_name, msg)
+
+    def return_error(self, last_step: int, error: str):
+        if last_step == 0:
+            self.driver.back()
+            return [False, f"Failed: {self.steps[0]}"]
+        elif last_step == 1:
+            self.driver.back()
+            return [False, f"Failed: {self.steps[1]}"]
+        elif last_step == 2:
+            self.driver.back()
+            return [False, f"Failed: {self.steps[2]}"]
+        elif last_step == 3:
+            self.driver.back()
+            self.driver.back()
+            self.dprint(f"Failed: {self.steps[3]} :: {error}")
+            return [False, f"Failed: {self.steps[3]} :: {error}"]
 
 
-    def click_button(self, btns: List) -> List:
-        '''
-            Given a button list [Result from detector], remove the button and Click it
+    ##  Typing
+    def escape_chars(self, title: str):
+        title_search = title.replace("'", "\\'")
+        title_search = title_search.replace(" ", "\ ")
+        title_search = title_search.replace('"', '\\"')
+        title_search = title_search.replace("&", "\&")
+        title_search = title_search.replace("-", "\-")
+        title_search = title_search.replace("!", "\!")
+        title_search = title_search.replace("?", "\?")
+        title_search = title_search.replace("@", "\@")
+        title_search = title_search.replace("#", "\#")
+        title_search = title_search.replace("$", "\$")
+        title_search = title_search.replace("%", "\%")
+        title_search = title_search.replace("+", "\+")
+        return title_search
 
-            Returns the remaining buttons.
-        '''
-        btns = sorted(btns, key=self.sorted_conf)
-        self.dprint("Btns: ",btns )
-        tapped = False
-        if(len(btns) >= 1):
-            btn = btns.pop()
-            self.tap_screen(*self.get_coords(btn))
-            tapped = True
-        return btns, tapped
+    def send_keys_ADB(self, title: str, submit=True, esc=True):
+        title_search = title
+        if esc:
+            title_search = self.escape_chars(title)
+
+        # for _ in range(len("testminnie001@gmail.com") + 5):
+        #     cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'keyevent', ADB_KEYCODE_DEL)
+        #     subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+
+        for c in title_search:
+            cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'text', c)
+            subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+        if submit:
+            cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'keyevent', ADB_KEYCODE_ENTER)
+            subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+
+    def cleanup_run(self, app_package_name: str):
+        print("Cleaning up")
+        self.prev_act = None
+        self.cur_act = None
+        close_app(app_package_name, self.transport_id)
+        # self.uninstall_app(app_package_name)  # (save space)
+        print("Skipping uninstall")
+        open_app(PLAYSTORE_PACKAGE_NAME, self.transport_id, self.arc_version)
+        self.driver.orientation = 'PORTRAIT'
 
 
+    ## Login w/ YOLO Model
     def sleep_while_in_progress(self, app_package_name: str):
-        ''' Sleeps while in progress
+        ''' Sleeps while in download is in progress.
+
+            Used to wait for a game to download its extra content.
         '''
         timeout = 60 * 3
         start = time()
@@ -508,187 +707,16 @@ class AppValidator:
 
         if not logged_in:
             self.report.update_status(app_package_name, ValidationReport.FAIL, 'Failed to log in')
+            self.update_report_history(app_package_name, "Failed to log in.")
             return False
         else:
             # For now, if app opens without error, we'll report successful
             self.report.update_status(app_package_name, ValidationReport.PASS, 'Logged in (sorta)')
+            self.update_report_history(app_package_name, "Logged in (sorta).")
         return True
 
-    def get_coords(self, btn: List):
-        ''' Given a list of list representing a bounding box's top left &
-            bottom right corners, return the mid point as a string to be
-            compatible with adb shell input text.
 
-            Args:
-                btn = [[x1, y1], [x2, y2]]
-            Returns:
-                (x, y): List[str]
-         '''
-        x = (btn[0][0] + btn[1][0]) / 2
-        y = (btn[0][1] + btn[1][1]) / 2
-        return str(int(x)), str(int(y))
-
-    def check_AMACe_PWA_GAME(self, app_package_name: str) -> List[bool]:
-        ''' TODO() Finish implementation... '''
-        # App is now open, check types PWA/ AMAC_E, Game
-        is_amace, is_pwa, is_game = False, False, False
-        try:
-            is_game = has_surface_name(self.transport_id, app_package_name)
-
-        except Exception as error:
-            self.dprint("Failed", error)
-        return [is_amace, is_pwa, is_game]
-
-    def scrape_dev_test_image(self):
-        try:
-            self.driver.get_screenshot_as_file(
-            f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/scraped_images/{self.dev_ss_count}.png"
-            )
-            self.dev_ss_count += 1
-        except Exception as error:
-            print("Error w/ dev ss: ", error)
-
-    def cleanup_run(self, app_package_name: str):
-        print("Cleaning up")
-        close_app(app_package_name, self.transport_id)
-        # self.uninstall_app(app_package_name)  # (save space)
-        print("Skipping uninstall")
-        open_app(PLAYSTORE_PACKAGE_NAME, self.transport_id, self.arc_version)
-        self.driver.orientation = 'PORTRAIT'
-
-    def dev_SS_loop(self):
-        ''' Loop that pauses on input allowing to take multiple screenshots
-                after manually changing app state.
-        '''
-        ans = ''
-        while not (ans == 'q'):
-            ans = input("Take your screen shots bro...")
-            print(f"{ans=}, {(not ans == 'q')}")
-            if not (ans == 'q'):
-                print("Taking SS")
-                self.scrape_dev_test_image()
-            else:
-                print("Quit from SS")
-
-    def update_report_history(self, package_name: str, msg: str):
-        try:
-            num = len(self.report.report[package_name]['history'])
-            path = f"{get_root_path()}/images/history/{self.ip}"
-            create_dir_if_not_exists(path)
-            full_path = f"{path}/{num}.png"
-            self.driver.get_screenshot_as_file(full_path)
-            self.report.add_history(package_name, msg, full_path)
-        except Exception as error:
-            print("Failed to get SS", error)
-            self.report.add_history(package_name, msg)
-
-    def run(self):
-        '''
-            Main loop of the Playstore class, starts the cycle of discovering,
-            installing, logging in and uninstalling each app from self.package_names.
-
-            It ensures that the playstore is open at the beginning and that
-            the device orientation is returned to portrait.
-        '''
-        self.driver.orientation = 'PORTRAIT'
-        for app_title, app_package_name in self.package_names:
-            self.report.create(app_package_name, app_title)
-            try:
-
-                self.start_time = get_start_time()
-                installed, error = self.discover_and_install(app_title, app_package_name)
-                # installed, error = True, False # Successful
-                self.dprint(f"Installed? {installed}   err: {error}")
-
-                if not installed and not error is None:
-                    self.report.update_status(app_package_name, ValidationReport.FAIL, error)
-                    self.cleanup_run(app_package_name)
-                    continue
-
-                # TODO, check if last step in disovery knows whether or not the app was installed or not....
-                self.update_report_history(app_package_name, "App discovery and installation successful.")
-
-
-                if not open_app(app_package_name, self.transport_id, self.arc_version):
-                    reason = ''
-                    if self.check_playstore_invalid(app_package_name):
-                        reason = "App package is invalid, update/ remove from list."
-                    elif not self.is_installed(app_package_name):
-                        reason = "Failed to open because the package was not installed."
-                    else:
-                        reason = "Failed to open"
-
-                    self.report.update_status(app_package_name, ValidationReport.FAIL, reason)
-                    print("Failed", self.report.report[app_package_name]['reason'])
-                    self.cleanup_run(app_package_name)
-                    continue
-                self.update_report_history(app_package_name, "App launch successful.")
-
-
-                # TODO wait for activity to start intelligently, not just package
-                # At this point we have successfully launched the app.
-                self.dprint("Waiting for app to start/ load...")
-                sleep(5) # ANR Period
-                CrashType, crashed_act = check_crash(app_package_name,
-                                            self.start_time, self.transport_id)
-                if(not CrashType == CrashType.SUCCESS):
-                    self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
-                    self.cleanup_run(app_package_name)
-                    continue
-
-                # self.scrape_dev_test_image()
-                # self.dev_SS_loop()
-
-                is_amace, is_pwa, is_game = self.check_AMACe_PWA_GAME(app_package_name)
-                # info = gather_app_info(self.transport_id, app_package_name)
-                # print(f"App {info=}")
-
-                logged_in = self.attempt_login(app_title, app_package_name, is_game)
-                 # Report Final App Status
-
-                print(f"Attempt loging: {logged_in=}")
-
-                self.cleanup_run(app_package_name)
-            except Exception as error:
-                print("Error in main RUN: ", error)
-                if error == "PLAYSTORECRASH":
-                    self.dprint("restart this attemp!")
-
-
-    def is_open(self, package_name: str) -> bool:
-        cmd = ('adb', '-t', self.transport_id, 'shell', 'pidof', package_name)
-        outstr = subprocess.run(cmd, check=True, encoding='utf-8',
-                                capture_output=True).stdout.strip()
-        self.dprint(outstr)
-        return len(outstr) > 0
-
-    def is_installed(self, package_name: str) -> bool:
-        """Returns whether package_name is installed.
-        Args:
-            package_name: A string representing the name of the application to
-                be targeted.
-        Returns:
-            A boolean representing if package is installed.
-        """
-        cmd = ('adb', '-t', self.transport_id, 'shell', 'pm', 'list', 'packages')
-        outstr = subprocess.run(cmd, check=True, encoding='utf-8',
-            capture_output=True).stdout.strip()
-        full_pkg_regexp = fr'^package:({re.escape(package_name)})$'
-        regexp = full_pkg_regexp
-
-        # IGNORECASE is needed because some package names use uppercase letters.
-        matches = re.findall(regexp, outstr, re.MULTILINE | re.IGNORECASE)
-        if len(matches) == 0:
-            self.dprint(f'No installed package matches "{package_name}"')
-            return False
-        if len(matches) > 1:
-            self.dprint(f'More than one package matches "{package_name}":')
-            for p in matches:
-                self.dprint(f' - {p}')
-            return False
-        self.dprint(f'Found package name: "{matches[0]}"')
-        return True
-
+    ## PlayStore install discovery
     def is_installed_UI(self):
         '''
             Checks for the presence of the Uninstall button indicating that the
@@ -759,66 +787,6 @@ class AppValidator:
         except Exception as e:
             return False
 
-    def uninstall_multiple(self):
-        for name in [pack_info[1] for pack_info in self.package_names]:
-            self.uninstall_app(name)
-
-    def uninstall_app(self, package_name: str):
-        '''
-            Uninstalls app and waits 40 seconds or so while checking if app is still installed.
-            Returns True once app is fianlly unisntalled.
-            Returns False if it takes too long to unisntall or some other unexpected error.
-        '''
-        uninstalled = False
-        try:
-            cmd = ( 'adb', '-t', self.transport_id, 'uninstall', package_name)
-            outstr = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
-            sleep(5)
-            uninstalled = True
-        except Exception as e:
-            self.dprint("Error uninstalling: ", package_name, e)
-
-        if uninstalled:
-            try:
-                sleep_cycle = 0
-                while self.is_installed(package_name) and sleep_cycle <= 20:
-                    sleep(2)
-                    self.dprint("Sleeping.... zzz")
-                    sleep_cycle += 1
-                self.dprint(f"Took roughly {5 + sleep_cycle * 2} seconds.")
-            except Exception as e:
-                self.dprint("Error checking is installed after uninstall: ", package_name, e)
-
-    def escape_chars(self, title: str):
-        title_search = title.replace("'", "\\'")
-        title_search = title_search.replace(" ", "\ ")
-        title_search = title_search.replace('"', '\\"')
-        title_search = title_search.replace("&", "\&")
-        title_search = title_search.replace("-", "\-")
-        title_search = title_search.replace("!", "\!")
-        title_search = title_search.replace("?", "\?")
-        title_search = title_search.replace("@", "\@")
-        title_search = title_search.replace("#", "\#")
-        title_search = title_search.replace("$", "\$")
-        title_search = title_search.replace("%", "\%")
-        title_search = title_search.replace("+", "\+")
-        return title_search
-
-    def return_error(self, last_step: int, error: str):
-        if last_step == 0:
-            self.driver.back()
-            return [False, f"Failed: {self.steps[0]}"]
-        elif last_step == 1:
-            self.driver.back()
-            return [False, f"Failed: {self.steps[1]}"]
-        elif last_step == 2:
-            self.driver.back()
-            return [False, f"Failed: {self.steps[2]}"]
-        elif last_step == 3:
-            self.driver.back()
-            self.driver.back()
-            self.dprint(f"Failed: {self.steps[3]} :: {error}")
-            return [False, f"Failed: {self.steps[3]} :: {error}"]
 
     def click_playstore_search(self):
         ''' Clicks Search Icon
@@ -858,21 +826,6 @@ class AppValidator:
             subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
         sleep(2)  # Wait for search results
 
-    def send_keys_ADB(self, title: str, submit=True, esc=True):
-        title_search = title
-        if esc:
-            title_search = self.escape_chars(title)
-
-        # for _ in range(len("testminnie001@gmail.com") + 5):
-        #     cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'keyevent', ADB_KEYCODE_DEL)
-        #     subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
-
-        for c in title_search:
-            cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'text', c)
-            subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
-        if submit:
-            cmd = ( 'adb', '-t', self.transport_id, 'shell', 'input', 'keyevent', ADB_KEYCODE_ENTER)
-            subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
 
     def press_app_icon(self, title: str):
         '''
@@ -909,7 +862,7 @@ class AppValidator:
                 pass
         raise("Icon not found!")
 
-    def extract_numbers(self, bounds: str):
+    def extract_bounds(self, bounds: str):
         '''
             Given '[882,801][1014,933]', return [882,801,1014,933].
         '''
@@ -934,6 +887,7 @@ class AppValidator:
         '''
         already_installed = False  # Potentailly already isntalled
         err = False
+        print(f"{self.device_name=}, {DEVICES.HELIOS=}")
         try:
             # input("About to search for 1st install")
             if self.is_emu:
@@ -944,7 +898,7 @@ class AppValidator:
                 install_BTN = self.driver.find_element(
                     by=AppiumBy.ANDROID_UIAUTOMATOR,
                     value=content_desc)
-                bounds = self.extract_numbers(
+                bounds = self.extract_bounds(
                     install_BTN.get_attribute("bounds"))
                 self.click_unknown_install_btn(bounds)
             elif not self.device_name == DEVICES.HELIOS:
@@ -954,6 +908,7 @@ class AppValidator:
                     by=AppiumBy.ACCESSIBILITY_ID, value="Install")
                 install_BTN.click()
             else:
+                # For some reason Helios acts weirdly and not the same as EVE which is also ARC-R...
                 # ARC_R Helios -> driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value='''new UiSelector().className("android.widget.View").text("Install")''')
                 content_desc = f'''
                     new UiSelector().className("android.widget.Button").text("Install")
@@ -1001,8 +956,6 @@ class AppValidator:
         if not self.is_installed_UI():  # Waits up to 7mins to find install button.
             raise Exception("Failed to install app!!")
 
-
-
     def discover_and_install(self, title: str, install_package_name: str):
         '''
          A method to search Google Playstore for an app and install via the Playstore UI.
@@ -1033,6 +986,7 @@ class AppValidator:
             self.install_app_UI(install_package_name)
             self.check_playstore_crash()
             # input("Step 3, press install")
+            self.update_report_history(install_package_name, "App discovery and installation process successful.")
 
             self.driver.back()  # back to seach results
             self.driver.back()  # back to home page
@@ -1055,6 +1009,80 @@ class AppValidator:
                     self.steps[last_step])
                 self.dprint("Eror:::: ", error)
                 return self.return_error(last_step, error)
+
+    ##  Main Loop
+    def run(self):
+        '''
+            Main loop of the Playstore class, starts the cycle of discovering,
+            installing, logging in and uninstalling each app from self.package_names.
+
+            It ensures that the playstore is open at the beginning and that
+            the device orientation is returned to portrait.
+        '''
+        self.driver.orientation = 'PORTRAIT'
+        for app_title, app_package_name in self.package_names:
+            self.report.create(app_package_name, app_title)
+            try:
+
+                self.start_time = get_start_time()
+                installed, error = self.discover_and_install(app_title, app_package_name)
+                # installed, error = True, False # Successful
+                self.dprint(f"Installed? {installed}   err: {error}")
+
+                if not installed and not error is None:
+                    self.report.update_status(app_package_name, ValidationReport.FAIL, error)
+                    self.cleanup_run(app_package_name)
+                    continue
+
+
+
+
+
+                if not open_app(app_package_name, self.transport_id, self.arc_version):
+                    reason = ''
+                    if self.check_playstore_invalid(app_package_name):
+                        reason = "App package is invalid, update/ remove from list."
+                    elif not self.is_installed(app_package_name):
+                        reason = "Failed to open because the package was not installed."
+                    else:
+                        reason = "Failed to open"
+
+                    self.report.update_status(app_package_name, ValidationReport.FAIL, reason)
+                    print("Failed", self.report.report[app_package_name]['reason'])
+                    self.cleanup_run(app_package_name)
+                    continue
+
+
+
+                # TODO wait for activity to start intelligently, not just package
+                # At this point we have successfully launched the app.
+                self.dprint("Waiting for app to start/ load...")
+                sleep(5) # ANR Period
+                CrashType, crashed_act = check_crash(app_package_name,
+                                            self.start_time, self.transport_id)
+                if(not CrashType == CrashType.SUCCESS):
+                    self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
+                    self.cleanup_run(app_package_name)
+                    continue
+
+                self.update_report_history(app_package_name, "App launch successful.")
+                # self.scrape_dev_test_image()
+                # self.dev_SS_loop()
+
+                info = AppInfo(self.transport_id, app_package_name).gather_app_info()
+                print(f"App {info=}")
+                if not info['is_pwa']:
+                    logged_in = self.attempt_login(app_title, app_package_name, info['is_game'])
+                    print(f"Attempt loging: {logged_in=}")
+
+
+
+                self.cleanup_run(app_package_name)
+            except Exception as error:
+                print("Error in main RUN: ", error)
+                if error == "PLAYSTORECRASH":
+                    self.dprint("restart this attemp!")
+
 
 
 

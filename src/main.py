@@ -5,9 +5,8 @@ import sys
 from playstore.playstore import AppValidator
 from utils.parallel import MultiprocessTaskRunner
 from utils.utils import (PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME,
-    TOP_500_APPS, adb_connect, android_des_caps,
-    find_transport_id, get_arc_version, get_device_name, is_emulator,
-    lazy_start_appium_server, stop_appium_server, check_amace, gather_app_info )
+    TOP_500_APPS, Device, android_des_caps,
+    lazy_start_appium_server, stop_appium_server)
 
 # Starts Appium Server.
 # python3 main.py 192.168.1.113:5555 192.168.1.238:5555 192.168.1.248:5555
@@ -16,7 +15,7 @@ from utils.utils import (PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME,
 weights = 'notebooks/yolov5/runs/train/exp007/weights/best_309.pt'
 weights = 'notebooks/yolov5/runs/train/exp4/weights/best.pt'  # Lastest RoboFlow Model V1
 weights = 'notebooks/yolov5/runs/train/exp6/weights/best.pt'  # Lastest RoboFlow Model V2
-weights = 'notebooks/yolov5/runs/train/exp7/weights/best.pt'  # Lastest RoboFlow Model V2
+weights = 'notebooks/yolov5/runs/train/exp7/weights/best.pt'  # Lastest RoboFlow Model V3
 
 if __name__ == "__main__":
     ips = sys.argv[1:]
@@ -52,15 +51,16 @@ if __name__ == "__main__":
     # ip = '192.168.1.248:5555' # ARC-R Morphius,
     # ip = '192.168.1.:5555' # ARC-P Krane,
     # ip = '192.168.1.137:5555' # ARC-R Kohaku,
-    # ip = '192.168.1.238:5555' # ARC-R Helios,
-    ip = '192.168.1.113:5555' # ARC-P CoachZ
+    ip = '192.168.1.238:5555' # ARC-R Helios,
+    # ip = '192.168.1.113:5555' # ARC-P CoachZ
 
-    res = adb_connect(ip)
-    transport_id = find_transport_id(ip)
-    version = get_arc_version(transport_id)
     service = lazy_start_appium_server()
-    is_emu = is_emulator(transport_id)
-    device_name = get_device_name(transport_id)
+    device = Device(ip)
+    # res = adb_connect(ip)
+    # transport_id = find_transport_id(ip)
+    # version = get_arc_version(transport_id)
+    # is_emu = is_emulator(transport_id)
+    # device_name = get_device_name(transport_id)
 
     print("Creating driver...")
     driver = webdriver.Remote(
@@ -73,16 +73,12 @@ if __name__ == "__main__":
     )
     driver.implicitly_wait(5)
     driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
-
+    sleep(3)  # Wait for playstore to load, there is an animation that delays the text from showing immediately which cause the search to fail (on first launch i think...)
 
     validator = AppValidator(
         driver,
         TOP_500_APPS[1:2],
-        transport_id,
-        version,
-        ip,
-        is_emu,
-        device_name,
+        device,
         weights
         )
     validator.uninstall_multiple()

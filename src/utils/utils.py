@@ -6,9 +6,37 @@ import re
 import subprocess
 from enum import Enum
 from time import time
-from typing import AnyStr, Dict, List
+from typing import AnyStr, Dict, List, Tuple
 import cv2
+import numpy as np
 
+# Ip Address of machien Running Appium Server
+EXECUTOR = 'http://192.168.0.175:4723/wd/hub'
+PLAYSTORE_PACKAGE_NAME = "com.android.vending"
+PLAYSTORE_MAIN_ACT = "com.google.android.finsky.activities.MainActivity"
+
+# Labels for YOLOv5
+LOGIN = 'loginfield'
+PASSWORD = 'passwordfield'
+CONTINUE = 'Continue'
+GOOGLE_AUTH = 'GoogleAuth'
+FB_ATUH = 'Facebook Auth'
+SIGN_IN = 'Sign In'
+
+IMAGE_LABELS = [
+    LOGIN,
+    PASSWORD,
+    CONTINUE,
+    GOOGLE_AUTH,
+    FB_ATUH,
+    SIGN_IN
+]
+
+ACCOUNTS = {
+    'com.roblox.client': ['testminnie000', 'testminnie123'],
+    'com.facebook.orca': ['testminnie001@gmail.com', 'testminnie123'],
+    'com.facebook.talk': ['testminnie001@gmail.com', 'testminnie123'],
+}
 
 class ArcVersions(Enum):
     '''
@@ -27,7 +55,7 @@ class CrashType(Enum):
 
 class DEVICES(Enum):
     '''
-        Enumeration for the result when checking if a program crashed.
+        Enumeration for device_names as reported via ADB getprop device name.
     '''
     KEVIN = "kevin"
     COACHZ = "coachz"
@@ -38,8 +66,392 @@ class DEVICES(Enum):
     KOHAKU = "kohaku"
     KRANE = "krane"
 
+# APK & Manifest stuff
+class AppInfo:
+    def __init__(self, transport_id: str, package_name: str):
+        self.transport_id = transport_id
+        self.package_name = package_name
+
+    def __get_aapt_version(self ):
+        '''
+            Returns path of the latest version of aapt installed on host device.
+        '''
+        android_home = os.environ.get("ANDROID_HOME")
+        # aapt = f"{android_home}/build-tools/*/aapt"
+        aapt = f"{android_home}/build-tools/"
+        items = os.listdir(aapt)
+
+        # Iterate over the items
+        for item in items[::-1]:
+            return  os.path.join(aapt, item, "aapt")
+        return ""
+
+    def __check_chromium_webapk(self, manifest: str):
+        pattern = r".*org\.chromium\.webapk\.shell_apk.*"
+        matches = re.findall(pattern, manifest, flags=re.MULTILINE)
+        print(f"{matches=}")
+        return True if matches else False
+
+    def __get_apk(self) -> bool:
+        ''' Grabs the APK from device.
+
+            adb shell pm path package_name
+
+            package:/data/app/~~-TjCwRkZEFass6mjqTzMtg==/com.netflix.mediaclient-mPHhWQM2xwIJco8coL6OYg==/base.apk
+            # package:/data/app/~~-TjCwRkZEFass6mjqTzMtg==/com.netflix.mediaclient-mPHhWQM2xwIJco8coL6OYg==/split_config.en.apk
+            # package:/data/app/~~-TjCwRkZEFass6mjqTzMtg==/com.netflix.mediaclient-mPHhWQM2xwIJco8coL6OYg==/split_config.mdpi.apk
+            # package:/data/app/~~-TjCwRkZEFass6mjqTzMtg==/com.netflix.mediaclient-mPHhWQM2xwIJco8coL6OYg==/split_config.x86_64.apk
+
+            JUST NEED BASE APK FOR MAIN INFO
+
+            Grabs APK via ADB PULL /path/to/apk
+            and stores it in /apks/<package_name>
+
+            Returns True when APK is in required location. False otherwise.
+        '''
+        print("Gettign APK ", self.package_name)
+
+        if not is_package_installed(self.transport_id, self.package_name):
+            return False
+
+        root_path = get_root_path()
+        dl_dir = f"{root_path}/apks/{self.package_name}"
+        create_dir_if_not_exists(dl_dir)
+
+        does_exist = file_exists(f"{root_path}/apks/{self.package_name}/base.apk")
+        if does_exist:
+            return True
+
+        cmd = ('adb', '-t', self.transport_id, 'shell', 'pm', 'path', self.package_name )
+        print("File exists ", does_exist)
+        outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+                                    capture_output=True).stdout.strip()
+        apk_path = None
+        for line in outstr.split("\n"):
+            if 'base.apk' in line and not "asset" in line:
+                apk_path = line[len("package:"):]
+
+        print(f"Found apk path: {apk_path}")
 
 
+
+        print("Pulling APK: ", self.package_name, dl_dir)
+
+        cmd = ('adb', '-t', self.transport_id, 'pull', apk_path, dl_dir )
+        outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+                                    capture_output=True).stdout.strip()
+
+        return True
+
+    def __download_manifest(self):
+        ''' Grabs the APK Manifest from ...  '''
+        # /Android/Sdk/tools/bin/apkanalyzer manifest print /path/to/app.apk
+        #     N: android=http://schemas.android.com/apk/res/android
+        #   E: manifest (line=0)
+        #     A: android:versionCode(0x0101021b)=(type 0x10)0xc49f
+        #     A: android:versionName(0x0101021c)="8.52.2 build 14 50335" (Raw: "8.52.2 build 14 50335")
+        # Need to download APK tho....
+        # aapt dump badging my.apk | sed -n "s/.*versionName='\([^']*\).*/\1/p"
+        # ./aapt2 dump xmltree --file AndroidManifest.xml /home/killuh/Downloads/com.netflix.mediaclient_8.52.2\ build\ 14\ 50335.apk
+        # ./aapt dump xmltree /home/killuh/Downloads/com.netflix.mediaclient_8.52.2\ build\ 14\ 50335.apk AndroidManifest.xml
+        # ./aapt dump xmltree app.apk AndroidManifest.xml
+
+
+        aapt = self.__get_aapt_version()
+        root_path = get_root_path()
+        manifest_path = f"{root_path}/apks/{self.package_name}/manifest.txt"
+        apk_path = f"{root_path}/apks/{self.package_name}/base.apk"
+
+        if file_exists(manifest_path):
+            with open(manifest_path, 'r', encoding='utf-8') as f:
+                return f.read()
+
+        cmd = (aapt, "dump", "badging", apk_path)
+        manifest = subprocess.run(cmd, check=True, encoding='utf-8',
+                                    capture_output=True).stdout.strip()
+
+        with open(manifest_path, 'w', encoding='utf-8') as f:
+            f.write(manifest)
+
+        return manifest
+
+    def __get_app_info(self, manifest_text: str)  -> dict:
+        ''' Grabs the App version from ...
+        '''
+        info_line = manifest_text.split("\n")[0]
+        # Define the regular expression pattern
+        pattern = r"name='(?P<name>.*?)' versionCode='(?P<versionCode>.*?)' versionName='(?P<versionName>.*?)' compileSdkVersion='(?P<compileSdkVersion>.*?)' compileSdkVersionCodename='(?P<compileSdkVersionCodename>.*?)'"
+
+        # Search for the pattern in the string
+        match = re.search(pattern, info_line)
+
+        # Extract the groups
+        if match:
+            info = {
+                'name': match.group("name"),
+                'versionCode': match.group("versionCode"),
+                'versionName': match.group("versionName"),
+                'compileSdkVersion': match.group("compileSdkVersion"),
+                'compileSdkVersionCodename': match.group("compileSdkVersionCodename"),
+                'is_pwa': self.__check_chromium_webapk(manifest_text)
+            }
+
+            # print(f'Match found!  {info}')
+            return info
+        else:
+            print("No match found.")
+        return dict()
+
+    def __has_surface_name(self) -> str:
+        pattern_with_surface = rf"""^SurfaceView\s*-\s*(?P<package>{self.package_name})/[\w.#]*$"""                    # Surface window
+        re_surface = re.compile(pattern_with_surface, re.MULTILINE | re.IGNORECASE | re.VERBOSE)
+        cmd = ('adb', '-t', self.transport_id, 'shell', 'dumpsys', 'SurfaceFlinger', '--list')
+        surfaces_list = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+        last = None
+        for match in re_surface.finditer(surfaces_list):
+            print(f"Found match: ", match)
+            last = match
+        if last:
+            if self.package_name != last.group('package'):
+                return False
+            # UE4 games have at least two SurfaceView surfaces. The one
+            # that seems to in the foreground is the last one.
+            # return last.group()
+            return True
+
+        # Some apps will report a surface in use but will not have a SurfaceView.
+        # E.g. Facebook messenger has surfaces views present while the user is on the login screen but it does not report a 'SurfaceView'
+
+        # pattern_without_surface = rf"""^(?P<package>{package_name})/[\w.#]*$"""
+        # re_without_surface = re.compile(pattern_without_surface, re.MULTILINE | re.IGNORECASE | re.VERBOSE)
+        # # Fallback: SurfaceView was not found.
+        # matches_without_surface = re_without_surface.search(surfaces_list)
+        # if matches_without_surface:
+        #     if package_name != matches_without_surface.group('package'):
+        #         return False
+        #         # return (f'Surface not found for package {package_name}. '
+        #         #                 'Please ensure the app is running.')
+        #     # return matches_without_surface.group()
+        #     return True
+        return False
+
+    def gather_app_info(self):
+        '''
+        Downloads APK & manifest from App and extracts information from Manifest.
+        '''
+        if self.__get_apk():
+            manifest = self.__download_manifest()
+            app_info = self.__get_app_info(manifest)
+            app_info['is_game'] = self.__has_surface_name()
+            return app_info
+        return None
+
+class Device:
+    def __init__(self, ip: str):
+        self.__is_connected = self.adb_connect(ip)
+        self.transport_id = self.find_transport_id(ip)
+        self.__device_info = {
+            'ip': ip,
+            'transport_id': self.transport_id,
+            'is_emu': self.is_emulator(),
+            'arc_version': self.get_arc_version(),
+            'device_name': self.get_device_name(),
+            'wxh': self.get_display_size(),
+        }
+
+    def is_connected(self):
+        return self.__is_connected
+
+    def adb_connect(self, ip: str):
+        '''
+            Connects device via ADB
+
+            Params:
+                ip: ip_address on local network of device to connect to.
+
+            Returns:
+                A boolean representing if the connection was successful.
+        '''
+        try:
+            cmd = ('adb', 'connect', ip)
+            outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+                                    capture_output=True).stdout.strip()
+            print(outstr)
+        except Exception as err:
+            print("Error connecting to ADB", err)
+            return False
+        return True
+
+    def find_transport_id(self, ip_address)-> str:
+        ''' Gets the transport_id from ADB devices command.
+
+            ['192.168.1.113:5555', 'device', 'product:strongbad', 'model:strongbad',
+                'device:strongbad_cheets', 'transport_id:1']
+
+            Params:
+                ip_address: A string representing the name of the device
+                    according to ADB devices, typically the ip address.
+
+            Returns:
+                A string representing the transport id for the device matching the
+                    @ip_adress
+
+        '''
+        cmd = ('adb', 'devices', '-l')
+        outstr = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+        # Split the output into a list of lines
+        lines = outstr.split("\n")
+        for line in lines:
+            # Split the line into words
+            words = line.split()
+            if ip_address in words:
+                # The transport ID is the last word in the line
+                return words[-1].split(":")[-1]
+        # If the IP address was not found, return None
+        return '-1'
+
+
+    def is_emulator(self):
+        ''' Checks if device is an emulator.
+
+            Params:
+                transport_id: The transport id of the connected android device.
+
+            Returns:
+                A boolean representing if it's an emulator or not.
+        '''
+
+        cmd = ('adb','-t', self.transport_id, 'shell', 'getprop', "ro.build.characteristics")
+        try:
+            res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
+            return res == "emulator"
+        except Exception as err:
+            print("Failed to check for emualtor", err)
+        return False
+
+    def get_arc_version(self):
+        ''' Gets Android OS version on connected device.
+
+            Params:
+                self.transport_id: The transport id of the connected android device.
+
+            Returns:
+                An ENUM representing the Android Version [P, R] else None if
+                    release if not found from ADB getprop.
+
+
+        '''
+        cmd = ('adb','-t', self.transport_id, 'shell', 'getprop', "ro.build.version.release")
+        try:
+            res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
+            # print("Arc version: ", res)
+            if res == "9":
+                return ArcVersions.ARC_P
+            elif res == "11":
+                return ArcVersions.ARC_R
+        except Exception as err:
+            print("Cannot find Android Version", err)
+        return None
+
+    def get_device_name(self):
+        ''' Gets name of connected device.
+
+            Params:
+                self.transport_id: The transport id of the connected android device.
+
+            Returns:
+                An ENUM representing the Android Version [P, R] else None if
+                    release if not found from ADB getprop.
+
+
+        '''
+        cmd = ('adb','-t', self.transport_id, 'shell', 'getprop', "ro.product.board")
+        try:
+            res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
+            return res
+        except Exception as err:
+            print("Cannot find device name", err)
+        return None
+
+    def get_display_size(self):
+        ''' Determines the devices current display size.
+                adb shell wm size
+        '''
+        cmd = ('adb','-t', self.transport_id, 'shell', 'wm', "size")
+        try:
+            res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
+            size_str = res.split(": ")[1]  # Extract the string after the colon
+            print(f"{ map(int, size_str.split('x'))= }")
+            width, height = map(int, size_str.split("x"))  # Split the string into width and height, and convert them to integers
+            return width, height
+        except Exception as err:
+            print("Cannot find Android Version", err)
+        return None
+
+
+    def info(self):
+        return {**self.__device_info}
+
+
+##      Appium config & stuff  ##
+def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: AnyStr) -> Dict:
+    '''
+        Formats the Desired Capabilities for Appium Server.
+    '''
+    return {
+        'platformName': 'Android',
+        'appium:udid': device_name,
+        'appium:appPackage': app_package,
+        'appium:automationName': 'UiAutomator2',
+        'appium:appActivity': main_activity,
+        'appium:ensureWebviewHavepages': "true",
+        'appium:nativeWebScreenshot': "true",
+        'appium:newCommandTimeout': 3600,
+        'appium:connectHardwareKeyboard': "true",
+        'appium:noReset': True,
+        "appium:uiautomator2ServerInstallTimeout": 60000
+    }
+
+def stop_appium_server(service: AppiumService):
+    ''' Stops the Appium Server running on port 4723'''
+    service.stop()
+    cmd = ["kill", "$(lsof -t -i :4723)"]
+    res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
+
+def lazy_start_appium_server():
+    ''' Attempts to start Appium server. '''
+    print("Starting Server")
+    try:
+        service = AppiumService()
+        service.start(args=['--address', '0.0.0.0', '-p', str(4723), '--base-path', '/wd/hub'])
+        # For some reason, interacting with service before returning has prevented random errors like:
+        # Failed to establish a new connection: [Errno 111] Connection refused
+        # Remote end closed
+        while not service.is_listening or not service.is_running:
+            print("Waiting for appium service to listen...")
+        return service
+    except Exception as error:
+        print("Error starting appium server", str(error))
+    return None
+
+
+##          Filesystem stuff     ##
+def get_root_path():
+    root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
+    root_path = '/'.join(root_path)
+    return f"/{root_path}"
+
+def create_dir_if_not_exists(directory):
+    print("Create dir if not exist", directory)
+    if not os.path.exists(directory):
+        print("Creating dir: ", directory)
+        os.makedirs(directory)
+
+def file_exists(directory):
+    return os.path.exists(directory)
+
+
+##              App stuff           ##
 def get_cur_activty(transport_id: str, ArcVersion: ArcVersions = ArcVersions.ARC_R) -> List[str]:
     '''
         Gets the current activity running in the foreground.
@@ -77,10 +489,10 @@ def get_cur_activty(transport_id: str, ArcVersion: ArcVersions = ArcVersions.ARC
             result = re.search(query, text)
 
             if result is None:
-                print("Cant find current activity.")
+                print("Cant find current activity.", text)
                 return "",""
 
-            print(result.group("package_name"), result.group("act_name"))
+            print(f"{result.group('package_name')=} {result.group('act_name')=}")
             return result.group("package_name"), result.group("act_name")
         except Exception as err:
             print("Err get_cur_activty ", err)
@@ -105,14 +517,13 @@ def open_app(package_name: str, transport_id: int, ArcVersion: ArcVersions = Arc
         cur_package = ""
         MAX_WAIT_FOR_OPEN_APP = 420  # 7 mins
         t = time()
-        while cur_package != package_name and int(time() - t) < MAX_WAIT_FOR_OPEN_APP:
+        # org.chromium.arc.applauncher will be the package if a PWA is launched...
+        while cur_package != package_name and cur_package != "org.chromium.arc.applauncher" and int(time() - t) < MAX_WAIT_FOR_OPEN_APP:
             try:
                 cur_package, act_name = get_cur_activty(transport_id, ArcVersion)
             except Exception as err:
                 print("Err getting cur act", err)
         print(outstr)
-
-
     except Exception as err:
         print("Error opening app with monkey", err)
         return False
@@ -131,144 +542,38 @@ def close_app(package_name: str, transport_id: int):
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
                                 capture_output=True).stdout.strip()
         print(f"Closed {package_name}...")
-        print(outstr)
     except Exception as err:
         print("Error closing app with monkey", err)
         return False
     return True
 
-def adb_connect(ip: str):
-    '''
-        Connects device via ADB
+def is_package_installed(transport_id: str, package_name: str):
+    ''' Checks if package is installed via ADB. '''
+    # Call the adb shell pm list packages command
+    result = subprocess.run(
+        ['adb', '-t', transport_id, 'shell', 'pm', 'list', 'packages'],
+        check=False, encoding='utf-8', capture_output=True
+    ).stdout.strip()
+    # Check the output for the package name
+    return package_name in result
 
-        Params:
-            ip: ip_address on local network of device to connect to.
-
-        Returns:
-            A boolean representing if the connection was successful.
+def is_download_in_progress(transport_id: str, package_name: str):
+    ''' Runs the command:
+        adb shell dumpsys activity services | grep <package_name>
+        and if anything is returned, then return True as there is a download in progress.
+        Good for waiting for games to downlaod extra content.
     '''
     try:
-        cmd = ('adb', 'connect', ip)
-        outstr = subprocess.run(cmd, check=True, encoding='utf-8',
-                                capture_output=True).stdout.strip()
-        print(outstr)
-    except Exception as err:
-        print("Error connecting to ADB", err)
-        return False
-    return True
-
-def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: AnyStr) -> Dict:
-    '''
-        Formats the Desired Capabilities for Appium Server.
-    '''
-    return {
-        'platformName': 'Android',
-        'appium:udid': device_name,
-        'appium:appPackage': app_package,
-        'appium:automationName': 'UiAutomator2',
-        'appium:appActivity': main_activity,
-        'appium:ensureWebviewHavepages': "true",
-        'appium:nativeWebScreenshot': "true",
-        'appium:newCommandTimeout': 3600,
-        'appium:connectHardwareKeyboard': "true",
-        'appium:noReset': True,
-        "appium:uiautomator2ServerInstallTimeout": 60000
-    }
-
-def find_transport_id(ip_address)-> str:
-    ''' Gets the transport_id from ADB devices command.
-
-        ['192.168.1.113:5555', 'device', 'product:strongbad', 'model:strongbad',
-            'device:strongbad_cheets', 'transport_id:1']
-
-        Params:
-            ip_address: A string representing the name of the device
-                according to ADB devices, typically the ip address.
-
-        Returns:
-            A string representing the transport id for the device matching the
-                @ip_adress
-
-    '''
-    cmd = ('adb', 'devices', '-l')
-    outstr = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
-    # Split the output into a list of lines
-    lines = outstr.split("\n")
-    for line in lines:
-        # Split the line into words
-        words = line.split()
-        if ip_address in words:
-            # The transport ID is the last word in the line
-            return words[-1].split(":")[-1]
-    # If the IP address was not found, return None
-    return '-1'
-
-def is_emulator(transport_id: str):
-    ''' Checks if device is an emulator.
-
-        Params:
-            transport_id: The transport id of the connected android device.
-
-        Returns:
-            A boolean representing if it's an emulator or not.
-    '''
-
-    cmd = ('adb','-t', transport_id, 'shell', 'getprop', "ro.build.characteristics")
-    try:
-        res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
-        return res == "emulator"
-    except Exception as err:
-        print("Failed to check for emualtor", err)
+        command = f'adb -t {transport_id} shell dumpsys activity services | grep com.google.android.finsky.assetmoduleservice.AssetModuleService:{package_name}'
+        output = subprocess.check_output(command, shell=True).decode('utf-8')
+        return bool(output.strip())
+    except Exception as error:
+        print("Error w/ checking download in progress")
+        print(error)
     return False
 
-def get_arc_version(transport_id: str):
-    ''' Gets Android OS version on connected device.
 
-        Params:
-            transport_id: The transport id of the connected android device.
-
-        Returns:
-            An ENUM representing the Android Version [P, R] else None if
-                release if not found from ADB getprop.
-
-
-    '''
-    cmd = ('adb','-t', transport_id, 'shell', 'getprop', "ro.build.version.release")
-    try:
-        res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
-        # print("Arc version: ", res)
-        if res == "9":
-            return ArcVersions.ARC_P
-        elif res == "11":
-            return ArcVersions.ARC_R
-    except Exception as err:
-        print("Cannot find Android Version", err)
-    return None
-
-def get_device_name(transport_id: str):
-    ''' Gets name of connected device.
-
-        Params:
-            transport_id: The transport id of the connected android device.
-
-        Returns:
-            An ENUM representing the Android Version [P, R] else None if
-                release if not found from ADB getprop.
-
-
-    '''
-    cmd = ('adb','-t', transport_id, 'shell', 'getprop', "ro.product.board")
-    try:
-        res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
-        # print("Device name: ", res)
-        if res == "9":
-            return ArcVersions.ARC_P
-        elif res == "11":
-            return ArcVersions.ARC_R
-    except Exception as err:
-        print("Cannot find Android Version", err)
-    return None
-
+##       Error log checks - Possibly move to its own class.. ##
 def get_logs(start_time: str, transport_id: str):
     '''Grabs logs from ADB logcat starting at a specified time.
 
@@ -362,56 +667,60 @@ def get_start_time():
     return datetime.fromtimestamp(time()).strftime('%m-%d %H:%M:%S.%f')[:-3]
 
 
-def is_package_installed(transport_id: str, package_name: str):
-    ''' Checks if package is installed via ADB. '''
-    # Call the adb shell pm list packages command
-    result = subprocess.run(
-        ['adb', '-t', transport_id, 'shell', 'pm', 'list', 'packages'],
-        check=False, encoding='utf-8', capture_output=True
-    ).stdout.strip()
-    # Check the output for the package name
-    return package_name in result
+##                  Image utils               ##
 
-def stop_appium_server(service: AppiumService):
-    ''' Stops the Appium Server running on port 4723'''
-    service.stop()
-    cmd = ["kill", "$(lsof -t -i :4723)"]
-    res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
+def transform_coord_from_resized(original_size: Tuple, resized_to: Tuple, resized_coords: Tuple) -> Tuple[int]:
+    ''' Given original img size, resized image size and resized coords, this will calculate the original coords.
 
+        Args:
+            original_size: A tuple defining the size of the original image representing the screen coords.
+            resized_to: A tuple defining the size of the resized image.
+            resized_coords: A tuple representing the x,y coords reported from detection on the resized image.
 
-def get_root_path():
-    root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
-    root_path = '/'.join(root_path)
-    return f"/{root_path}"
+            The image is resized from its current size to 1200x800.
+            So the bound box is now referencing the resized image.
 
-def lazy_start_appium_server():
-    ''' Attempts to start Appium server. '''
-    print("Starting Server")
-    try:
-        service = AppiumService()
-        service.start(args=['--address', '0.0.0.0', '-p', str(4723), '--base-path', '/wd/hub'])
-        # For some reason, interacting with service before returning has prevented random errors like:
-        # Failed to establish a new connection: [Errno 111] Connection refused
-        # Remote end closed
-        while not service.is_listening or not service.is_running:
-            print("Waiting for appium service to listen...")
-        return service
-    except Exception as error:
-        print("Error starting appium server", str(error))
-    return None
+            For ex, Helios @ 100% = 1536 x 864 => actual point to click = (0.4167, 0.5) x (1536, 864) = (640, 432)
+                                  = 1200 x 800 => returns x,y to click @ (500, 400) => % => ([500/1200], [400/800]) = (0.4167, 0.5)
 
-'''
-Two problems
+            So, when we resize and new image reports (500, 400) we need to actually click (640, 432)
+
+            Returns:
+            A tuple representing the coordinates on the original image.
+    '''
+    x_coord_factor = resized_coords[0] / resized_to[0]
+    y_coord_factor = resized_coords[1] / resized_to[1]
+    return (original_size[0]* x_coord_factor, original_size[1] * y_coord_factor)
+
+def save_resized_image(image_bytes: bytes, new_size: Tuple, output_path: str):
+    """
+    Resize the input PNG image bytes to the given size using OpenCV2 and save it as a PNG file.
+
+    TODO() Need to transform coordinates now....
 
 
-1. Getting screen shot with window titles
-2. Detecting image.
-3. Yolo obj detection
+    Args:
+        image_bytes: The input PNG image as bytes.
+        new_size: A tuple (width, height) of the desired new image size.
+        output_path: The path to save the resized image file.
 
-'''
+    Returns:
+        None.
+    """
+    # Read the image from bytes using OpenCV2
+    image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+    image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
 
+    # Get the original image size
+    original_size = image.shape[:2][::-1]
 
+    # Resize the image using OpenCV2
+    resized_image = cv2.resize(image, new_size, interpolation=cv2.INTER_LINEAR)
 
+    # Save the resized image as a PNG file
+    cv2.imwrite(output_path, resized_image)
+
+# Not used, need to get SS of ChromeOS first....
 def find_template(large_img, small_img, method=cv2.TM_CCOEFF_NORMED):
     method = cv2.TM_SQDIFF_NORMED
     # Read the images
@@ -444,30 +753,14 @@ def find_template(large_img, small_img, method=cv2.TM_CCOEFF_NORMED):
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-
-
-# '''
-# Apk Analyzer - AMAC-e
-#  ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] id=window_session_id=8 flg=0x10200000 cmp=sk.styk.martin.apkanalyzer/.ui.main.MainActivity} from uid 1000
-
-
-
-# '''
-def create_dir_if_not_exists(directory):
-    print("Create dir if not exist", directory)
-    if not os.path.exists(directory):
-        print("Creating dir: ", directory)
-        os.makedirs(directory)
-
-def file_exists(directory):
-    return os.path.exists(directory)
-
-
-# # Identify Android vs PWA & AMAC-e
 def check_amace(driver, package_name: str) -> bool:
+    # '''
+    # Apk Analyzer - AMAC-e
+    #  ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] id=window_session_id=8 flg=0x10200000 cmp=sk.styk.martin.apkanalyzer/.ui.main.MainActivity} from uid 1000
+    # '''
     # Grab screenshot of device
     # Look for AMAC-e image.
-    names = ['amace_phone', 'amace_tablet', 'amace_resize']
+    names = ['amace_phone', 'amace_tablet', 'amace_resize'] # names of .pngs for template matching.
     root_path = get_root_path()
     ss_path = f"{root_path}/apks/{package_name}/test.png"
     does_exist = file_exists(ss_path)
@@ -480,252 +773,8 @@ def check_amace(driver, package_name: str) -> bool:
     return False
 
 
-# '''
-#     1. Pull APK from device
-#     2. Store APK in /apks/package_name
-#     3. Run aapt commands
-#         - 1. Store Manifest in memory
-#         - 2. Parse for version_name
-#         - 3. Save Manifest in apks/package_name
-
-
-# '''
-
-
-
-
-def get_apk(transport_id: str, package_name: str) -> bool:
-    ''' Grabs the APK from device.
-
-        adb shell pm path package_name
-
-        package:/data/app/~~-TjCwRkZEFass6mjqTzMtg==/com.netflix.mediaclient-mPHhWQM2xwIJco8coL6OYg==/base.apk
-        # package:/data/app/~~-TjCwRkZEFass6mjqTzMtg==/com.netflix.mediaclient-mPHhWQM2xwIJco8coL6OYg==/split_config.en.apk
-        # package:/data/app/~~-TjCwRkZEFass6mjqTzMtg==/com.netflix.mediaclient-mPHhWQM2xwIJco8coL6OYg==/split_config.mdpi.apk
-        # package:/data/app/~~-TjCwRkZEFass6mjqTzMtg==/com.netflix.mediaclient-mPHhWQM2xwIJco8coL6OYg==/split_config.x86_64.apk
-
-        JUST NEED BASE APK FOR MAIN INFO
-
-        Grabs APK via ADB PULL /path/to/apk
-        and stores it in /apks/<package_name>
-
-        Returns True when APK is in required location. False otherwise.
-    '''
-    print("Gettign APK ", package_name)
-
-    if not is_package_installed(transport_id, package_name):
-        return False
-
-    root_path = get_root_path()
-    dl_dir = f"{root_path}/apks/{package_name}"
-    create_dir_if_not_exists(dl_dir)
-
-    does_exist = file_exists(f"{root_path}/apks/{package_name}/base.apk")
-    if does_exist:
-        return True
-
-    cmd = ('adb', '-t', transport_id, 'shell', 'pm', 'path', package_name )
-    print("File exists ", does_exist)
-    outstr = subprocess.run(cmd, check=True, encoding='utf-8',
-                                capture_output=True).stdout.strip()
-    apk_path = None
-    for line in outstr.split("\n"):
-        if 'base.apk' in line and not "asset" in line:
-            apk_path = line[len("package:"):]
-
-    print(f"Found apk path: {apk_path}")
-
-
-
-    print("Pulling APK: ", package_name, dl_dir)
-
-    cmd = ('adb', '-t', transport_id, 'pull', apk_path, dl_dir )
-    outstr = subprocess.run(cmd, check=True, encoding='utf-8',
-                                capture_output=True).stdout.strip()
-
-    return True
-
-def gather_app_info(transport_id: str, package_name: str):
-    '''
-    Downloads APK & manifest from App and extracts information from Manifest.
-    '''
-    if get_apk(transport_id, package_name):
-        manifest = download_manifest(package_name)
-        print(manifest[:200])
-        app_info = get_app_info(manifest)
-        return app_info
-    return None
-
-
-def get_aapt_version():
-    '''
-        Returns path of the latest version of aapt installed on host device.
-    '''
-    android_home = os.environ.get("ANDROID_HOME")
-    # aapt = f"{android_home}/build-tools/*/aapt"
-    aapt = f"{android_home}/build-tools/"
-    items = os.listdir(aapt)
-
-    # Iterate over the items
-    for item in items[::-1]:
-        return  os.path.join(aapt, item, "aapt")
-    return ""
-
-# App version
-def get_app_info(manifest_text: str)  -> dict:
-    ''' Grabs the App version from ...
-    '''
-
-    info_line = manifest_text.split("\n")[0]
-    # Define the regular expression pattern
-    pattern = r"name='(?P<name>.*?)' versionCode='(?P<versionCode>.*?)' versionName='(?P<versionName>.*?)' compileSdkVersion='(?P<compileSdkVersion>.*?)' compileSdkVersionCodename='(?P<compileSdkVersionCodename>.*?)'"
-
-    # Search for the pattern in the string
-    match = re.search(pattern, info_line)
-
-    # Extract the groups
-    if match:
-        info = {
-            'name': match.group("name"),
-            'versionCode': match.group("versionCode"),
-            'versionName': match.group("versionName"),
-            'compileSdkVersion': match.group("compileSdkVersion"),
-            'compileSdkVersionCodename': match.group("compileSdkVersionCodename")
-        }
-
-        # print(f'Match found!  {info}')
-        return info
-    else:
-        print("No match found.")
-
-
-
-
-    return dict()
-
-# Manifest DL
-def download_manifest(package_name: str):
-    ''' Grabs the APK Manifest from ...  '''
-    # /Android/Sdk/tools/bin/apkanalyzer manifest print /path/to/app.apk
-    #     N: android=http://schemas.android.com/apk/res/android
-    #   E: manifest (line=0)
-    #     A: android:versionCode(0x0101021b)=(type 0x10)0xc49f
-    #     A: android:versionName(0x0101021c)="8.52.2 build 14 50335" (Raw: "8.52.2 build 14 50335")
-    # Need to download APK tho....
-    # aapt dump badging my.apk | sed -n "s/.*versionName='\([^']*\).*/\1/p"
-    # ./aapt2 dump xmltree --file AndroidManifest.xml /home/killuh/Downloads/com.netflix.mediaclient_8.52.2\ build\ 14\ 50335.apk
-    # ./aapt dump xmltree /home/killuh/Downloads/com.netflix.mediaclient_8.52.2\ build\ 14\ 50335.apk AndroidManifest.xml
-    # ./aapt dump xmltree app.apk AndroidManifest.xml
-
-
-    aapt = get_aapt_version()
-    root_path = get_root_path()
-    manifest_path = f"{root_path}/apks/{package_name}/manifest.txt"
-    apk_path = f"{root_path}/apks/{package_name}/base.apk"
-
-    if file_exists(manifest_path):
-        with open(manifest_path, 'r', encoding='utf-8') as f:
-            return f.read()
-
-    cmd = (aapt, "dump", "badging", apk_path)
-    manifest = subprocess.run(cmd, check=True, encoding='utf-8',
-                                capture_output=True).stdout.strip()
-
-    with open(manifest_path, 'w', encoding='utf-8') as f:
-        f.write(manifest)
-
-    return manifest
-
-
-# Games vs App - Surface View check
-"""
-Returns the surface name for a given package name.
-Args:
-    package_name: A string representing the name of the application to
-        be targeted.
-Returns:
-    A string representing a surface name of the package name.
-"""
-def has_surface_name(transport_id: str, package_name: str) -> str:
-    pattern_with_surface = rf"""^SurfaceView\s*-\s*(?P<package>{package_name})/[\w.#]*$"""                    # Surface window
-    re_surface = re.compile(pattern_with_surface, re.MULTILINE | re.IGNORECASE | re.VERBOSE)
-    cmd = ('adb', '-t', transport_id, 'shell', 'dumpsys', 'SurfaceFlinger', '--list')
-    surfaces_list = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
-    last = None
-    for match in re_surface.finditer(surfaces_list):
-        print(f"Found match: ", match)
-        last = match
-    if last:
-        if package_name != last.group('package'):
-            return False
-        # UE4 games have at least two SurfaceView surfaces. The one
-        # that seems to in the foreground is the last one.
-        # return last.group()
-        return True
-
-    # Some apps will report a surface in use but will not have a SurfaceView.
-    # E.g. Facebook messenger has surfaces views present while the user is on the login screen but it does not report a 'SurfaceView'
-
-    # pattern_without_surface = rf"""^(?P<package>{package_name})/[\w.#]*$"""
-    # re_without_surface = re.compile(pattern_without_surface, re.MULTILINE | re.IGNORECASE | re.VERBOSE)
-    # # Fallback: SurfaceView was not found.
-    # matches_without_surface = re_without_surface.search(surfaces_list)
-    # if matches_without_surface:
-    #     if package_name != matches_without_surface.group('package'):
-    #         return False
-    #         # return (f'Surface not found for package {package_name}. '
-    #         #                 'Please ensure the app is running.')
-    #     # return matches_without_surface.group()
-    #     return True
-    return False
-
-
-
-def is_download_in_progress(transport_id: str, package_name: str):
-    ''' Runs the command:
-        adb shell dumpsys activity services | grep <package_name>
-        and if anything is returned, then return True as there is a download in progress.
-    '''
-    try:
-        command = f'adb -t {transport_id} shell dumpsys activity services | grep com.google.android.finsky.assetmoduleservice.AssetModuleService:{package_name}'
-        output = subprocess.check_output(command, shell=True).decode('utf-8')
-        return bool(output.strip())
-    except Exception as error:
-        print("Error w/ checking download in progress")
-        print(error)
-    return False
-
-# Ip Address of machien Running Appium Server
-EXECUTOR = 'http://192.168.0.175:4723/wd/hub'
-PLAYSTORE_PACKAGE_NAME = "com.android.vending"
-PLAYSTORE_MAIN_ACT = "com.google.android.finsky.activities.MainActivity"
-
-# Labels for YOLOv5
-LOGIN = 'loginfield'
-PASSWORD = 'passwordfield'
-CONTINUE = 'Continue'
-GOOGLE_AUTH = 'GoogleAuth'
-FB_ATUH = 'Facebook Auth'
-SIGN_IN = 'Sign In'
-
-
-IMAGE_LABELS = [
-    LOGIN,
-    PASSWORD,
-    CONTINUE,
-    GOOGLE_AUTH,
-    FB_ATUH,
-    SIGN_IN
-]
-
-
-ACCOUNTS = {
-    'com.roblox.client': ['testminnie000', 'testminnie123'],
-    'com.facebook.orca': ['testminnie001@gmail.com', 'testminnie123'],
-    'com.facebook.talk': ['testminnie001@gmail.com', 'testminnie123'],
-}
-
 PACKAGE_NAMES = [
+    [ "Twitter", "com.twitter.android"],
     # [ "Rocket League Sideswipe", "com.Psyonix.RL2D"],
     # ['Apk Analyzer', 'sk.styk.martin.apkanalyzer'],
     ['Roblox', 'com.roblox.client'],
@@ -1121,9 +1170,7 @@ PACKAGE_NAMES = [
     ['Google Opinion Rewards', 'com.google.android.apps.paidtasks'],
 ]
 
-
 TOP_500_APPS = PACKAGE_NAMES[:500]
-
 
 ''' 100- 150 failure report
 FreeCell Solitaire at.ner.SolitaireFreeCell search/install status: FAILED - [192.168.1.113:5555]
