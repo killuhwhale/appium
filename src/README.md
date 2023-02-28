@@ -15,6 +15,15 @@ Prep work for Chromebook:
     - python3 main.py [ips]
     - python3 main.py python3 main.py 192.168.1.113:5555 192.168.1.238:5555 192.168.1.248:5555
 
+- AMAC-e Dismiss strategy - wont work -> ADB shell input does not interact with the ChromeOS AMAC-e overlays.
+    -  adb exec-out uiautomator dump /dev/tty
+        - Dumps XML of app
+        - In the first view whihc would be the parent view of the app, there is a bounds attr that gives the current position
+            of app.
+        - Using this position we can try to double click the AMAC-e.
+            - First click dismisses any overlays and opens the options (phone, tablet, resize)
+            - Second click closes options.
+        **Still do not know if and when there is AMAC-e but when it does show up, we might be able to dismiss it.
 
 
  - Improve model

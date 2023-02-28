@@ -81,6 +81,7 @@ if __name__ == "__main__":
         device,
         weights
         )
+    input("Pause....")
     validator.uninstall_multiple()
     validator.run()
     validator.report.print_report()
