@@ -15,33 +15,42 @@ Prep work for Chromebook:
     - python3 main.py [ips]
     - python3 main.py python3 main.py 192.168.1.113:5555 192.168.1.238:5555 192.168.1.248:5555
 
-- AMAC-e Dismiss strategy - wont work -> ADB shell input does not interact with the ChromeOS AMAC-e overlays.
-    -  adb exec-out uiautomator dump /dev/tty
-        - Dumps XML of app
-        - In the first view whihc would be the parent view of the app, there is a bounds attr that gives the current position
-            of app.
-        - Using this position we can try to double click the AMAC-e.
-            - First click dismisses any overlays and opens the options (phone, tablet, resize)
-            - Second click closes options.
-        **Still do not know if and when there is AMAC-e but when it does show up, we might be able to dismiss it.
 
 
- - Improve model
-    -  Possibly scrape same image set from multiple devices w/ varying screen sizes.
-    - Detection that works on Coach-Z does not work as well on HElios
-        - Different screen sizes.
-        - Resizing doesnt seem to help in this case.
-            - Try resizing to CoachZ size? instead of resizing to 640x640
+# Major TODOs
+    - Label Facebook Auth in Dataset
+        - Also, possibly create a flow to login to facebook app before tests so that we can use it for auth in the rest of the apps...
 
-        - CoachZ (2160 1440 native 1200 x 800 @ 100%) = 1200 x 800
-        - Helios (1920 1080 native)                   => resize to -> 1200 x 800
-        - Eve    (2400 1600 native)                   => resize to -> 1200 x 800
+    - Google Auth account selection
+        - scrape images for Google Auth Selection
+            - Find a profile pic that will be used w/ our test accounts.
 
+    - Detect AMAC-e (determine if app is O4C) -> impossible feat so far unless building test image.
+        - AMAC-E overlays will not actually interfere with our process.
+        - When sending comands via ADB, it essentially ignore those windows/ overlays.
 
- - Google Auth account selection
+    - Improve model
+        - Most likely will need to scrape same image set from multiple devices w/ varying screen sizes.
+        - Detection that works on Coach-Z does not work as well on HElios
+            - Different screen sizes.
+            - Resizing doesnt seem to help in this case.
+                - Try resizing to CoachZ size? instead of resizing to 640x640
 
- - Identify AMAC-e
-    - near impossible or what?
+            - Resizing to CoachZ kinda work but Roblox:
+                - Didnt recognize Login field
+                    - It usually recongizes this so this solution wont work.
+
+            - Might need to really scrape from multiple devices....
+
+               | Reported Display size | Appears Size |
+            - CoachZ (2160 1440 native 1200 x 800 @ 100%) 1.5
+            - Helios (1920 1080 native   ?  x  ?  @ 100%) 1.78
+            - Eve    (2400 1600 native   ?  x  ?  @ 100%) 1.5
+            The reported display size is the size of the image.
+
+            - Ultimately, we wont need to resize if our dataset contains the sizes we need....
+                - or we resize everything to 640x640
+                - Since in our training, we resize the training img to 640^2
 
 
 Bugs:
@@ -58,6 +67,9 @@ Bugs:
 
 
 # NOTES
+
+-  adb exec-out uiautomator dump /dev/tty
+        - Dumps view heirarchy
 
 # https://github.com/appium/appium-uiautomator2-driver#driverserver
 #   - appium:skipServerInstallation => Improve startup speed if we know UIAutomator is already installed...

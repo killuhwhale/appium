@@ -66,7 +66,7 @@ class MultiprocessTaskRunner:
             This function will be called when the user presses CTRL+C
         '''
         print("CTRL+C pressed. Exiting program.",  _signal, _frame)
-        # self.report.print_report()
+        # self.report.print()
         try:
             merged_reports = {}
             for driver, validator in zip(self.drivers, self.valdiators):
@@ -74,7 +74,7 @@ class MultiprocessTaskRunner:
                 driver.quit()
             print("Merged reports", merged_reports)
             self.clear_processes()
-            ValidationReport.print_reports(merged_reports)
+            ValidationReport.print_report(merged_reports)
         except Exception as err:
             print("Error: ", err)
         sys.exit(1)
@@ -98,7 +98,7 @@ class MultiprocessTaskRunner:
             sleep(1.2)
         print("Reports recv'd: ", reports, len(self.ips))
         # input("Finished running")
-        ValidationReport.print_reports(merged_reports)
+        ValidationReport.print_report(merged_reports)
 
     def clear_processes(self):
         '''

@@ -70,12 +70,11 @@ class ValidationReport:
 
     def __init__(self, report_title: str):
         self.report = collections.defaultdict(ValidationReport.default_dict)
+        # Device and Session information for the report.
         self.report_title = report_title
 
-    def create(self, package_name: str, app_name: str):
-        ''' Create a report of a pacage if a report DNExist'''
-        print("Creating new status object!!!!!!!!!!!!!")
-        print(f"Report title: {self.report_title}")
+    def add_app(self, package_name: str, app_name: str):
+        ''' Adds an app to the report. '''
         if self.report[package_name]['status'] == -1:
             self.report[package_name]['name'] = app_name
             self.report[package_name]['report_title'] = self.report_title
@@ -87,47 +86,6 @@ class ValidationReport:
 
     def add_history(self,package_name: str, history_msg: str, img_path: str=""):
         self.report[package_name]['history'].append({'msg':history_msg, 'img': img_path })
-
-    @staticmethod
-    def ascii_footer():
-        ''' Report decoration.'''
-        print(ValidationReport.Green)
-
-        print('''
-               _  _     _  _     _  _     _   ___ _ _       _       _    _ _           _  _____     _  _     _  _     _  _
-             _| || |_ _| || |_ _| || |_  | | / (_) | |     | |     | |  | | |         | ||____ |  _| || |_ _| || |_ _| || |_
-            |_  __  _|_  __  _|_  __  _| | |/ / _| | |_   _| |__   | |  | | |__   __ _| |    / / |_  __  _|_  __  _|_  __  _|
-             _| || |_ _| || |_ _| || |_  |    \| | | | | | | '_ \  | |/\| | '_ \ / _` | |    \ \  _| || |_ _| || |_ _| || |_
-            |_  __  _|_  __  _|_  __  _| | |\  \ | | | |_| | | | | \  /\  / | | | (_| | |.___/ / |_  __  _|_  __  _|_  __  _|
-              |_||_|   |_||_|   |_||_|   \_| \_/_|_|_|\__,_|_| |_|  \/  \/|_| |_|\__,_|_|\____/    |_||_|   |_||_|   |_||_|
-        ''')
-        print(ValidationReport.RESET)
-
-    @staticmethod
-    def ascii_header():
-        ''' Report decoration.'''
-        print(ValidationReport.Green)
-        print('''
-              _  _     _  _     _  _    ______                      _       _  _     _  _     _  _
-            _| || |_ _| || |_ _| || |_  | ___ \                    | |    _| || |_ _| || |_ _| || |_
-           |_  __  _|_  __  _|_  __  _| | |_/ /___ _ __   ___  _ __| |_  |_  __  _|_  __  _|_  __  _|
-            _| || |_ _| || |_ _| || |_  |    // _ \ '_ \ / _ \| '__| __|  _| || |_ _| || |_ _| || |_
-           |_  __  _|_  __  _|_  __  _| | |\ \  __/ |_) | (_) | |  | |_  |_  __  _|_  __  _|_  __  _|
-             |_||_|   |_||_|   |_||_|   \_| \_\___| .__/ \___/|_|   \__|   |_||_|   |_||_|   |_||_|
-                                                | |
-                                                |_|
-        ''')
-        print(ValidationReport.RESET)
-
-    @staticmethod
-    def anim_starting():
-        ''' Report decoration.'''
-        print("\033[2J")  # clear the screen
-        for i in range(ValidationReport.REPEAT_TIMES):
-            color = ValidationReport.COLORS[i % 3]
-            print("\033[0;0H")  # move cursor to top-left corner
-            ValidationReport.ascii_starting(color)
-            sleep(0.075)
 
     @staticmethod
     def ascii_starting(color=None):
@@ -147,9 +105,46 @@ class ValidationReport:
         ''')
         print(ValidationReport.RESET)
 
-    def print_report(self):
-        ''' Prints 'self' report.'''
-        ValidationReport.print_reports(self.report)
+    @staticmethod
+    def anim_starting():
+        ''' Report decoration.'''
+        print("\033[2J")  # clear the screen
+        for i in range(ValidationReport.REPEAT_TIMES):
+            color = ValidationReport.COLORS[i % 3]
+            print("\033[0;0H")  # move cursor to top-left corner
+            ValidationReport.ascii_starting(color)
+            sleep(0.075)
+
+    @staticmethod
+    def ascii_header():
+        ''' Report decoration.'''
+        print(ValidationReport.Green)
+        print('''
+              _  _     _  _     _  _    ______                      _       _  _     _  _     _  _
+            _| || |_ _| || |_ _| || |_  | ___ \                    | |    _| || |_ _| || |_ _| || |_
+           |_  __  _|_  __  _|_  __  _| | |_/ /___ _ __   ___  _ __| |_  |_  __  _|_  __  _|_  __  _|
+            _| || |_ _| || |_ _| || |_  |    // _ \ '_ \ / _ \| '__| __|  _| || |_ _| || |_ _| || |_
+           |_  __  _|_  __  _|_  __  _| | |\ \  __/ |_) | (_) | |  | |_  |_  __  _|_  __  _|_  __  _|
+             |_||_|   |_||_|   |_||_|   \_| \_\___| .__/ \___/|_|   \__|   |_||_|   |_||_|   |_||_|
+                                                | |
+                                                |_|
+        ''')
+        print(ValidationReport.RESET)
+
+    @staticmethod
+    def ascii_footer():
+        ''' Report decoration.'''
+        print(ValidationReport.Green)
+
+        print('''
+               _  _     _  _     _  _     _   ___ _ _       _       _    _ _           _  _____     _  _     _  _     _  _
+             _| || |_ _| || |_ _| || |_  | | / (_) | |     | |     | |  | | |         | ||____ |  _| || |_ _| || |_ _| || |_
+            |_  __  _|_  __  _|_  __  _| | |/ / _| | |_   _| |__   | |  | | |__   __ _| |    / / |_  __  _|_  __  _|_  __  _|
+             _| || |_ _| || |_ _| || |_  |    \| | | | | | | '_ \  | |/\| | '_ \ / _` | |    \ \  _| || |_ _| || |_ _| || |_
+            |_  __  _|_  __  _|_  __  _| | |\  \ | | | |_| | | | | \  /\  / | | | (_| | |.___/ / |_  __  _|_  __  _|_  __  _|
+              |_||_|   |_||_|   |_||_|   \_| \_/_|_|_|\__,_|_| |_|  \/  \/|_| |_|\__,_|_|\____/    |_||_|   |_||_|   |_||_|
+        ''')
+        print(ValidationReport.RESET)
 
     @staticmethod
     def sorted_name(p: List):
@@ -157,8 +152,8 @@ class ValidationReport:
         return p[0]
 
     @staticmethod
-    def print_reports(report: collections.defaultdict, with_history: bool=False):
-        '''  Prints a given report. '''
+    def print_report(report: collections.defaultdict, with_history: bool=False):
+        '''  Prints all apps from a given report. '''
         # Sorted by packge name
         ValidationReport.ascii_header()
         for package_name, status_obj in sorted(report.items(), key=ValidationReport.sorted_name):
@@ -191,6 +186,10 @@ class ValidationReport:
             print()
         ValidationReport.ascii_footer()
 
+    def print(self):
+        ''' Prints 'self' report.'''
+        ValidationReport.print_report(self.report)
+
 
 class AppValidator:
     '''
@@ -216,7 +215,7 @@ class AppValidator:
         self.is_emu = self.device['is_emu']
         self.device_name = self.device['device_name']
         self.package_names = package_names  # List of packages to test as [app_title, app_package_name]
-        self.report = ValidationReport(self.ip)
+        self.report = ValidationReport(f'{self.device_name}_{self.ip}')
         self.steps = [
             'Click search icon',
             'Send keys for search',
@@ -231,7 +230,7 @@ class AppValidator:
         self.detector = ObjDetector(self.test_img_fp, [self.weights])
         self.ID = f"{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}-{self.ip.split(':')[0]}"
         self.instance_num = instance_num
-        self.dev_ss_count = 280
+        self.dev_ss_count = 0
 
     def dprint(self, *args):
         color = self.report.COLORS[2:][self.instance_num % len(self.report.COLORS)]
@@ -384,23 +383,17 @@ class AppValidator:
         x = (btn[0][0] + btn[1][0]) / 2
         y = (btn[0][1] + btn[1][1]) / 2
 
-        coords = transform_coord_from_resized(
-            (self.device['wxh']),
-            (1200, 800),
-            (int(x), int(y))
-        )
-        return str(int(coords[0])), str(int(coords[1]))
+        # coords = transform_coord_from_resized(
+        #     (self.device['wxh']),
+        #     (1200, 800),
+        #     (int(x), int(y))
+        # )
+        # return str(int(coords[0])), str(int(coords[1]))
+        return str(int(x)), str(int(y))
 
 
     ##  Images/ Reporting
-    def scrape_dev_test_image(self):
-        try:
-            self.driver.get_screenshot_as_file(
-            f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/scraped_images/{self.dev_ss_count}.png"
-            )
-            self.dev_ss_count += 1
-        except Exception as error:
-            print("Error w/ dev ss: ", error)
+
 
     def get_test_ss(self) -> bool:
         '''
@@ -412,12 +405,13 @@ class AppValidator:
 
         # Removes first empty index and 'main.py' from "/path/to/src/main.py"
         #    ['', 'path', 'to', 'src', 'main.py']
-        root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
-        root_path = '/'.join(root_path)
+        # root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
+        # root_path = '/'.join(root_path)
+        root_path = get_root_path()
         try:
-            # self.driver.get_screenshot_as_file(f"/{root_path}/notebooks/yolo_images/{self.test_img_fp}")
-            png_bytes = self.driver.get_screenshot_as_png()
-            save_resized_image(png_bytes, (1200,800), f"/{root_path}/notebooks/yolo_images/{self.test_img_fp}")
+            self.driver.get_screenshot_as_file(f"{root_path}/notebooks/yolo_images/{self.test_img_fp}")
+            # png_bytes = self.driver.get_screenshot_as_png()
+            # save_resized_image(png_bytes, (1200,800), f"/{root_path}/notebooks/yolo_images/{self.test_img_fp}")
 
             return True
         except ScreenshotException as e:
@@ -432,16 +426,13 @@ class AppValidator:
         '''
             Attempts to get SS of device when an error occures and saves to
                 a given location.
-
-
-
         '''
-
         # Removes first empty index and 'main.py' from "/path/to/src/main.py"
         #    ['', 'path', 'to', 'src', 'main.py']
-        root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
-        root_path = '/'.join(root_path)
-        path = f"/{root_path}/images/errors/{self.ID}"
+        # root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
+        # root_path = '/'.join(root_path)
+        root_path = get_root_path()
+        path = f"{root_path}/images/errors/{self.ID}"
         #Create dir
         if not os.path.exists(path):
             os.makedirs(path)
@@ -458,6 +449,15 @@ class AppValidator:
 
         self.dprint("Error taking SS: ", root_path)
         return False
+
+    def scrape_dev_test_image(self):
+        try:
+            self.driver.get_screenshot_as_file(
+            f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/scraped_images/{self.dev_ss_count}.png"
+            )
+            self.dev_ss_count += 1
+        except Exception as error:
+            print("Error w/ dev ss: ", error)
 
     def dev_SS_loop(self):
         ''' Loop that pauses on input allowing to take multiple screenshots
@@ -1021,7 +1021,7 @@ class AppValidator:
         '''
         self.driver.orientation = 'PORTRAIT'
         for app_title, app_package_name in self.package_names:
-            self.report.create(app_package_name, app_title)
+            self.report.add_app(app_package_name, app_title)
             try:
 
                 self.start_time = get_start_time()
@@ -1066,14 +1066,13 @@ class AppValidator:
                     continue
 
                 self.update_report_history(app_package_name, "App launch successful.")
-                # self.scrape_dev_test_image()
-                # self.dev_SS_loop()
+                self.dev_SS_loop()
 
                 info = AppInfo(self.transport_id, app_package_name).gather_app_info()
                 print(f"App {info=}")
-                if not info['is_pwa']:
-                    logged_in = self.attempt_login(app_title, app_package_name, info['is_game'])
-                    print(f"Attempt loging: {logged_in=}")
+                # if not info['is_pwa']:
+                #     logged_in = self.attempt_login(app_title, app_package_name, info['is_game'])
+                #     print(f"Attempt loging: {logged_in=}")
 
 
 

@@ -258,6 +258,7 @@ class Device:
             'device_name': self.get_device_name(),
             'wxh': self.get_display_size(),
         }
+        print(self.__device_info)
 
     def is_connected(self):
         return self.__is_connected
@@ -381,7 +382,6 @@ class Device:
         try:
             res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
             size_str = res.split(": ")[1]  # Extract the string after the colon
-            print(f"{ map(int, size_str.split('x'))= }")
             width, height = map(int, size_str.split("x"))  # Split the string into width and height, and convert them to integers
             return width, height
         except Exception as err:
@@ -437,6 +437,7 @@ def lazy_start_appium_server():
 
 ##          Filesystem stuff     ##
 def get_root_path():
+    ''' Returns root path /home/user/pathto/appium/src '''
     root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
     root_path = '/'.join(root_path)
     return f"/{root_path}"
@@ -774,16 +775,15 @@ def check_amace(driver, package_name: str) -> bool:
 
 
 PACKAGE_NAMES = [
-    [ "Twitter", "com.twitter.android"],
+    # [ "Twitter", "com.twitter.android"],
     # [ "Rocket League Sideswipe", "com.Psyonix.RL2D"],
     # ['Apk Analyzer', 'sk.styk.martin.apkanalyzer'],
     ['Roblox', 'com.roblox.client'],
     # ['Showmax', 'com.showmax.app'],  # NA in region
     # ['Epic Seven', 'com.stove.epic7.google'], #  Failed send keys
-    # ['Legión Anime Tema Oscuro', 'aplicaciones.paleta.alterlegionanime'],  # Fialst o send keys
+    # ['Legión Anime Tema Oscuro', 'aplicaciones.paleta.alterlegionanime'],  # Failed to send keys
     # ['Garena Free Fire', 'com.dts.freefireth'],
     # ['My Boy! - GBA Emulator', 'com.fastemulator.gba'],  # Purchase required, unable to install...
-    # ['Messenger', 'com.facebook.orca'],
     ['Messenger', 'com.facebook.orca'],
     ['Messenger Kids', 'com.facebook.talk'],
     ['Among Us!', 'com.innersloth.spacemafia'],
@@ -844,7 +844,7 @@ PACKAGE_NAMES = [
     ['Guns of Glory', 'com.diandian.gog'],
     ['Bowmasters', 'com.miniclip.bowmasters'],
     ['CW Network', 'com.cw.fullepisodes.android'],
-    ['Zooba', 'com.wildlife.games.battle.royale.free.zooba'],  ## LAST
+    ['Zooba', 'com.wildlife.games.battle.royale.free.zooba'],
     ['Amino: Communities and Chats', 'com.narvii.amino.master'],
     ['Solitaire Classic', 'com.freegame.solitaire.basic2'], # Fails to find correct app in search
     ['Summoners War', 'com.com2us.smon.normal.freefull.google.kr.android.common'], # Faisl to download extra data but doesnt crash app
@@ -891,7 +891,7 @@ PACKAGE_NAMES = [
     ['com.yoku.marumovie', 'com.yoku.marumovie'],
     ['Family Farm Seaside', 'com.funplus.familyfarm'],
     ['World of Tanks Blitz', 'net.wargaming.wot.blitz'],
-    ['eBay', 'com.ebay.mobile'], # Last
+    ['eBay', 'com.ebay.mobile'],
     ['Count Masters - Stickman Clash', 'freeplay.crowdrun.com'],
     ['Gallery: Coloring Book', 'com.beresnevgames.gallerycoloringbook'],
     ['Krita', 'org.krita'],
@@ -1017,7 +1017,7 @@ PACKAGE_NAMES = [
     ['Mahjong', 'com.fenghenda.mahjong'],
     ['Galaxy Attack: Alien Shooter', 'com.alien.shooter.galaxy.attack'],
     ['Madden NFL 21 Mobile Football', 'com.ea.gp.maddennfl21mobile'],
-    ['Bubble Shooter Rainbow - Shoot & Pop Puzzle', 'com.blackout.bubble'], # LAST
+    ['Bubble Shooter Rainbow - Shoot & Pop Puzzle', 'com.blackout.bubble'],
     ['VIDEOMEDIASET', 'it.fabbricadigitale.android.videomediaset'],
     ['Google Earth', 'com.google.earth'],
     ['Viaplay', 'com.viaplay.android'],

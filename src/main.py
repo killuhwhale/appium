@@ -11,7 +11,6 @@ from utils.utils import (PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME,
 # Starts Appium Server.
 # python3 main.py 192.168.1.113:5555 192.168.1.238:5555 192.168.1.248:5555
 
-
 weights = 'notebooks/yolov5/runs/train/exp007/weights/best_309.pt'
 weights = 'notebooks/yolov5/runs/train/exp4/weights/best.pt'  # Lastest RoboFlow Model V1
 weights = 'notebooks/yolov5/runs/train/exp6/weights/best.pt'  # Lastest RoboFlow Model V2
@@ -44,14 +43,14 @@ if __name__ == "__main__":
     ###################################
 
     # ip = '192.168.1.128:5555' # ARC-P Kevin ARM 32-bit
-    # ip = '192.168.1.125:5555' # ARC-R Eve
+    ip = '192.168.1.125:5555' # ARC-R Eve
     # ip = 'emulator-5554' # ARC-R
     # ip = '710KPMZ0409387' # ARC-R Pixel 2
     # ip = '192.168.1.149:5555' # ARC-P Caroline,
     # ip = '192.168.1.248:5555' # ARC-R Morphius,
     # ip = '192.168.1.:5555' # ARC-P Krane,
     # ip = '192.168.1.137:5555' # ARC-R Kohaku,
-    ip = '192.168.1.238:5555' # ARC-R Helios,
+    # ip = '192.168.1.238:5555' # ARC-R Helios,
     # ip = '192.168.1.113:5555' # ARC-P CoachZ
 
     service = lazy_start_appium_server()
@@ -63,6 +62,11 @@ if __name__ == "__main__":
     # device_name = get_device_name(transport_id)
 
     print("Creating driver...")
+    # webdriver.Remote(...) throws
+    # when ADB isnt already approved to connect @ ip
+    # i.e when the Host hasnt authenticated to DUT previsouly. (user on DUT must approve dialog)
+    # Might be useful to leave as is, that way the program doesnt continue with a bad driver.
+    '''selenium.common.exceptions.WebDriverException: Message: An unknown server-side error occurred while processing the command. Original error: Error getting device API level. Original error: Error executing adbExec. Original error: 'Command '/home/killuh/Android/Sdk/platform-tools/adb -P 5037 -s 192.168.1.125\:5555 shell getprop ro.build.version.sdk' exited with code 1'; Command output: adb: device unauthorized.'''
     driver = webdriver.Remote(
         "http://0.0.0.0:4723/wd/hub",
         android_des_caps(
@@ -77,14 +81,13 @@ if __name__ == "__main__":
 
     validator = AppValidator(
         driver,
-        TOP_500_APPS[1:2],
+        TOP_500_APPS[:100],
         device,
         weights
         )
-    input("Pause....")
     validator.uninstall_multiple()
     validator.run()
-    validator.report.print_report()
+    validator.report.print()
     driver.quit()
 
     ###################################
