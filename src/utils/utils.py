@@ -52,6 +52,7 @@ class CrashType(Enum):
     SUCCESS = "Success"
     WIN_DEATH = "Win Death"
     FORCE_RM_ACT_RECORD = "Force removed ActivityRecord"
+    ANR = "App not responding"
 
 class DEVICES(Enum):
     '''
@@ -165,10 +166,14 @@ class AppInfo:
         if file_exists(manifest_path):
             with open(manifest_path, 'r', encoding='utf-8') as f:
                 return f.read()
-
-        cmd = (aapt, "dump", "badging", apk_path)
-        manifest = subprocess.run(cmd, check=True, encoding='utf-8',
+        manifest = ""
+        try:
+            cmd = (aapt, "dump", "badging", apk_path)
+            manifest = subprocess.run(cmd, check=True, encoding='utf-8',
                                     capture_output=True).stdout.strip()
+        except Exception as error:
+            print("Error getting manifest: ", error)
+            return manifest
 
         with open(manifest_path, 'w', encoding='utf-8') as f:
             f.write(manifest)
@@ -178,6 +183,8 @@ class AppInfo:
     def __get_app_info(self, manifest_text: str)  -> dict:
         ''' Grabs the App version from ...
         '''
+        if not manifest_text:
+            return Dict()
         info_line = manifest_text.split("\n")[0]
         # Define the regular expression pattern
         pattern = r"name='(?P<name>.*?)' versionCode='(?P<versionCode>.*?)' versionName='(?P<versionName>.*?)' compileSdkVersion='(?P<compileSdkVersion>.*?)' compileSdkVersionCodename='(?P<compileSdkVersionCodename>.*?)'"
@@ -241,6 +248,8 @@ class AppInfo:
         '''
         if self.__get_apk():
             manifest = self.__download_manifest()
+            if not manifest:
+                return None
             app_info = self.__get_app_info(manifest)
             app_info['is_game'] = self.__has_surface_name()
             return app_info
@@ -277,6 +286,8 @@ class Device:
             cmd = ('adb', 'connect', ip)
             outstr = subprocess.run(cmd, check=True, encoding='utf-8',
                                     capture_output=True).stdout.strip()
+            if outstr.startswith("failed to connect to"):
+                raise Exception(outstr)
             print(outstr)
         except Exception as err:
             print("Error connecting to ADB", err)
@@ -385,7 +396,7 @@ class Device:
             width, height = map(int, size_str.split("x"))  # Split the string into width and height, and convert them to integers
             return width, height
         except Exception as err:
-            print("Cannot find Android Version", err)
+            print("Cannot find display size", err)
         return None
 
 
@@ -453,51 +464,96 @@ def file_exists(directory):
 
 
 ##              App stuff           ##
-def get_cur_activty(transport_id: str, ArcVersion: ArcVersions = ArcVersions.ARC_R) -> List[str]:
+
+def is_ANR(dumpsys_act_text: str, package_name: str) -> bool:
+    # TODO confirm this works by finding an APP that throws ANR consistently. OR create an app that crashes.
+    ''' Given a string, dumpsys_act_text, determine if an ANR window is present.
+
+        ANR Text:
+            mFocusedWindow=Window{afc9fce u0 Application Not Responding: com.thezeusnetwork.www}
+
+        Params:
+            dumpsys_act_text: Output from ADB dumpsys activity.
+            package: The app's package name.
+
+        Returns True if ANR text is present.
     '''
-        Gets the current activity running in the foreground.
+    regex = rf".*Application Not Responding: {package_name}.*"
+    is_ANR_res = re.search(regex, dumpsys_act_text)
+    print(f"{is_ANR_res=}")
+    return not is_ANR_res is None
+
+def dumpysys_activity(transport_id: str, ArcVersion: ArcVersions) -> str:
+    try:
+        keyword = ""
+        if ArcVersion == ArcVersions.ARC_P:
+            keyword = "mResumedActivity"
+        if ArcVersion == ArcVersions.ARC_R:
+            keyword = "mFocusedWindow"
+        cmd = ('adb', '-t', transport_id, 'shell', 'dumpsys', 'activity',
+                '|', 'grep', keyword)
+        return subprocess.run(cmd, check=False, encoding='utf-8',
+            capture_output=True).stdout.strip()
+    except Exception as err:
+            print("Err dumpysys_activity ", err)
+    return ''
+
+
+def get_cur_activty(transport_id: str, ArcVersion: ArcVersions, package_name: str) -> Dict:
+    ''' Gets the current activity running in the foreground.
+
+        ARC-P
+            mResumedActivity: ActivityRecord{9588d06 u0 com.netflix.mediaclient/o.cwK t127}
+        ARC-R
+            mFocusedWindow=Window{b3ef1fc u0 NotificationShade} ## Sleep
+            mFocusedWindow=Window{3f50b2f u0 com.netflix.mediaclient/com.netflix.mediaclient.acquisition.screens.signupContainer.SignupNativeActivity}
+
+
+        Failing on Barnes and Noble => Has pop up asking to join wifi networks...
+            text = mFocusedWindow=Window{7cc92bd u0 android}
 
         Params:
             transport_id: The transport id of the connected android device.
             ArcVersion: ArcVersion Enum for the device.
 
         Returns:
-            A List of strings: [package_name, activity_name]
+            - A Dict containing:
+                package_name: current focused package.
+                act_name: The current focused activity.
+                is_ANR_thrown: boolean indicating if ANR window is present.
+                ANR_for_package: package name found in ANR message or empty string if is_ANR_thrown is False.
     '''
     MAX_WAIT_FOR_OPEN_APP = 420  # 7 mins
     t = time()
     while int(time() - t) < MAX_WAIT_FOR_OPEN_APP:
-        try:
-            '''
+        text = dumpysys_activity(transport_id, ArcVersion)
+        query = r".*{.*\s.*\s(?P<package_name>.*)/(?P<act_name>[\S\.]*)\s*.*}"
+        result = re.search(query, text)
 
-                ARC-P
-                mResumedActivity: ActivityRecord{9588d06 u0 com.netflix.mediaclient/o.cwK t127}
-                ARC-R
-                mFocusedWindow=Window{b3ef1fc u0 NotificationShade} ## Sleep
-                mFocusedWindow=Window{3f50b2f u0 com.netflix.mediaclient/com.netflix.mediaclient.acquisition.screens.signupContainer.SignupNativeActivity}
-            '''
-            keyword = ""
-            if ArcVersion == ArcVersions.ARC_P:
-                keyword = "mResumedActivity"
-            if ArcVersion == ArcVersions.ARC_R:
-                keyword = "mFocusedWindow"
-            cmd = ('adb', '-t', transport_id, 'shell', 'dumpsys', 'activity',
-                    '|', 'grep', keyword)
-            text = subprocess.run(cmd, check=False, encoding='utf-8',
-                capture_output=True).stdout.strip()
+        if result is None:
+            is_ANR_thrown = is_ANR(text, package_name)
+            print("Cant find current activity.", f"{is_ANR_thrown=}", text)
+            return {
+                "package_name": '',
+                "act_name": '',
+                "is_ANR_thrown": is_ANR_thrown,
+                "ANR_for_package": 'packge_name here'
+            }
 
-            query = r".*{.*\s.*\s(?P<package_name>.*)/(?P<act_name>[\S\.]*)\s*.*}"
-            result = re.search(query, text)
+        print(f"get_cur_activty: {result.group('package_name')=} {result.group('act_name')=}")
+        return  {
+            "package_name": result.group("package_name"),
+            "act_name": result.group("act_name"),
+            "is_ANR_thrown": False,
+            "ANR_for_package": ''
+        }
 
-            if result is None:
-                print("Cant find current activity.", text)
-                return "",""
-
-            print(f"{result.group('package_name')=} {result.group('act_name')=}")
-            return result.group("package_name"), result.group("act_name")
-        except Exception as err:
-            print("Err get_cur_activty ", err)
-    return "",""
+    return {
+        "package_name": '',
+        "act_name": '',
+        "is_ANR_thrown": False,
+        "ANR_for_package": ''
+    }
 
 def open_app(package_name: str, transport_id: int, ArcVersion: ArcVersions = ArcVersions.ARC_R):
     '''
@@ -519,12 +575,17 @@ def open_app(package_name: str, transport_id: int, ArcVersion: ArcVersions = Arc
         MAX_WAIT_FOR_OPEN_APP = 420  # 7 mins
         t = time()
         # org.chromium.arc.applauncher will be the package if a PWA is launched...
-        while cur_package != package_name and cur_package != "org.chromium.arc.applauncher" and int(time() - t) < MAX_WAIT_FOR_OPEN_APP:
+        while (
+            cur_package != package_name and
+            cur_package != "com.google.android.permissioncontroller" and
+            cur_package != "org.chromium.arc.applauncher" and
+            int(time() - t) < MAX_WAIT_FOR_OPEN_APP):
             try:
-                cur_package, act_name = get_cur_activty(transport_id, ArcVersion)
+                res = get_cur_activty(transport_id, ArcVersion, package_name)
+                cur_package = res['package_name']
             except Exception as err:
                 print("Err getting cur act", err)
-        print(outstr)
+        print(f"open_app {outstr=}")
     except Exception as err:
         print("Error opening app with monkey", err)
         return False
@@ -575,97 +636,152 @@ def is_download_in_progress(transport_id: str, package_name: str):
 
 
 ##       Error log checks - Possibly move to its own class.. ##
-def get_logs(start_time: str, transport_id: str):
-    '''Grabs logs from ADB logcat starting at a specified time.
 
-        Params:
-            start_time: The formatted string representing the time the app was
-                launched/ started.
-            transport_id: The transport id of the connected android device.
+class ErrorDetector:
+    ''' Detects crashes from Logcat and ANRs from Dumpsys activity.
+    '''
+    def __init__(self, transport_id: str, ArcVersion: ArcVersions):
+        self.__transport_id = transport_id
+        self.__package_name = ""
+        self.__ArcVersion = ArcVersion
+        self.__start_time = None  # Logcat logs starting at
+        self.reset_start_time()
 
-        Returns
+    def get_package_name(self):
+        return self.__package_name
+
+    def update_package_name(self, package_name: str):
+        self.__package_name = package_name
+
+    def update_transport_id(self, transport_id: str):
+        self.__transport_id = transport_id
+
+    def update_arc_version(self, ArcVersion: ArcVersions):
+        self.__ArcVersion = ArcVersion
+
+    ''' TODO Add check for F DEBUG LOGS => 03-01 15:50:25.856 22026 22026 F DEBUG   : pid: 21086, tid: 21241, name: UnityMain  >>> zombie.survival.craft.z <<<
+    03-01 15:50:25.855 22026 22026 F DEBUG   : *** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***
+    03-01 15:50:25.855 22026 22026 F DEBUG   : Build fingerprint: 'google/hatch/hatch_cheets:11/R112-15357.0.0/9629516:user/release-keys'
+    03-01 15:50:25.855 22026 22026 F DEBUG   : Revision: '0'
+    03-01 15:50:25.855 22026 22026 F DEBUG   : ABI: 'x86_64'
+    03-01 15:50:25.856 22026 22026 F DEBUG   : Timestamp: 2023-03-01 15:50:25-0800
+    03-01 15:50:25.856 22026 22026 F DEBUG   : pid: 21086, tid: 21241, name: UnityMain  >>> zombie.survival.craft.z <<<
+    03-01 15:50:25.856 22026 22026 F DEBUG   : uid: 10194
+    03-01 15:50:25.856 22026 22026 F DEBUG   : signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x133
+    03-01 15:50:25.856 22026 22026 F DEBUG   : Cause: null pointer dereference
+    03-01 15:50:25.856 22026 22026 F DEBUG   :     rax 0000000085f94600  rbx 000000000df6aca9  rcx 000071850ab02dc0  rdx 0000000000000000
+    03-01 15:50:25.856 22026 22026 F DEBUG   :     r8  0000718526483360  r9  000071850ab02dc0  r10 0000718526483060  r11 00007185264830f0
+    03-01 15:50:25.856 22026 22026 F DEBUG   :     r12 0000000000000000  r13 00007184393076c0  r14 00007184375221e0  r15 0000000000000000
+    03-01 15:50:25.856 22026 22026 F DEBUG   :     rdi 0000718428d363c0  rsi 000071843c108280
+    03-01 15:50:25.856 22026 22026 F DEBUG   :     rbp 000071852efb3000  rsp 0000718526483340  rip 000000000e038131
+    03-01 15:50:25.916 22026 22026 F DEBUG   : backtrace:
+    03-01 15:50:25.916 22026 22026 F DEBUG   :       #00 pc 0000000000bd8131  [anon:Mem_0x20000000]
+
 
     '''
-    cmd = ('adb', '-t', transport_id, 'logcat', 'time', '-t', start_time)  #
-    logs =  subprocess.run(cmd, check=False, encoding='utf-8',
-         capture_output=True).stdout.strip()
-    return logs
+    def __get_logs(self, start_time: str):
+        '''Grabs logs from ADB logcat starting at a specified time.
 
-def check_for_win_death(package_name: str, logs: str):
-    ''' Searches logs for WIN DEATH record.
+            Params:
+                start_time: The formatted string representing the time the app was
+                    launched/ started.
+                transport_id: The transport id of the connected android device.
 
-        12-28 17:48:37.233   153   235 I WindowManager: WIN DEATH: Window{913e5ce u0 com.Psyonix.RL2D/com.epicgames.ue4.GameActivity}
+            Returns
 
-        Returns:
-            A string representing the failing activity otherwise it returns an empty string.
-    '''
-    # adb logcat -v time -t 10:30:00
+        '''
+        cmd = ('adb', '-t', self.__transport_id, 'logcat', 'time', '-t', start_time)  #
+        self.__logs =  subprocess.run(cmd, check=False, encoding='utf-8',
+            capture_output=True).stdout.strip()
 
-    win_death = rf"\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*I WindowManager: WIN DEATH: Window{'{'}.*\s.*\s{package_name}/.*{'}'}"
-    win_death_pattern = re.compile(win_death, re.MULTILINE)
-    match = win_death_pattern.search(logs)
-    if match:
-        # print("match ", match.group(0))
-        failed_activity = match.group(0).split("/")[-1][:-1]
-        # print("failed act: ", failed_activity)
-        return failed_activity
-    return ""
+    def __check_for_win_death(self):
+        ''' Searches logs for WIN DEATH record.
 
-def check_force_remove_record(package_name: str, logs: str):
-    ''' Searches logs for Force remove ActivtyRecord.
+            12-28 17:48:37.233   153   235 I WindowManager: WIN DEATH: Window{913e5ce u0 com.Psyonix.RL2D/com.epicgames.ue4.GameActivity}
 
-        12-28 17:48:37.254   153  4857 W ActivityManager: Force removing ActivityRecord{f024fcc u0 com.Psyonix.RL2D/com.epicgames.ue4.GameActivity t195}: app died, no saved state
+            Returns:
+                A string representing the failing activity otherwise it returns an empty string.
+        '''
+        # adb logcat -v time -t 10:30:00
 
-        Returns:
-            A string representing the failing activity otherwise it returns an empty string.
-    '''
+        win_death = rf"\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*I WindowManager: WIN DEATH: Window{'{'}.*\s.*\s{self.__package_name}/.*{'}'}"
+        win_death_pattern = re.compile(win_death, re.MULTILINE)
+        match = win_death_pattern.search(self.__logs)
+        if match:
+            # print("match ", match.group(0))
+            failed_activity = match.group(0).split("/")[-1][:-1]
+            # print("failed act: ", failed_activity)
+            return failed_activity
+        return ""
 
-    force_removed = rf"^\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*W ActivityManager: Force removing ActivityRecord{'{'}.*\s.*\s{package_name}/.*\s.*{'}'}: app died, no saved state$"
-    force_removed_pattern = re.compile(force_removed, re.MULTILINE)
-    match = force_removed_pattern.search(logs)
+    def __check_force_remove_record(self):
+        ''' Searches logs for Force remove ActivtyRecord.
+
+            12-28 17:48:37.254   153  4857 W ActivityManager: Force removing ActivityRecord{f024fcc u0 com.Psyonix.RL2D/com.epicgames.ue4.GameActivity t195}: app died, no saved state
+
+            Returns:
+                A string representing the failing activity otherwise it returns an empty string.
+        '''
+
+        force_removed = rf"^\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*W ActivityManager: Force removing ActivityRecord{'{'}.*\s.*\s{self.__package_name}/.*\s.*{'}'}: app died, no saved state$"
+        force_removed_pattern = re.compile(force_removed, re.MULTILINE)
+        match = force_removed_pattern.search(self.__logs)
 
 
-    if match:
-        print("match ", match.group(0))
-        failed_activity = match.group(0).split("/")[-1][:-1].split(" ")[0]
-        print("failed act: ", failed_activity)
-        return failed_activity
-    return ""
+        if match:
+            print("match ", match.group(0))
+            failed_activity = match.group(0).split("/")[-1][:-1].split(" ")[0]
+            print("failed act: ", failed_activity)
+            return failed_activity
+        return ""
 
-def check_crash(package_name: str, start_time: str, transport_id: str):
-    ''' Grabs logcat logs starting at a specified time and check for crash logs.
+    def __check_for_ANR(self) -> bool:
+        ''' Checks dumpsys for ANR.
+        '''
+        dumpsys_act_text = dumpysys_activity(self.__transport_id, self.__ArcVersion)
+        return is_ANR(dumpsys_act_text, self.__package_name)
 
-        Params:
-            package_name: The name of the package to check crash logs for.
-            start_time: The formatted string representing the time the app was
-                launched/ started.
-            transport_id: The transport id of the connected android device.
+    def check_crash(self):
+        ''' Grabs logcat logs starting at a specified time and check for crash logs.
 
-        Return:
-            A string representing the failing activity otherwise it returns an empty string.
+            Params:
+                package_name: The name of the package to check crash logs for.
+                start_time: The formatted string representing the time the app was
+                    launched/ started.
+                transport_id: The transport id of the connected android device.
 
-    '''
-    logs = get_logs(start_time, transport_id)
+            Return:
+                A string representing the failing activity otherwise it returns an empty string.
 
-    failed_act: str = check_for_win_death(package_name, logs)
-    if len(failed_act) > 0:
-        return (CrashType.WIN_DEATH, failed_act)
+        '''
+        self.__get_logs(self.__start_time)
 
-    failed_act: str = check_force_remove_record(package_name, logs)
-    if len(failed_act) > 0:
-        return (CrashType.WIN_DEATH, failed_act)
-    return (CrashType.SUCCESS, "")
+        failed_act: str = self.__check_for_win_death()
+        if failed_act:
+            return (CrashType.WIN_DEATH, failed_act)
 
-def get_start_time():
-    '''
-        Gets current time and formats it properly to match ADB -t arg.
+        failed_act: str = self.__check_force_remove_record()
+        if failed_act:
+            return (CrashType.WIN_DEATH, failed_act)
 
-        This is used at the beginning of a test for an app.
-        It will limit the amount logs we will need to search each run.
+        if self.__check_for_ANR():
+            return (CrashType.ANR, "ANR detected.")
 
-        Returns a string in the format "MM-DD HH:MM:SS.ms"
-    '''
-    return datetime.fromtimestamp(time()).strftime('%m-%d %H:%M:%S.%f')[:-3]
+        return (CrashType.SUCCESS, "")
+
+    def __get_start_time(self, ):
+        '''
+            Gets current time and formats it properly to match ADB -t arg.
+
+            This is used at the beginning of a test for an app.
+            It will limit the amount logs we will need to search each run.
+
+            Returns a string in the format "MM-DD HH:MM:SS.ms"
+        '''
+        return datetime.fromtimestamp(time()).strftime('%m-%d %H:%M:%S.%f')[:-3]
+
+    def reset_start_time(self):
+        self.__start_time = self.__get_start_time()
 
 
 ##                  Image utils               ##
@@ -773,6 +889,13 @@ def check_amace(driver, package_name: str) -> bool:
         find_template(ss_path, amace_icon_path)
     return False
 
+def dev_scrape_start_at_app(start_package_name: str, app_list: List[List[str]]) -> int:
+    ''' Given package name, returns index in the list.'''
+    for i, app in enumerate(app_list):
+        app_name, package_name = app
+        if start_package_name == package_name:
+            return i
+    raise Exception("package name not in the list.")
 
 PACKAGE_NAMES = [
     # [ "Twitter", "com.twitter.android"],
@@ -835,7 +958,7 @@ PACKAGE_NAMES = [
     ['Solitaire - Classic Card Games', 'com.mobilityware.solitaire'],
     ['The Sims FreePlay', 'com.ea.games.simsfreeplay_na'],
     ['ITV Player', 'air.ITVMobilePlayer'],
-    ['Family Farm Adventure', 'com.farmadventure.global'],
+    ['Family Farm Adventure', 'com.farmadventure.global'], # Failed on first open.... not sure why.
     ['Finding Home', 'dk.tactile.mansionstory'],
     ['Sling Television', 'com.sling'],
     ['Asphalt 9: Legends', 'com.gameloft.android.ANMP.GloftA9HM'],
@@ -884,7 +1007,7 @@ PACKAGE_NAMES = [
     ['Crossy Road', 'com.yodo1.crossyroad'],
     ['com.vanced.android.youtube', 'com.vanced.android.youtube'],
     ['TradingView', 'com.tradingview.tradingviewapp'],
-    ['Slots - House of Fun', 'com.pacificinteractive.HouseOfFun'],
+    ['Slots - House of Fun', 'com.pacificinteractive.HouseOfFun'], # LAST Scarped...
     ['RISK: Global Domination', 'com.hasbro.riskbigscreen'],
     ['My Boy! Free - GBA Emulator', 'com.fastemulator.gbafree'],
     ['MARVEL Strike Force', 'com.foxnextgames.m3'],
@@ -915,15 +1038,15 @@ PACKAGE_NAMES = [
     ['Pocket Mortys', 'com.turner.pocketmorties'],
     ['Wish - Shopping Made Fun', 'com.contextlogic.wish'],
     ['Scary Teacher 3D', 'com.zakg.scaryteacher.hellgame'],
-    ['FreeCell Solitaire', 'at.ner.SolitaireFreeCell'],
-    ['Solitaire Card Games Free', 'com.Nightingale.Solitaire.Card.Games.Free'],
+    ['FreeCell Solitaire', 'at.ner.SolitaireFreeCell'],  # Doest find correct package
+    ['Solitaire Card Games Free', 'com.Nightingale.Solitaire.Card.Games.Free'], # Doest find correct package
     ['250+ Solitaire Collection', 'com.anoshenko.android.solitaires'],
     ['NOOK', 'bn.ereader'],
     ['Evony', 'com.topgamesinc.evony'],
     ['Wonder Merge - Magic Merging and Collecting Games', 'com.cookapps.wonder.merge.dragon.magic.evolution.merging.wondermerge'],
     ['Wood Block Puzzle - Free Classic Block Puzzle Game', 'puzzle.blockpuzzle.cube.relax'],
     ['Hungry Shark Evolution', 'com.fgol.HungrySharkEvolution'],
-    # ['Mergical', 'com.fotoable.mergetown'],   # Package not found
+    ['Mergical', 'com.fotoable.mergetown'],   # Package not found
     ["Diggy's Adventure", 'air.com.pixelfederation.diggy'],
     ['My Talking Angela', 'com.outfit7.mytalkingangelafree'],
     ['The Tribez', 'com.gameinsight.tribez'],
@@ -933,15 +1056,15 @@ PACKAGE_NAMES = [
     ['Earn Cash & Money Rewards - CURRENT Music Screen', 'us.current.android'],
     ['Talking Tom Gold Run', 'com.outfit7.talkingtomgoldrun'],
     ['Hollywood Story', 'org.nanobit.hollywood'],
-    ['hayu', 'com.upst.hayu'],
+    ['hayu', 'com.upst.hayu'], # Failed click app icon
     ['NPO', 'nl.uitzendinggemist'],
-    ['V - Real-time celeb broadcasting app', 'com.naver.vapp'],
+    ['V - Real-time celeb broadcasting app', 'com.naver.vapp'], # Failed click app icon
     ['Cash Frenzy', 'slots.pcg.casino.games.free.android'],
     ['Crayola Scribble Scrubbie Pets', 'com.crayolallc.crayola_scribble_scrubbie_pets'],
     ['SALTO, TV & streaming illimités dans une seule app', 'fr.salto.app'],
     ['Catwalk Beauty', 'com.catwalk.fashion.star'],
     ['Mahjong Solitaire', 'com.mobilityware.MahjongSolitaire'],
-    ['Pepi Tales: Kings Castle', 'com.PepiPlay.KingsCastle'],
+    ['Pepi Tales: Kings Castle', 'com.PepiPlay.KingsCastle'], # Some weird issue happened...
     ['Spider Solitaire', 'com.cardgame.spider.fishdom'],
     ['Relax Jigsaw Puzzles', 'com.openmygame.games.android.jigsawpuzzle'],
     ['L.O.L. Surprise! Disco House', 'com.tutotoons.app.lolsurprisediscohouse'],
@@ -960,7 +1083,7 @@ PACKAGE_NAMES = [
     ['Tie Dye', 'com.crazylabs.tie.dye.art'],
     ['eFootball PES 2020', 'jp.konami.pesam'],
     ['Veezie.st - Enjoy your videos, easily.', 'st.veezie'],
-    ["TV d'Orange", 'com.orange.owtv'],
+    ["TV d'Orange film, streaming", 'com.orange.owtv'],
     ['Prodigy Math Game', 'com.prodigygame.prodigy'],
     ['Head Ball 2', 'com.masomo.headball2'],
     ['Drive Ahead', 'com.dodreams.driveahead'],
@@ -975,7 +1098,7 @@ PACKAGE_NAMES = [
     ['Hotel Hideaway', 'com.piispanen.hotelhideaway'],
     ['U-NEXT', 'jp.unext.mediaplayer'],
     ['DraStic DS Emulator', 'com.dsemu.drastic'],
-    ['1v1.LOL', 'lol.onevone'],
+    ['1v1.LOL', 'lol.onevone'], # Age verification
     ['Sketch - Draw & Paint', 'com.sonymobile.sketch'],
     ['Merge Elves', 'com.merge.elves'],
     ['Teamfight Tactics', 'com.riotgames.league.teamfighttactics'],
@@ -1002,20 +1125,20 @@ PACKAGE_NAMES = [
     ['Daily Themed Crossword Puzzle', 'in.crossy.daily_crossword'],
     ['Age of Civilizations II', 'age.of.civilizations2.jakowski.lukasz'],
     ['globo.tv', 'com.globo.globotv'],
-    ['Colorscapes Plus - Color by Number, Coloring Games', 'com.artlife.color.number.coloring.games'],
-    ['Transformers: Earth Wars', 'com.backflipstudios.transformersearthwars'],
+    ['Color by Number Coloring Games', 'com.artlife.color.number.coloring.games'],
+    ['TRANSFORMERS: Earth Wars', 'com.backflipstudios.transformersearthwars'],
     ['Web Video Cast | Browser to TV/Chromecast/Roku/+', 'com.instantbits.cast.webvideo'],
     ['Plurall', 'com.kongros.plurall'],
     ['Spades Royale', 'com.bbumgames.spadesroyale'],
     ['TextingStory', 'com.textingstory.textingstory'],
     ['My PlayHome Plus', 'com.playhome.plus'],
     ['Flipboard', 'flipboard.app'],
-    ['Cross Stitch', 'com.inapp.cross.stitch'],
+    ['Cross Stitch', 'com.inapp.cross.stitch'], # Not found
     ['Who is? Brain Teaser & Riddles', 'com.unicostudio.whois'],
     ['thinkorswim', 'com.devexperts.tdmobile.platform.android.thinkorswim'],
-    ['Slots Casino Games by Huuuge', 'com.huuuge.casino.slots'],
+    ['Huuuge Casino Slots Vegas 777', 'com.huuuge.casino.slots'],
     ['Mahjong', 'com.fenghenda.mahjong'],
-    ['Galaxy Attack: Alien Shooter', 'com.alien.shooter.galaxy.attack'],
+    ['Galaxy Attack: Alien Shooting', 'com.alien.shooter.galaxy.attack'],  # App not available on Helios -> doesnt show in results but when clicking on link, it shows 'Your device isn't compatible with this version.'
     ['Madden NFL 21 Mobile Football', 'com.ea.gp.maddennfl21mobile'],
     ['Bubble Shooter Rainbow - Shoot & Pop Puzzle', 'com.blackout.bubble'],
     ['VIDEOMEDIASET', 'it.fabbricadigitale.android.videomediaset'],

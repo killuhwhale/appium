@@ -16,15 +16,18 @@ from selenium.webdriver.common.actions import interaction
 from selenium.webdriver.common.actions.action_builder import ActionBuilder
 from selenium.webdriver.common.actions.pointer_input import PointerInput
 from time import sleep, time
-from typing import List
+from typing import Dict, List
 
 
 from objdetector.objdetector import ObjDetector
 from utils.utils import (
     ACCOUNTS, ADB_KEYCODE_DEL, DEVICES, SIGN_IN, AppInfo, ArcVersions, CONTINUE, CrashType, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
-    PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, Device, check_amace,
-    check_crash, close_app, create_dir_if_not_exists, get_cur_activty, get_root_path,
-    get_start_time, is_download_in_progress, open_app, save_resized_image, transform_coord_from_resized)
+    PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, Device, ErrorDetector, check_amace,
+    close_app, create_dir_if_not_exists, get_cur_activty, get_root_path,
+     is_download_in_progress, open_app, save_resized_image, transform_coord_from_resized)
+
+class ANRThrownException(Exception):
+    pass
 
 class ValidationReport:
     '''
@@ -159,7 +162,7 @@ class ValidationReport:
         for package_name, status_obj in sorted(report.items(), key=ValidationReport.sorted_name):
             is_good = status_obj['status'] == ValidationReport.PASS
             status_color = ValidationReport.Green if is_good else ValidationReport.RED
-            print("Status obj: ", status_obj, status_color, is_good)
+            # print("Status obj: ", status_obj, status_color, is_good)
             print(ValidationReport.Blue, end="")
             print(f"{status_obj['name']} ", end="")
             print(ValidationReport.RESET, end="")
@@ -215,6 +218,8 @@ class AppValidator:
         self.is_emu = self.device['is_emu']
         self.device_name = self.device['device_name']
         self.package_names = package_names  # List of packages to test as [app_title, app_package_name]
+        self.current_package = None
+        self.err_detector = ErrorDetector(self.transport_id, self.arc_version)
         self.report = ValidationReport(f'{self.device_name}_{self.ip}')
         self.steps = [
             'Click search icon',
@@ -230,7 +235,7 @@ class AppValidator:
         self.detector = ObjDetector(self.test_img_fp, [self.weights])
         self.ID = f"{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}-{self.ip.split(':')[0]}"
         self.instance_num = instance_num
-        self.dev_ss_count = 0
+        self.dev_ss_count = 320
 
     def dprint(self, *args):
         color = self.report.COLORS[2:][self.instance_num % len(self.report.COLORS)]
@@ -250,9 +255,15 @@ class AppValidator:
     def is_new_activity(self) -> bool:
         '''
             Calls adb shell dumpsys activity | grep mFocusedWindow
+
+            Raises
         '''
-        package, activity = get_cur_activty(self.transport_id,  self.arc_version)
-        act_name = f"{package}/{activity}"
+        results: Dict = get_cur_activty(self.transport_id,  self.arc_version, self.current_package)
+        if results['is_ANR_thrown']:
+            raise ANRThrownException(results)
+
+
+        act_name = f"{results['package_name']}/{results['act_name']}"
         self.prev_act = self.cur_act  # Update
         self.cur_act = act_name
         # Init
@@ -393,8 +404,6 @@ class AppValidator:
 
 
     ##  Images/ Reporting
-
-
     def get_test_ss(self) -> bool:
         '''
             Attempts to get SS of device and saves to a location where the
@@ -679,28 +688,32 @@ class AppValidator:
         login_entered = False
         password_entered = False
         while not logged_in and login_attemps < 4:
-            CrashType, crashed_act = check_crash(app_package_name,
-                                    self.start_time, self.transport_id)
+            CrashType, crashed_act = self.err_detector.check_crash()
             if(not CrashType == CrashType.SUCCESS):
                 self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
                 break
 
-            res = self.handle_login(login_entered,
-                                    password_entered,
-                                    is_game,
-                                    app_package_name)
-            logged_in, login_entered, password_entered = res  # Unpack, looks better
+            try:
+                res = self.handle_login(login_entered,
+                                        password_entered,
+                                        is_game,
+                                        app_package_name)
+                logged_in, login_entered, password_entered = res
+                print(f"\n\n After attempt login: ")
+                print(f"{logged_in=}, {login_entered=}, {password_entered=} \n\n")
+                if logged_in:
+                    break
+                login_attemps += 1
 
-            print(f"\n\n After attempt login: ")
-            print(f"{logged_in=}, {login_entered=}, {password_entered=} \n\n")
-            if logged_in:
-                break
+            except ANRThrownException as error_obj:
+                if error_obj['ANR_for_package'] == app_package_name:
+                    self.update_report_history(app_package_name, "ANR thrown.")
+                    self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
+                    return False
 
-            login_attemps += 1
 
         # Check for crash once more after login attempts.
-        CrashType, crashed_act = check_crash(app_package_name,
-                                    self.start_time, self.transport_id)
+        CrashType, crashed_act = self.err_detector.check_crash()
         if(not CrashType == CrashType.SUCCESS):
             self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
             return False
@@ -805,11 +818,14 @@ class AppValidator:
 
     def check_playstore_crash(self):
         # 01-05 22:08:57.546   129   820 I WindowManager: WIN DEATH: Window{afca274 u0 com.android.vending/com.google.android.finsky.activities.MainActivity}
-        CrashType, crashed_act = check_crash(PLAYSTORE_PACKAGE_NAME, self.start_time, self.transport_id)
+        cur_package = self.err_detector.get_package_name()
+        self.err_detector.update_package_name(PLAYSTORE_PACKAGE_NAME)
+        CrashType, crashed_act = self.err_detector.check_crash()
+        self.err_detector.update_package_name(cur_package)  # switch back to package
         if(not CrashType == CrashType.SUCCESS):
             self.dprint("PlayStore crashed ", CrashType.value)
             # self.driver.reset()  # Reopen app
-            raise("PLAYSTORECRASH")
+            raise Exception("PLAYSTORECRASH")
 
     def search_playstore(self, title: str, submit=True):
         content_desc = f'''
@@ -860,7 +876,7 @@ class AppValidator:
                     # input("Next icon...")
             except Exception as e:
                 pass
-        raise("Icon not found!")
+        raise Exception("Icon not found!")
 
     def extract_bounds(self, bounds: str):
         '''
@@ -887,7 +903,7 @@ class AppValidator:
         '''
         already_installed = False  # Potentailly already isntalled
         err = False
-        print(f"{self.device_name=}, {DEVICES.HELIOS=}")
+        print(f"{self.device_name=}, {DEVICES.HELIOS.value=}")
         try:
             # input("About to search for 1st install")
             if self.is_emu:
@@ -901,7 +917,7 @@ class AppValidator:
                 bounds = self.extract_bounds(
                     install_BTN.get_attribute("bounds"))
                 self.click_unknown_install_btn(bounds)
-            elif not self.device_name == DEVICES.HELIOS:
+            elif not self.device_name == DEVICES.HELIOS.value:
                 # ARC_P CoachZ -> find_element(by=AppiumBy.ACCESSIBILITY_ID, value="Install")
                 print(f"Looking at ACCESSIBILITY_ID, value=Install")
                 install_BTN = self.driver.find_element(
@@ -1021,10 +1037,13 @@ class AppValidator:
         '''
         self.driver.orientation = 'PORTRAIT'
         for app_title, app_package_name in self.package_names:
+            self.current_package = app_package_name
             self.report.add_app(app_package_name, app_title)
-            try:
+            self.err_detector.reset_start_time()
+            self.err_detector.update_package_name(app_package_name)
 
-                self.start_time = get_start_time()
+
+            try:
                 installed, error = self.discover_and_install(app_title, app_package_name)
                 # installed, error = True, False # Successful
                 self.dprint(f"Installed? {installed}   err: {error}")
@@ -1053,13 +1072,9 @@ class AppValidator:
                     continue
 
 
-
-                # TODO wait for activity to start intelligently, not just package
-                # At this point we have successfully launched the app.
                 self.dprint("Waiting for app to start/ load...")
                 sleep(5) # ANR Period
-                CrashType, crashed_act = check_crash(app_package_name,
-                                            self.start_time, self.transport_id)
+                CrashType, crashed_act = self.err_detector.check_crash()
                 if(not CrashType == CrashType.SUCCESS):
                     self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
                     self.cleanup_run(app_package_name)
