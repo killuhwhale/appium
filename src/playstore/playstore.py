@@ -240,6 +240,7 @@ class AppValidator:
         self.weights = weights
         self.detector = ObjDetector(self.test_img_fp, [self.weights])
         self.ID = f"{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}-{self.ip.split(':')[0]}"
+        self.__name_span_text = ''
         self.instance_num = instance_num
         self.dev_ss_count = 320
 
@@ -341,7 +342,7 @@ class AppValidator:
 
     ##  Http Get
     def check_playstore_invalid(self, package_name) -> bool:
-        ''' Checks if an app's package_name is invalid vai Google playstore URL
+        ''' Checks if an app's package_name is invalid via Google playstore URL
             If invalid, returns True
             If valid, returns False
         '''
@@ -358,6 +359,32 @@ class AppValidator:
                 return False
         else:
             return True
+
+    def check_playstore_name(self, package_name) -> bool:
+        ''' Checks an app's name via Google playstore URL
+            Returns the apps name from the playstore.
+        '''
+
+        url = f'https://play.google.com/store/apps/details?id={package_name}'
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            # self.dprint(response.text)
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            error_section = soup.find('div', {'id': 'error-section'})
+            if error_section:
+                return ""
+
+            name_span_parent = soup.find('h1', {'itemprop': 'name'})
+            name_span = name_span_parent.findChild('span')
+            print(f"{name_span.text=}")
+            if name_span:
+                self.__name_span_text = name_span.text
+                return name_span.text
+            else:
+                return ""
+        else:
+            return ""
 
 
     ##  Buttons
@@ -1052,6 +1079,7 @@ class AppValidator:
                 self.dprint("Eror:::: ", error)
                 return self.return_error(last_step, error)
 
+
     ##  Main Loop
     def run(self):
         '''
@@ -1075,8 +1103,14 @@ class AppValidator:
                 self.dprint(f"Installed? {installed}   err: {error}")
 
                 if not installed and not error is None:
+                    reason = ""
+                    if self.check_playstore_invalid(app_package_name):
+                        reason = "App package is invalid, update/ remove from list."
+                    elif not app_title == self.check_playstore_name(app_package_name):
+                        reason = f"App package name {app_title} does not match the current name on the playstore {self.__name_span_text}"
+
                     self.report.update_status(app_package_name, ValidationReport.FAIL, error)
-                    self.update_report_history(app_package_name, "Failed to install app.")
+                    self.update_report_history(app_package_name, f"Failed to install app. {reason}")
                     self.cleanup_run(app_package_name)
                     continue
 
@@ -1084,6 +1118,10 @@ class AppValidator:
                     reason = ''
                     if self.check_playstore_invalid(app_package_name):
                         reason = "App package is invalid, update/ remove from list."
+
+                    elif not app_title == self.check_playstore_name(app_package_name):
+                        reason = f"App package name {app_package_name} does not match the current name on the playstore {self.__name_span_text}"
+
                     elif not self.is_installed(app_package_name):
                         reason = "Failed to open because the package was not installed."
                     else:

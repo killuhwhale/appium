@@ -1093,7 +1093,7 @@ PACKAGE_NAMES = [
     ['SALTO, TV & streaming illimités dans une seule app', 'fr.salto.app'],
     ['Catwalk Beauty', 'com.catwalk.fashion.star'],
     ['Mahjong Solitaire', 'com.mobilityware.MahjongSolitaire'],
-    ['Pepi Wonder World: Magic Isle!', 'com.PepiPlay.KingsCastle'], # Some weird issue happened...
+    ['Pepi Wonder World: Magic Isle!', 'com.PepiPlay.KingsCastle'],
     ['Spider Solitaire', 'com.cardgame.spider.fishdom'],
     ['Relax Jigsaw Puzzles', 'com.openmygame.games.android.jigsawpuzzle'],
     ['L.O.L. Surprise! Disco House', 'com.tutotoons.app.lolsurprisediscohouse'],

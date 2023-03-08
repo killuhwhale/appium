@@ -70,8 +70,8 @@ if __name__ == "__main__":
     driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
     sleep(3)  # Wait for playstore to load, there is an animation that delays the text from showing immediately which cause the search to fail (on first launch i think...)
 
-    fb_handle = FacebookApp(driver, device, weights)
-    fb_handle.install_and_login()
+    # fb_handle = FacebookApp(driver, device, weights)
+    # fb_handle.install_and_login()
 
     starting_app = "com.mobilityware.CastleSolitaire"
 
@@ -84,9 +84,10 @@ if __name__ == "__main__":
         device,
         weights
         )
+
     validator.uninstall_multiple()
     validator.run()
-    validator.report.merge(fb_handle.validator.report)
+    # validator.report.merge(fb_handle.validator.report)
     validator.report.print()
     driver.quit()
 
