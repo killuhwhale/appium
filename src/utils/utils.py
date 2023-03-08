@@ -14,6 +14,8 @@ import numpy as np
 EXECUTOR = 'http://192.168.0.175:4723/wd/hub'
 PLAYSTORE_PACKAGE_NAME = "com.android.vending"
 PLAYSTORE_MAIN_ACT = "com.google.android.finsky.activities.MainActivity"
+FACEBOOK_PACKAGE_NAME = "com.facebook.katana"
+FACEBOOK_APP_NAME = "Facebook"
 
 # Labels for YOLOv5
 LOGIN = 'loginfield'
@@ -36,6 +38,8 @@ ACCOUNTS = {
     'com.roblox.client': ['testminnie000', 'testminnie123'],
     'com.facebook.orca': ['testminnie001@gmail.com', 'testminnie123'],
     'com.facebook.talk': ['testminnie001@gmail.com', 'testminnie123'],
+    FACEBOOK_PACKAGE_NAME: ['testminnie001@gmail.com', 'testminnie123'],
+
 }
 
 class ArcVersions(Enum):
@@ -53,6 +57,7 @@ class CrashType(Enum):
     WIN_DEATH = "Win Death"
     FORCE_RM_ACT_RECORD = "Force removed ActivityRecord"
     ANR = "App not responding"
+    FDEBUG_CRASH = "F DBUG crash"
 
 class DEVICES(Enum):
     '''
@@ -169,7 +174,7 @@ class AppInfo:
         manifest = ""
         try:
             cmd = (aapt, "dump", "badging", apk_path)
-            manifest = subprocess.run(cmd, check=True, encoding='utf-8',
+            manifest = subprocess.run(cmd, check=False, encoding='utf-8',
                                     capture_output=True).stdout.strip()
         except Exception as error:
             print("Error getting manifest: ", error)
@@ -257,22 +262,23 @@ class AppInfo:
 
 class Device:
     def __init__(self, ip: str):
-        self.__is_connected = self.adb_connect(ip)
-        self.transport_id = self.find_transport_id(ip)
+        self.__is_connected = self.__adb_connect(ip)
+        self.__transport_id = self.__find_transport_id(ip)
         self.__device_info = {
             'ip': ip,
-            'transport_id': self.transport_id,
-            'is_emu': self.is_emulator(),
-            'arc_version': self.get_arc_version(),
-            'device_name': self.get_device_name(),
-            'wxh': self.get_display_size(),
+            'transport_id': self.__transport_id,
+            'is_emu': self.__is_emulator(),
+            'arc_version': self.__get_arc_version(),
+            'device_name': self.__get_device_name(),
+            'wxh': self.__get_display_size(),
+            'arc_build': self.__get_arc_build()
         }
         print(self.__device_info)
 
     def is_connected(self):
         return self.__is_connected
 
-    def adb_connect(self, ip: str):
+    def __adb_connect(self, ip: str):
         '''
             Connects device via ADB
 
@@ -294,7 +300,7 @@ class Device:
             return False
         return True
 
-    def find_transport_id(self, ip_address)-> str:
+    def __find_transport_id(self, ip_address)-> str:
         ''' Gets the transport_id from ADB devices command.
 
             ['192.168.1.113:5555', 'device', 'product:strongbad', 'model:strongbad',
@@ -323,7 +329,7 @@ class Device:
         return '-1'
 
 
-    def is_emulator(self):
+    def __is_emulator(self):
         ''' Checks if device is an emulator.
 
             Params:
@@ -333,7 +339,7 @@ class Device:
                 A boolean representing if it's an emulator or not.
         '''
 
-        cmd = ('adb','-t', self.transport_id, 'shell', 'getprop', "ro.build.characteristics")
+        cmd = ('adb','-t', self.__transport_id, 'shell', 'getprop', "ro.build.characteristics")
         try:
             res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
             return res == "emulator"
@@ -341,7 +347,7 @@ class Device:
             print("Failed to check for emualtor", err)
         return False
 
-    def get_arc_version(self):
+    def __get_arc_version(self):
         ''' Gets Android OS version on connected device.
 
             Params:
@@ -353,7 +359,7 @@ class Device:
 
 
         '''
-        cmd = ('adb','-t', self.transport_id, 'shell', 'getprop', "ro.build.version.release")
+        cmd = ('adb','-t', self.__transport_id, 'shell', 'getprop', "ro.build.version.release")
         try:
             res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
             # print("Arc version: ", res)
@@ -365,7 +371,7 @@ class Device:
             print("Cannot find Android Version", err)
         return None
 
-    def get_device_name(self):
+    def __get_device_name(self):
         ''' Gets name of connected device.
 
             Params:
@@ -377,7 +383,7 @@ class Device:
 
 
         '''
-        cmd = ('adb','-t', self.transport_id, 'shell', 'getprop', "ro.product.board")
+        cmd = ('adb','-t', self.__transport_id, 'shell', 'getprop', "ro.product.board")
         try:
             res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
             return res
@@ -385,11 +391,11 @@ class Device:
             print("Cannot find device name", err)
         return None
 
-    def get_display_size(self):
+    def __get_display_size(self):
         ''' Determines the devices current display size.
                 adb shell wm size
         '''
-        cmd = ('adb','-t', self.transport_id, 'shell', 'wm', "size")
+        cmd = ('adb','-t', self.__transport_id, 'shell', 'wm', "size")
         try:
             res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
             size_str = res.split(": ")[1]  # Extract the string after the colon
@@ -399,6 +405,16 @@ class Device:
             print("Cannot find display size", err)
         return None
 
+    def __get_arc_build(self):
+        cmd = ('adb','-t', self.__transport_id, 'shell', 'getprop', "ro.build.display.id")
+        try:
+            res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
+            return res
+        except Exception as err:
+            print("Cannot find display size", err)
+        return None
+
+        pass
 
     def info(self):
         return {**self.__device_info}
@@ -423,9 +439,8 @@ def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: An
         "appium:uiautomator2ServerInstallTimeout": 60000
     }
 
-def stop_appium_server(service: AppiumService):
+def stop_appium_server():
     ''' Stops the Appium Server running on port 4723'''
-    service.stop()
     cmd = ["kill", "$(lsof -t -i :4723)"]
     res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
 
@@ -497,7 +512,6 @@ def dumpysys_activity(transport_id: str, ArcVersion: ArcVersions) -> str:
     except Exception as err:
             print("Err dumpysys_activity ", err)
     return ''
-
 
 def get_cur_activty(transport_id: str, ArcVersion: ArcVersions, package_name: str) -> Dict:
     ''' Gets the current activity running in the foreground.
@@ -594,18 +608,23 @@ def open_app(package_name: str, transport_id: int, ArcVersion: ArcVersions = Arc
 def close_app(package_name: str, transport_id: int):
     '''
         Opens an app using ADB monkey.
+        adb shell am broadcast -a android.intent.action.ACTION_SHUTDOWN
 
         Params:
             package_name: The name of the package to check crash logs for.
             transport_id: The transport id of the connected android device.
     '''
     try:
-        cmd = ('adb', '-t', transport_id, 'shell', 'am', 'force-stop', package_name)
+        cmd = None
+        if package_name == FACEBOOK_PACKAGE_NAME:
+            cmd = ('adb', '-t', transport_id, 'shell', 'am', 'broadcast', "-a", "android.intent.action.ACTION_SHUTDOWN")
+        else:
+            cmd = ('adb', '-t', transport_id, 'shell', 'am', 'force-stop', package_name)
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
                                 capture_output=True).stdout.strip()
         print(f"Closed {package_name}...")
     except Exception as err:
-        print("Error closing app with monkey", err)
+        print("Error closing app ", err)
         return False
     return True
 
@@ -626,9 +645,15 @@ def is_download_in_progress(transport_id: str, package_name: str):
         Good for waiting for games to downlaod extra content.
     '''
     try:
-        command = f'adb -t {transport_id} shell dumpsys activity services | grep com.google.android.finsky.assetmoduleservice.AssetModuleService:{package_name}'
-        output = subprocess.check_output(command, shell=True).decode('utf-8')
-        return bool(output.strip())
+        # command = f'adb -t {transport_id} shell dumpsys activity services | grep com.google.android.finsky.assetmoduleservice.AssetModuleService:{package_name}'
+        # output = subprocess.check_output(command, shell=True).decode('utf-8')
+
+        result = subprocess.run(
+            ['adb', '-t', transport_id, 'shell', 'dumpsys', 'activity', 'services', "|", "grep", f"com.google.android.finsky.assetmoduleservice.AssetModuleService:{package_name}"],
+            check=False, encoding='utf-8', capture_output=True
+        ).stdout.strip()
+        print(f"is_download_in_progress {result=}")
+        return bool(result)
     except Exception as error:
         print("Error w/ checking download in progress")
         print(error)
@@ -659,26 +684,6 @@ class ErrorDetector:
     def update_arc_version(self, ArcVersion: ArcVersions):
         self.__ArcVersion = ArcVersion
 
-    ''' TODO Add check for F DEBUG LOGS => 03-01 15:50:25.856 22026 22026 F DEBUG   : pid: 21086, tid: 21241, name: UnityMain  >>> zombie.survival.craft.z <<<
-    03-01 15:50:25.855 22026 22026 F DEBUG   : *** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***
-    03-01 15:50:25.855 22026 22026 F DEBUG   : Build fingerprint: 'google/hatch/hatch_cheets:11/R112-15357.0.0/9629516:user/release-keys'
-    03-01 15:50:25.855 22026 22026 F DEBUG   : Revision: '0'
-    03-01 15:50:25.855 22026 22026 F DEBUG   : ABI: 'x86_64'
-    03-01 15:50:25.856 22026 22026 F DEBUG   : Timestamp: 2023-03-01 15:50:25-0800
-    03-01 15:50:25.856 22026 22026 F DEBUG   : pid: 21086, tid: 21241, name: UnityMain  >>> zombie.survival.craft.z <<<
-    03-01 15:50:25.856 22026 22026 F DEBUG   : uid: 10194
-    03-01 15:50:25.856 22026 22026 F DEBUG   : signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x133
-    03-01 15:50:25.856 22026 22026 F DEBUG   : Cause: null pointer dereference
-    03-01 15:50:25.856 22026 22026 F DEBUG   :     rax 0000000085f94600  rbx 000000000df6aca9  rcx 000071850ab02dc0  rdx 0000000000000000
-    03-01 15:50:25.856 22026 22026 F DEBUG   :     r8  0000718526483360  r9  000071850ab02dc0  r10 0000718526483060  r11 00007185264830f0
-    03-01 15:50:25.856 22026 22026 F DEBUG   :     r12 0000000000000000  r13 00007184393076c0  r14 00007184375221e0  r15 0000000000000000
-    03-01 15:50:25.856 22026 22026 F DEBUG   :     rdi 0000718428d363c0  rsi 000071843c108280
-    03-01 15:50:25.856 22026 22026 F DEBUG   :     rbp 000071852efb3000  rsp 0000718526483340  rip 000000000e038131
-    03-01 15:50:25.916 22026 22026 F DEBUG   : backtrace:
-    03-01 15:50:25.916 22026 22026 F DEBUG   :       #00 pc 0000000000bd8131  [anon:Mem_0x20000000]
-
-
-    '''
     def __get_logs(self, start_time: str):
         '''Grabs logs from ADB logcat starting at a specified time.
 
@@ -708,11 +713,11 @@ class ErrorDetector:
         win_death_pattern = re.compile(win_death, re.MULTILINE)
         match = win_death_pattern.search(self.__logs)
         if match:
-            # print("match ", match.group(0))
+            print(f"{match.group(0)=}")
             failed_activity = match.group(0).split("/")[-1][:-1]
             # print("failed act: ", failed_activity)
-            return failed_activity
-        return ""
+            return failed_activity, match.group(0)
+        return "", ""
 
     def __check_force_remove_record(self):
         ''' Searches logs for Force remove ActivtyRecord.
@@ -729,11 +734,30 @@ class ErrorDetector:
 
 
         if match:
-            print("match ", match.group(0))
+            print(f"{match.group(0)=}")
             failed_activity = match.group(0).split("/")[-1][:-1].split(" ")[0]
             print("failed act: ", failed_activity)
-            return failed_activity
-        return ""
+            return failed_activity, match.group(0)
+        return "", ""
+
+    def __check_f_debug_crash(self):
+        ''' Searches logs for F DEBUG crash logs.
+
+            03-03 14:36:13.060 19417 19417 F DEBUG   : pid: 19381, tid: 19381, name: lay.KingsCastle  >>> com.PepiPlay.KingsCastle <<<
+            alskdnlaksndlkasndklasnd
+            03-01 15:50:25.856 22026 22026 F DEBUG   : pid: 21086, tid: 21241, name: UnityMain  >>> zombie.survival.craft.z <<<
+            alskdnlaksndlkasndklasnd
+            [.\s]*F DEBUG[.\s]*>>> zombie.survival.craft.z <<<
+            Returns:
+                A string representing the failing activity otherwise it returns an empty string.
+        '''
+        force_removed = rf"[a-zA-Z0-9\s\-\:.,]*F DEBUG[a-zA-Z0-9\s\-\:.,]*>>> {self.__package_name} <<<"
+        force_removed_pattern = re.compile(force_removed, re.MULTILINE)
+        match = force_removed_pattern.search(self.__logs)
+
+        if match:
+            return '', match.group(0)
+        return "", ""
 
     def __check_for_ANR(self) -> bool:
         ''' Checks dumpsys for ANR.
@@ -741,7 +765,7 @@ class ErrorDetector:
         dumpsys_act_text = dumpysys_activity(self.__transport_id, self.__ArcVersion)
         return is_ANR(dumpsys_act_text, self.__package_name)
 
-    def check_crash(self):
+    def check_crash(self)-> Tuple:
         ''' Grabs logcat logs starting at a specified time and check for crash logs.
 
             Params:
@@ -756,18 +780,22 @@ class ErrorDetector:
         '''
         self.__get_logs(self.__start_time)
 
-        failed_act: str = self.__check_for_win_death()
+        failed_act, match = self.__check_for_win_death()
         if failed_act:
-            return (CrashType.WIN_DEATH, failed_act)
+            return (CrashType.WIN_DEATH, failed_act, match)
 
-        failed_act: str = self.__check_force_remove_record()
+        failed_act, match = self.__check_force_remove_record()
         if failed_act:
-            return (CrashType.WIN_DEATH, failed_act)
+            return (CrashType.WIN_DEATH, failed_act, match)
+
+        failed_act, match = self.__check_f_debug_crash()
+        if match:
+            return (CrashType.FDEBUG_CRASH, failed_act, match)
 
         if self.__check_for_ANR():
-            return (CrashType.ANR, "ANR detected.")
+            return (CrashType.ANR, "unknown activity", "ANR detected.")
 
-        return (CrashType.SUCCESS, "")
+        return (CrashType.SUCCESS, "", "")
 
     def __get_start_time(self, ):
         '''
@@ -901,6 +929,7 @@ PACKAGE_NAMES = [
     # [ "Twitter", "com.twitter.android"],
     # [ "Rocket League Sideswipe", "com.Psyonix.RL2D"],
     # ['Apk Analyzer', 'sk.styk.martin.apkanalyzer'],
+    [FACEBOOK_APP_NAME, FACEBOOK_PACKAGE_NAME],
     ['Roblox', 'com.roblox.client'],
     # ['Showmax', 'com.showmax.app'],  # NA in region
     # ['Epic Seven', 'com.stove.epic7.google'], #  Failed send keys
@@ -1064,7 +1093,7 @@ PACKAGE_NAMES = [
     ['SALTO, TV & streaming illimités dans une seule app', 'fr.salto.app'],
     ['Catwalk Beauty', 'com.catwalk.fashion.star'],
     ['Mahjong Solitaire', 'com.mobilityware.MahjongSolitaire'],
-    ['Pepi Tales: Kings Castle', 'com.PepiPlay.KingsCastle'], # Some weird issue happened...
+    ['Pepi Wonder World: Magic Isle!', 'com.PepiPlay.KingsCastle'], # Some weird issue happened...
     ['Spider Solitaire', 'com.cardgame.spider.fishdom'],
     ['Relax Jigsaw Puzzles', 'com.openmygame.games.android.jigsawpuzzle'],
     ['L.O.L. Surprise! Disco House', 'com.tutotoons.app.lolsurprisediscohouse'],

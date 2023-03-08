@@ -1,5 +1,6 @@
 import __main__
 import collections
+from copy import deepcopy
 import os
 import re
 import cv2
@@ -21,7 +22,7 @@ from typing import Dict, List
 
 from objdetector.objdetector import ObjDetector
 from utils.utils import (
-    ACCOUNTS, ADB_KEYCODE_DEL, DEVICES, SIGN_IN, AppInfo, ArcVersions, CONTINUE, CrashType, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
+    ACCOUNTS, ADB_KEYCODE_DEL, DEVICES, FACEBOOK_APP_NAME, FACEBOOK_PACKAGE_NAME, SIGN_IN, AppInfo, ArcVersions, CONTINUE, CrashType, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
     PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, Device, ErrorDetector, check_amace,
     close_app, create_dir_if_not_exists, get_cur_activty, get_root_path,
      is_download_in_progress, open_app, save_resized_image, transform_coord_from_resized)
@@ -167,7 +168,9 @@ class ValidationReport:
             print(f"{status_obj['name']} ", end="")
             print(ValidationReport.RESET, end="")
 
-            print(f"{package_name} status: ", end="")
+            print(ValidationReport.Cyan, end="")
+            print(f"{package_name} ", end="")
+            print(ValidationReport.RESET, end="")
 
             print(status_color, end="")
             print("PASSED" if is_good else "FAILED", end="")
@@ -192,6 +195,9 @@ class ValidationReport:
     def print(self):
         ''' Prints 'self' report.'''
         ValidationReport.print_report(self.report)
+
+    def merge(self, oreport: 'ValidationReport'):
+        self.report.update(deepcopy(oreport.report))
 
 
 class AppValidator:
@@ -298,12 +304,16 @@ class AppValidator:
         self.dprint(f'Found package name: "{matches[0]}"')
         return True
 
-    def uninstall_app(self, package_name: str):
+    def uninstall_app(self, package_name: str, force_rm: bool= False):
         '''
             Uninstalls app and waits 40 seconds or so while checking if app is still installed.
             Returns True once app is fianlly unisntalled.
             Returns False if it takes too long to unisntall or some other unexpected error.
         '''
+        if  package_name in [FACEBOOK_PACKAGE_NAME, PLAYSTORE_PACKAGE_NAME] and not force_rm:
+            print(f"Not uninstalling {package_name}")
+            return False
+
         uninstalled = False
         try:
             cmd = ( 'adb', '-t', self.transport_id, 'uninstall', package_name)
@@ -325,9 +335,9 @@ class AppValidator:
                 self.dprint("Error checking is installed after uninstall: ", package_name, e)
 
     def uninstall_multiple(self):
-        for name in [pack_info[1] for pack_info in self.package_names]:
-            self.uninstall_app(name)
-
+        for app_info in self.package_names:
+            package_name = app_info[1]
+            self.uninstall_app(package_name)
 
     ##  Http Get
     def check_playstore_invalid(self, package_name) -> bool:
@@ -496,7 +506,7 @@ class AppValidator:
         '''
         try:
             num = len(self.report.report[package_name]['history'])
-            path = f"{get_root_path()}/images/history/{self.ip}"
+            path = f"{get_root_path()}/images/history/{self.ip}/{package_name}"
             create_dir_if_not_exists(path)
             full_path = f"{path}/{num}.png"
             self.driver.get_screenshot_as_file(full_path)
@@ -565,7 +575,6 @@ class AppValidator:
         self.driver.orientation = 'PORTRAIT'
 
 
-    ## Login w/ YOLO Model
     def sleep_while_in_progress(self, app_package_name: str):
         ''' Sleeps while in download is in progress.
 
@@ -605,7 +614,7 @@ class AppValidator:
         CONTINUE_SUBMITTED = False
         tapped = False
         total_actions = 0
-        while actions < 4 and not CONTINUE_SUBMITTED and total_actions < 6:
+        while actions < 4 and not CONTINUE_SUBMITTED and total_actions < 4:
 
 
             if CONTINUE_SUBMITTED and login_entered and password_entered:
@@ -636,6 +645,8 @@ class AppValidator:
                     # self.send_keys_ADB("testminnie000", False)
                     self.send_keys_ADB(login_val, False, False)
                     print(f"Send Login - {login_val}        <-------")
+                else:
+                    print(f"Login info not created for {app_package_name}")
 
                 actions += 1
                 login_entered = True
@@ -649,6 +660,8 @@ class AppValidator:
                     self.send_keys_ADB(pass_val, False, False)
                     print(f"Send Password - {pass_val}       <-------")
                     password_entered = True
+                else:
+                    print(f"Password info not created for {app_package_name}")
                 actions += 1
                 sleep(3)
                 if self.is_new_activity():
@@ -683,13 +696,17 @@ class AppValidator:
         return False, login_entered, password_entered
 
     def attempt_login(self, app_title: str, app_package_name: str, is_game: bool):
+        fb_login_continue_after_login = app_package_name == FACEBOOK_PACKAGE_NAME
+        print(f"{fb_login_continue_after_login=}")
+
         login_attemps = 0
         logged_in = False
         login_entered = False
         password_entered = False
-        while not logged_in and login_attemps < 4:
-            CrashType, crashed_act = self.err_detector.check_crash()
+        while not logged_in and login_attemps < 6:
+            CrashType, crashed_act, msg = self.err_detector.check_crash()
             if(not CrashType == CrashType.SUCCESS):
+                self.update_report_history(app_package_name, f"{CrashType.value}: {crashed_act} - {msg}")
                 self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
                 break
 
@@ -701,8 +718,15 @@ class AppValidator:
                 logged_in, login_entered, password_entered = res
                 print(f"\n\n After attempt login: ")
                 print(f"{logged_in=}, {login_entered=}, {password_entered=} \n\n")
-                if logged_in:
+
+                if logged_in and not fb_login_continue_after_login:
                     break
+                elif logged_in and fb_login_continue_after_login:
+                    print("Logged in to FB! Reattempting for save info continue...")
+                    res = self.handle_login(login_entered,
+                                        password_entered,
+                                        is_game,
+                                        app_package_name)
                 login_attemps += 1
 
             except ANRThrownException as error_obj:
@@ -713,19 +737,20 @@ class AppValidator:
 
 
         # Check for crash once more after login attempts.
-        CrashType, crashed_act = self.err_detector.check_crash()
+        CrashType, crashed_act, msg = self.err_detector.check_crash()
         if(not CrashType == CrashType.SUCCESS):
-            self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
+            self.update_report_history(app_package_name, f"{CrashType.value}: {crashed_act} - {msg}")
+            self.update_report_history(app_package_name, msg)
             return False
 
         if not logged_in:
-            self.report.update_status(app_package_name, ValidationReport.FAIL, 'Failed to log in')
-            self.update_report_history(app_package_name, "Failed to log in.")
+            self.report.update_status(app_package_name, ValidationReport.PASS, 'Not logged in.')
+            self.update_report_history(app_package_name, "Not logged in.")
             return False
         else:
             # For now, if app opens without error, we'll report successful
-            self.report.update_status(app_package_name, ValidationReport.PASS, 'Logged in (sorta)')
-            self.update_report_history(app_package_name, "Logged in (sorta).")
+            self.report.update_status(app_package_name, ValidationReport.PASS, 'Logged in.')
+            self.update_report_history(app_package_name, "Logged in.")
         return True
 
 
@@ -820,9 +845,10 @@ class AppValidator:
         # 01-05 22:08:57.546   129   820 I WindowManager: WIN DEATH: Window{afca274 u0 com.android.vending/com.google.android.finsky.activities.MainActivity}
         cur_package = self.err_detector.get_package_name()
         self.err_detector.update_package_name(PLAYSTORE_PACKAGE_NAME)
-        CrashType, crashed_act = self.err_detector.check_crash()
+        CrashType, crashed_act, msg = self.err_detector.check_crash()
         self.err_detector.update_package_name(cur_package)  # switch back to package
         if(not CrashType == CrashType.SUCCESS):
+            # TODO() Determine what to do when this scenario happens.
             self.dprint("PlayStore crashed ", CrashType.value)
             # self.driver.reset()  # Reopen app
             raise Exception("PLAYSTORECRASH")
@@ -853,9 +879,9 @@ class AppValidator:
         '''
         title_first = title.split(" ")[0]
         descs = [
-            f'''new UiSelector().descriptionMatches(\".*{title_first}.*\");''', # Pixel 2
-            f'''new UiSelector().descriptionMatches(\"App: {title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");''',  # Chromebooks
-            f'''new UiSelector().descriptionMatches(\"{title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");''',
+            f'''new UiSelector().descriptionMatches(\".*(?i){title_first}.*\");''', # Pixel 2
+            f'''new UiSelector().descriptionMatches(\"App: (?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");''',  # Chromebooks
+            f'''new UiSelector().descriptionMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");''',
         ]
         app_icon = None
         for content_desc in descs:
@@ -1050,12 +1076,9 @@ class AppValidator:
 
                 if not installed and not error is None:
                     self.report.update_status(app_package_name, ValidationReport.FAIL, error)
+                    self.update_report_history(app_package_name, "Failed to install app.")
                     self.cleanup_run(app_package_name)
                     continue
-
-
-
-
 
                 if not open_app(app_package_name, self.transport_id, self.arc_version):
                     reason = ''
@@ -1074,22 +1097,21 @@ class AppValidator:
 
                 self.dprint("Waiting for app to start/ load...")
                 sleep(5) # ANR Period
-                CrashType, crashed_act = self.err_detector.check_crash()
+                CrashType, crashed_act, msg = self.err_detector.check_crash()
                 if(not CrashType == CrashType.SUCCESS):
                     self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
+                    self.update_report_history(app_package_name, f"{CrashType.value}: {crashed_act} - {msg}")
                     self.cleanup_run(app_package_name)
                     continue
 
                 self.update_report_history(app_package_name, "App launch successful.")
-                self.dev_SS_loop()
+                # self.dev_SS_loop()
 
                 info = AppInfo(self.transport_id, app_package_name).gather_app_info()
                 print(f"App {info=}")
-                # if not info['is_pwa']:
-                #     logged_in = self.attempt_login(app_title, app_package_name, info['is_game'])
-                #     print(f"Attempt loging: {logged_in=}")
-
-
+                if info and not info['is_pwa']:
+                    logged_in = self.attempt_login(app_title, app_package_name, info['is_game'])
+                    print(f"Attempt loging: {logged_in=}")
 
                 self.cleanup_run(app_package_name)
             except Exception as error:
@@ -1098,7 +1120,27 @@ class AppValidator:
                     self.dprint("restart this attemp!")
 
 
+class FacebookApp:
+    ''' Specific instance of AppValidator to install and login to facebook for
+        further auth.
 
+        This will be ran before the main valdiation process.
+    '''
+    def __init__(self, driver: webdriver.Remote,  device: Device, weights: str):
+        self.app_name = FACEBOOK_APP_NAME
+        self.package_name = FACEBOOK_PACKAGE_NAME
+        self.validator = AppValidator(
+            driver,
+            [[self.app_name, self.package_name],],
+            device,
+            weights
+        )
+
+    def install_and_login(self):
+        ''' Runs app valdiator to install, launch and login to Facebook.
+        '''
+        self.validator.uninstall_app(self.package_name, force_rm=True)
+        self.validator.run()
 
 if __name__ == "__main__":
     pass

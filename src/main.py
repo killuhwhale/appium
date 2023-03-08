@@ -2,9 +2,9 @@ from time import sleep
 from appium import webdriver
 import sys
 
-from playstore.playstore import AppValidator
+from playstore.playstore import AppValidator, FacebookApp
 from utils.parallel import MultiprocessTaskRunner
-from utils.utils import (PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME,
+from utils.utils import (FACEBOOK_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME,
     TOP_500_APPS, Device, android_des_caps, dev_scrape_start_at_app,
     lazy_start_appium_server, stop_appium_server)
 
@@ -53,6 +53,7 @@ if __name__ == "__main__":
     ip = '192.168.1.238:5555' # ARC-R Helios,
     # ip = '192.168.1.113:5555' # ARC-P CoachZ
 
+    stop_appium_server()
     service = lazy_start_appium_server()
     device = Device(ip)
 
@@ -69,6 +70,9 @@ if __name__ == "__main__":
     driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
     sleep(3)  # Wait for playstore to load, there is an animation that delays the text from showing immediately which cause the search to fail (on first launch i think...)
 
+    fb_handle = FacebookApp(driver, device, weights)
+    fb_handle.install_and_login()
+
     starting_app = "com.mobilityware.CastleSolitaire"
 
     start_idx = dev_scrape_start_at_app(starting_app, TOP_500_APPS)
@@ -76,12 +80,13 @@ if __name__ == "__main__":
 
     validator = AppValidator(
         driver,
-        TOP_500_APPS[start_idx: start_idx + 25],
+        TOP_500_APPS[start_idx: start_idx + 1],
         device,
         weights
         )
     validator.uninstall_multiple()
     validator.run()
+    validator.report.merge(fb_handle.validator.report)
     validator.report.print()
     driver.quit()
 
@@ -92,5 +97,6 @@ if __name__ == "__main__":
 
 
     print("Stopping App server")
-    stop_appium_server(service)
+    service.stop()
+
 
