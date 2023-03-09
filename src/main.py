@@ -15,6 +15,7 @@ weights = 'notebooks/yolov5/runs/train/exp007/weights/best_309.pt'
 weights = 'notebooks/yolov5/runs/train/exp4/weights/best.pt'  # Lastest RoboFlow Model V1
 weights = 'notebooks/yolov5/runs/train/exp6/weights/best.pt'  # Lastest RoboFlow Model V2
 weights = 'notebooks/yolov5/runs/train/exp7/weights/best.pt'  # Lastest RoboFlow Model V3
+weights = 'notebooks/yolov5/runs/train/exp8/weights/best.pt'  # Lastest RoboFlow Model V4
 
 if __name__ == "__main__":
     ips = sys.argv[1:]
@@ -73,7 +74,8 @@ if __name__ == "__main__":
     # fb_handle = FacebookApp(driver, device, weights)
     # fb_handle.install_and_login()
 
-    starting_app = "com.mobilityware.CastleSolitaire"
+    starting_app = "jp.co.yahoo.gyao.android.app"
+    starting_app = "com.roblox.client"
 
     start_idx = dev_scrape_start_at_app(starting_app, TOP_500_APPS)
     print(f"{start_idx=} ~ {starting_app=}")

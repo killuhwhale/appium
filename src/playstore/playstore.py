@@ -22,9 +22,9 @@ from typing import Dict, List
 
 from objdetector.objdetector import ObjDetector
 from utils.utils import (
-    ACCOUNTS, ADB_KEYCODE_DEL, DEVICES, FACEBOOK_APP_NAME, FACEBOOK_PACKAGE_NAME, SIGN_IN, AppInfo, ArcVersions, CONTINUE, CrashType, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
+    ACCOUNTS, ADB_KEYCODE_DEL, DEVICES, FACEBOOK_APP_NAME, FACEBOOK_PACKAGE_NAME, SIGN_IN, AppInfo, ArcVersions, CONTINUE, BuildChannels, CrashTypes, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
     PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, Device, ErrorDetector, check_amace,
-    close_app, create_dir_if_not_exists, get_cur_activty, get_root_path,
+    close_app, create_dir_if_not_exists, get_cur_activty, get_root_path, get_views,
      is_download_in_progress, open_app, save_resized_image, transform_coord_from_resized)
 
 class ANRThrownException(Exception):
@@ -218,11 +218,11 @@ class AppValidator:
         self.driver = driver
         self.device = device.info()
         print(f"{self.device=}")
-        self.ip = self.device['ip']
-        self.transport_id = self.device['transport_id']
-        self.arc_version = self.device['arc_version']
-        self.is_emu = self.device['is_emu']
-        self.device_name = self.device['device_name']
+        self.ip = self.device.ip
+        self.transport_id = self.device.transport_id
+        self.arc_version = self.device.arc_version
+        self.is_emu = self.device.is_emu
+        self.device_name = self.device.device_name
         self.package_names = package_names  # List of packages to test as [app_title, app_package_name]
         self.current_package = None
         self.err_detector = ErrorDetector(self.transport_id, self.arc_version)
@@ -468,34 +468,6 @@ class AppValidator:
         self.dprint("Error taking SS: ", root_path)
         return False
 
-    def get_error_ss(self, err_name: str) -> bool:
-        '''
-            Attempts to get SS of device when an error occures and saves to
-                a given location.
-        '''
-        # Removes first empty index and 'main.py' from "/path/to/src/main.py"
-        #    ['', 'path', 'to', 'src', 'main.py']
-        # root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
-        # root_path = '/'.join(root_path)
-        root_path = get_root_path()
-        path = f"{root_path}/images/errors/{self.ID}"
-        #Create dir
-        if not os.path.exists(path):
-            os.makedirs(path)
-
-        self.dprint("\n\n Saving SS to : ", path,"\n\n")
-
-        try:
-            self.driver.get_screenshot_as_file(f"{path}/{err_name}.png")
-            return True
-        except ScreenshotException as e:
-            self.dprint("App is scured! No error SS taken")
-        except Exception as e:
-            self.dprint("Error taking SS: ", e)
-
-        self.dprint("Error taking SS: ", root_path)
-        return False
-
     def scrape_dev_test_image(self):
         try:
             self.driver.get_screenshot_as_file(
@@ -732,9 +704,9 @@ class AppValidator:
         password_entered = False
         while not logged_in and login_attemps < 6:
             CrashType, crashed_act, msg = self.err_detector.check_crash()
-            if(not CrashType == CrashType.SUCCESS):
-                self.update_report_history(app_package_name, f"{CrashType.value}: {crashed_act} - {msg}")
-                self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
+            if(not CrashType == CrashTypes.SUCCESS):
+                self.update_report_history(app_package_name, f"{CrashTypes.value}: {crashed_act} - {msg}")
+                self.report.update_status(app_package_name, ValidationReport.FAIL, CrashTypes.value)
                 break
 
             try:
@@ -759,14 +731,14 @@ class AppValidator:
             except ANRThrownException as error_obj:
                 if error_obj['ANR_for_package'] == app_package_name:
                     self.update_report_history(app_package_name, "ANR thrown.")
-                    self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
+                    self.report.update_status(app_package_name, ValidationReport.FAIL, CrashTypes.value)
                     return False
 
 
         # Check for crash once more after login attempts.
         CrashType, crashed_act, msg = self.err_detector.check_crash()
-        if(not CrashType == CrashType.SUCCESS):
-            self.update_report_history(app_package_name, f"{CrashType.value}: {crashed_act} - {msg}")
+        if(not CrashType == CrashTypes.SUCCESS):
+            self.update_report_history(app_package_name, f"{CrashTypes.value}: {crashed_act} - {msg}")
             self.update_report_history(app_package_name, msg)
             return False
 
@@ -874,9 +846,9 @@ class AppValidator:
         self.err_detector.update_package_name(PLAYSTORE_PACKAGE_NAME)
         CrashType, crashed_act, msg = self.err_detector.check_crash()
         self.err_detector.update_package_name(cur_package)  # switch back to package
-        if(not CrashType == CrashType.SUCCESS):
+        if(not CrashType == CrashTypes.SUCCESS):
             # TODO() Determine what to do when this scenario happens.
-            self.dprint("PlayStore crashed ", CrashType.value)
+            self.dprint("PlayStore crashed ", CrashTypes.value)
             # self.driver.reset()  # Reopen app
             raise Exception("PLAYSTORECRASH")
 
@@ -970,7 +942,8 @@ class AppValidator:
                 bounds = self.extract_bounds(
                     install_BTN.get_attribute("bounds"))
                 self.click_unknown_install_btn(bounds)
-            elif not self.device_name == DEVICES.HELIOS.value:
+            elif self.device.channel == BuildChannels.STABLE:
+                # elif not self.device_name == DEVICES.HELIOS.value:
                 # ARC_P CoachZ -> find_element(by=AppiumBy.ACCESSIBILITY_ID, value="Install")
                 print(f"Looking at ACCESSIBILITY_ID, value=Install")
                 install_BTN = self.driver.find_element(
@@ -978,6 +951,7 @@ class AppValidator:
                 install_BTN.click()
             else:
                 # For some reason Helios acts weirdly and not the same as EVE which is also ARC-R...
+                # i think if its not on stable channel this works....
                 # ARC_R Helios -> driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value='''new UiSelector().className("android.widget.View").text("Install")''')
                 content_desc = f'''
                     new UiSelector().className("android.widget.Button").text("Install")
@@ -1056,7 +1030,6 @@ class AppValidator:
             self.check_playstore_crash()
             # input("Step 3, press install")
             self.update_report_history(install_package_name, "App discovery and installation process successful.")
-
             self.driver.back()  # back to seach results
             self.driver.back()  # back to home page
         except Exception as e:
@@ -1065,10 +1038,10 @@ class AppValidator:
             if error is None:
                 return [True, None]
             elif error == "PLAYSTORECRASH":
-                raise error
+                raise Exception(error)
             else:
-
-                self.get_error_ss(f"{title}_{self.steps[last_step].replace(' ','_')}")
+                self.update_report_history(install_package_name, f"Discovery/ install failure: {self.steps[last_step]}")
+                input("WAiting...")
                 # Debug
                 self.dprint("\n\n",
                     title,
@@ -1136,9 +1109,9 @@ class AppValidator:
                 self.dprint("Waiting for app to start/ load...")
                 sleep(5) # ANR Period
                 CrashType, crashed_act, msg = self.err_detector.check_crash()
-                if(not CrashType == CrashType.SUCCESS):
-                    self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
-                    self.update_report_history(app_package_name, f"{CrashType.value}: {crashed_act} - {msg}")
+                if(not CrashType == CrashTypes.SUCCESS):
+                    self.report.update_status(app_package_name, ValidationReport.FAIL, CrashTypes.value)
+                    self.update_report_history(app_package_name, f"{CrashTypes.value}: {crashed_act} - {msg}")
                     self.cleanup_run(app_package_name)
                     continue
 

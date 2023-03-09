@@ -49,7 +49,30 @@ class ArcVersions(Enum):
     ARC_P = 1
     ARC_R = 2
 
-class CrashType(Enum):
+class BuildChannels(Enum):
+    '''
+        Enumeration for each build channel on for ChromeOS.
+    '''
+    STABLE = 'stable'
+    BETA = 'beta'
+    DEV = 'dev'
+    CANARY = 'canary'
+    NOT_CHROMEOS = 'Android device is not running on ChromeOS'
+
+    @staticmethod
+    def get_channel(channel: str) -> 'BuildChannels':
+        if channel == BuildChannels.STABLE.value:
+            return BuildChannels.STABLE
+        elif channel == BuildChannels.BETA.value:
+            return BuildChannels.BETA
+        elif channel == BuildChannels.DEV.value:
+            return BuildChannels.DEV
+        elif channel == BuildChannels.CANARY.value:
+            return BuildChannels.CANARY
+        else:
+            return BuildChannels.NOT_CHROMEOS
+
+class CrashTypes(Enum):
     '''
         Enumeration for the result when checking if a program crashed.
     '''
@@ -57,7 +80,7 @@ class CrashType(Enum):
     WIN_DEATH = "Win Death"
     FORCE_RM_ACT_RECORD = "Force removed ActivityRecord"
     ANR = "App not responding"
-    FDEBUG_CRASH = "F DBUG crash"
+    FDEBUG_CRASH = "F DEBUG crash"
 
 class DEVICES(Enum):
     '''
@@ -260,19 +283,35 @@ class AppInfo:
             return app_info
         return None
 
+
+
+
 class Device:
+
+    class __DeviceInfo:
+        def __init__(self, info):
+            self.ip = info['ip']
+            self.transport_id = info['transport_id']
+            self.is_emu = info['is_emu']
+            self.arc_version = info['arc_version']
+            self.device_name = info['device_name']
+            self.channel = info['channel']
+            self.wxh = info['wxh']
+            self.arc_build = info['arc_build']
+
     def __init__(self, ip: str):
         self.__is_connected = self.__adb_connect(ip)
         self.__transport_id = self.__find_transport_id(ip)
-        self.__device_info = {
+        self.__device_info = self.__DeviceInfo({
             'ip': ip,
             'transport_id': self.__transport_id,
             'is_emu': self.__is_emulator(),
             'arc_version': self.__get_arc_version(),
             'device_name': self.__get_device_name(),
+            'channel': self.__get_device_build_channel(),
             'wxh': self.__get_display_size(),
-            'arc_build': self.__get_arc_build()
-        }
+            'arc_build': self.__get_arc_build(),
+        })
         print(self.__device_info)
 
     def is_connected(self):
@@ -328,7 +367,6 @@ class Device:
         # If the IP address was not found, return None
         return '-1'
 
-
     def __is_emulator(self):
         ''' Checks if device is an emulator.
 
@@ -374,9 +412,6 @@ class Device:
     def __get_device_name(self):
         ''' Gets name of connected device.
 
-            Params:
-                self.transport_id: The transport id of the connected android device.
-
             Returns:
                 An ENUM representing the Android Version [P, R] else None if
                     release if not found from ADB getprop.
@@ -387,6 +422,22 @@ class Device:
         try:
             res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
             return res
+        except Exception as err:
+            print("Cannot find device name", err)
+        return None
+
+    def __get_device_build_channel(self):
+        ''' Gets build channel of connected device.
+
+            Returns:
+                An ENUM representing the Build Channel.
+
+
+        '''
+        cmd = ('adb','-t', self.__transport_id, 'shell', 'getprop', "ro.boot.chromeos_channel")
+        try:
+            res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
+            return BuildChannels.get_channel(res)
         except Exception as err:
             print("Cannot find device name", err)
         return None
@@ -417,7 +468,156 @@ class Device:
         pass
 
     def info(self):
-        return {**self.__device_info}
+        return self.__device_info
+
+class ErrorDetector:
+    ''' Detects crashes from Logcat and ANRs from Dumpsys activity.
+    '''
+    def __init__(self, transport_id: str, ArcVersion: ArcVersions):
+        self.__transport_id = transport_id
+        self.__package_name = ""
+        self.__ArcVersion = ArcVersion
+        self.__start_time = None  # Logcat logs starting at
+        self.reset_start_time()
+
+    def get_package_name(self):
+        return self.__package_name
+
+    def update_package_name(self, package_name: str):
+        self.__package_name = package_name
+
+    def update_transport_id(self, transport_id: str):
+        self.__transport_id = transport_id
+
+    def update_arc_version(self, ArcVersion: ArcVersions):
+        self.__ArcVersion = ArcVersion
+
+    def __get_logs(self, start_time: str):
+        '''Grabs logs from ADB logcat starting at a specified time.
+
+            Params:
+                start_time: The formatted string representing the time the app was
+                    launched/ started.
+                transport_id: The transport id of the connected android device.
+
+            Returns
+
+        '''
+        cmd = ('adb', '-t', self.__transport_id, 'logcat', 'time', '-t', start_time)  #
+        self.__logs =  subprocess.run(cmd, check=False, encoding='utf-8',
+            capture_output=True).stdout.strip()
+
+    def __check_for_win_death(self):
+        ''' Searches logs for WIN DEATH record.
+
+            12-28 17:48:37.233   153   235 I WindowManager: WIN DEATH: Window{913e5ce u0 com.Psyonix.RL2D/com.epicgames.ue4.GameActivity}
+
+            Returns:
+                A string representing the failing activity otherwise it returns an empty string.
+        '''
+        # adb logcat -v time -t 10:30:00
+
+        win_death = rf"\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*I WindowManager: WIN DEATH: Window{'{'}.*\s.*\s{self.__package_name}/.*{'}'}"
+        win_death_pattern = re.compile(win_death, re.MULTILINE)
+        match = win_death_pattern.search(self.__logs)
+        if match:
+            print(f"{match.group(0)=}")
+            failed_activity = match.group(0).split("/")[-1][:-1]
+            # print("failed act: ", failed_activity)
+            return failed_activity, match.group(0)
+        return "", ""
+
+    def __check_force_remove_record(self):
+        ''' Searches logs for Force remove ActivtyRecord.
+
+            12-28 17:48:37.254   153  4857 W ActivityManager: Force removing ActivityRecord{f024fcc u0 com.Psyonix.RL2D/com.epicgames.ue4.GameActivity t195}: app died, no saved state
+
+            Returns:
+                A string representing the failing activity otherwise it returns an empty string.
+        '''
+
+        force_removed = rf"^\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*W ActivityManager: Force removing ActivityRecord{'{'}.*\s.*\s{self.__package_name}/.*\s.*{'}'}: app died, no saved state$"
+        force_removed_pattern = re.compile(force_removed, re.MULTILINE)
+        match = force_removed_pattern.search(self.__logs)
+
+
+        if match:
+            print(f"{match.group(0)=}")
+            failed_activity = match.group(0).split("/")[-1][:-1].split(" ")[0]
+            print("failed act: ", failed_activity)
+            return failed_activity, match.group(0)
+        return "", ""
+
+    def __check_f_debug_crash(self):
+        ''' Searches logs for F DEBUG crash logs.
+
+            03-03 14:36:13.060 19417 19417 F DEBUG   : pid: 19381, tid: 19381, name: lay.KingsCastle  >>> com.PepiPlay.KingsCastle <<<
+            alskdnlaksndlkasndklasnd
+            03-01 15:50:25.856 22026 22026 F DEBUG   : pid: 21086, tid: 21241, name: UnityMain  >>> zombie.survival.craft.z <<<
+            alskdnlaksndlkasndklasnd
+            [.\s]*F DEBUG[.\s]*>>> zombie.survival.craft.z <<<
+            Returns:
+                A string representing the failing activity otherwise it returns an empty string.
+        '''
+        force_removed = rf"[a-zA-Z0-9\s\-\:.,]*F DEBUG[a-zA-Z0-9\s\-\:.,]*>>> {self.__package_name} <<<"
+        force_removed_pattern = re.compile(force_removed, re.MULTILINE)
+        match = force_removed_pattern.search(self.__logs)
+
+        if match:
+            return '', match.group(0)
+        return "", ""
+
+    def __check_for_ANR(self) -> bool:
+        ''' Checks dumpsys for ANR.
+        '''
+        dumpsys_act_text = dumpysys_activity(self.__transport_id, self.__ArcVersion)
+        return is_ANR(dumpsys_act_text, self.__package_name)
+
+    def check_crash(self)-> Tuple:
+        ''' Grabs logcat logs starting at a specified time and check for crash logs.
+
+            Params:
+                package_name: The name of the package to check crash logs for.
+                start_time: The formatted string representing the time the app was
+                    launched/ started.
+                transport_id: The transport id of the connected android device.
+
+            Return:
+                A string representing the failing activity otherwise it returns an empty string.
+
+        '''
+        self.__get_logs(self.__start_time)
+
+        failed_act, match = self.__check_for_win_death()
+        if failed_act:
+            return (CrashTypes.WIN_DEATH, failed_act, match)
+
+        failed_act, match = self.__check_force_remove_record()
+        if failed_act:
+            return (CrashTypes.WIN_DEATH, failed_act, match)
+
+        failed_act, match = self.__check_f_debug_crash()
+        if match:
+            return (CrashTypes.FDEBUG_CRASH, failed_act, match)
+
+        if self.__check_for_ANR():
+            return (CrashTypes.ANR, "unknown activity", "ANR detected.")
+
+        return (CrashTypes.SUCCESS, "", "")
+
+    def __get_start_time(self, ):
+        '''
+            Gets current time and formats it properly to match ADB -t arg.
+
+            This is used at the beginning of a test for an app.
+            It will limit the amount logs we will need to search each run.
+
+            Returns a string in the format "MM-DD HH:MM:SS.ms"
+        '''
+        return datetime.fromtimestamp(time()).strftime('%m-%d %H:%M:%S.%f')[:-3]
+
+    def reset_start_time(self):
+        self.__start_time = self.__get_start_time()
 
 
 ##      Appium config & stuff  ##
@@ -659,157 +859,16 @@ def is_download_in_progress(transport_id: str, package_name: str):
         print(error)
     return False
 
-
-##       Error log checks - Possibly move to its own class.. ##
-
-class ErrorDetector:
-    ''' Detects crashes from Logcat and ANRs from Dumpsys activity.
+def get_views(transport_id: str):
+    ''' Creates an XML dump of current UI hierarchy.
     '''
-    def __init__(self, transport_id: str, ArcVersion: ArcVersions):
-        self.__transport_id = transport_id
-        self.__package_name = ""
-        self.__ArcVersion = ArcVersion
-        self.__start_time = None  # Logcat logs starting at
-        self.reset_start_time()
+    #  adb exec-out uiautomator dump /dev/tty
+    result = subprocess.run(
+            ['adb', '-t', transport_id, 'exec-out', 'uiautomator', 'dump', '/dev/tty'],
+            check=False, encoding='utf-8', capture_output=True
+        ).stdout.strip()
+    print(f"Get_views {result=}")
 
-    def get_package_name(self):
-        return self.__package_name
-
-    def update_package_name(self, package_name: str):
-        self.__package_name = package_name
-
-    def update_transport_id(self, transport_id: str):
-        self.__transport_id = transport_id
-
-    def update_arc_version(self, ArcVersion: ArcVersions):
-        self.__ArcVersion = ArcVersion
-
-    def __get_logs(self, start_time: str):
-        '''Grabs logs from ADB logcat starting at a specified time.
-
-            Params:
-                start_time: The formatted string representing the time the app was
-                    launched/ started.
-                transport_id: The transport id of the connected android device.
-
-            Returns
-
-        '''
-        cmd = ('adb', '-t', self.__transport_id, 'logcat', 'time', '-t', start_time)  #
-        self.__logs =  subprocess.run(cmd, check=False, encoding='utf-8',
-            capture_output=True).stdout.strip()
-
-    def __check_for_win_death(self):
-        ''' Searches logs for WIN DEATH record.
-
-            12-28 17:48:37.233   153   235 I WindowManager: WIN DEATH: Window{913e5ce u0 com.Psyonix.RL2D/com.epicgames.ue4.GameActivity}
-
-            Returns:
-                A string representing the failing activity otherwise it returns an empty string.
-        '''
-        # adb logcat -v time -t 10:30:00
-
-        win_death = rf"\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*I WindowManager: WIN DEATH: Window{'{'}.*\s.*\s{self.__package_name}/.*{'}'}"
-        win_death_pattern = re.compile(win_death, re.MULTILINE)
-        match = win_death_pattern.search(self.__logs)
-        if match:
-            print(f"{match.group(0)=}")
-            failed_activity = match.group(0).split("/")[-1][:-1]
-            # print("failed act: ", failed_activity)
-            return failed_activity, match.group(0)
-        return "", ""
-
-    def __check_force_remove_record(self):
-        ''' Searches logs for Force remove ActivtyRecord.
-
-            12-28 17:48:37.254   153  4857 W ActivityManager: Force removing ActivityRecord{f024fcc u0 com.Psyonix.RL2D/com.epicgames.ue4.GameActivity t195}: app died, no saved state
-
-            Returns:
-                A string representing the failing activity otherwise it returns an empty string.
-        '''
-
-        force_removed = rf"^\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*W ActivityManager: Force removing ActivityRecord{'{'}.*\s.*\s{self.__package_name}/.*\s.*{'}'}: app died, no saved state$"
-        force_removed_pattern = re.compile(force_removed, re.MULTILINE)
-        match = force_removed_pattern.search(self.__logs)
-
-
-        if match:
-            print(f"{match.group(0)=}")
-            failed_activity = match.group(0).split("/")[-1][:-1].split(" ")[0]
-            print("failed act: ", failed_activity)
-            return failed_activity, match.group(0)
-        return "", ""
-
-    def __check_f_debug_crash(self):
-        ''' Searches logs for F DEBUG crash logs.
-
-            03-03 14:36:13.060 19417 19417 F DEBUG   : pid: 19381, tid: 19381, name: lay.KingsCastle  >>> com.PepiPlay.KingsCastle <<<
-            alskdnlaksndlkasndklasnd
-            03-01 15:50:25.856 22026 22026 F DEBUG   : pid: 21086, tid: 21241, name: UnityMain  >>> zombie.survival.craft.z <<<
-            alskdnlaksndlkasndklasnd
-            [.\s]*F DEBUG[.\s]*>>> zombie.survival.craft.z <<<
-            Returns:
-                A string representing the failing activity otherwise it returns an empty string.
-        '''
-        force_removed = rf"[a-zA-Z0-9\s\-\:.,]*F DEBUG[a-zA-Z0-9\s\-\:.,]*>>> {self.__package_name} <<<"
-        force_removed_pattern = re.compile(force_removed, re.MULTILINE)
-        match = force_removed_pattern.search(self.__logs)
-
-        if match:
-            return '', match.group(0)
-        return "", ""
-
-    def __check_for_ANR(self) -> bool:
-        ''' Checks dumpsys for ANR.
-        '''
-        dumpsys_act_text = dumpysys_activity(self.__transport_id, self.__ArcVersion)
-        return is_ANR(dumpsys_act_text, self.__package_name)
-
-    def check_crash(self)-> Tuple:
-        ''' Grabs logcat logs starting at a specified time and check for crash logs.
-
-            Params:
-                package_name: The name of the package to check crash logs for.
-                start_time: The formatted string representing the time the app was
-                    launched/ started.
-                transport_id: The transport id of the connected android device.
-
-            Return:
-                A string representing the failing activity otherwise it returns an empty string.
-
-        '''
-        self.__get_logs(self.__start_time)
-
-        failed_act, match = self.__check_for_win_death()
-        if failed_act:
-            return (CrashType.WIN_DEATH, failed_act, match)
-
-        failed_act, match = self.__check_force_remove_record()
-        if failed_act:
-            return (CrashType.WIN_DEATH, failed_act, match)
-
-        failed_act, match = self.__check_f_debug_crash()
-        if match:
-            return (CrashType.FDEBUG_CRASH, failed_act, match)
-
-        if self.__check_for_ANR():
-            return (CrashType.ANR, "unknown activity", "ANR detected.")
-
-        return (CrashType.SUCCESS, "", "")
-
-    def __get_start_time(self, ):
-        '''
-            Gets current time and formats it properly to match ADB -t arg.
-
-            This is used at the beginning of a test for an app.
-            It will limit the amount logs we will need to search each run.
-
-            Returns a string in the format "MM-DD HH:MM:SS.ms"
-        '''
-        return datetime.fromtimestamp(time()).strftime('%m-%d %H:%M:%S.%f')[:-3]
-
-    def reset_start_time(self):
-        self.__start_time = self.__get_start_time()
 
 
 ##                  Image utils               ##
