@@ -22,7 +22,7 @@ from typing import Dict, List
 
 from objdetector.objdetector import ObjDetector
 from utils.utils import (
-    ACCOUNTS, ADB_KEYCODE_DEL, DEVICES, FACEBOOK_APP_NAME, FACEBOOK_PACKAGE_NAME, SIGN_IN, AppInfo, ArcVersions, CONTINUE, BuildChannels, CrashTypes, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
+    ACCOUNTS, ADB_KEYCODE_DEL, DEVICES, FACEBOOK_APP_NAME, FACEBOOK_PACKAGE_NAME, SIGN_IN, WEIGHTS, AppInfo, ArcVersions, CONTINUE, BuildChannels, CrashTypes, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
     PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, Device, ErrorDetector, check_amace,
     close_app, create_dir_if_not_exists, get_cur_activty, get_root_path, get_views,
      is_download_in_progress, open_app, save_resized_image, transform_coord_from_resized)
@@ -185,6 +185,7 @@ class ValidationReport:
                 print(ValidationReport.Green if is_good else ValidationReport.RED, end="")
                 print( status_obj['reason'], end="")
                 print(ValidationReport.RESET, end="")
+                print()
 
             # Print History
             print(ValidationReport.Yellow, end="")
@@ -215,12 +216,10 @@ class AppValidator:
             driver: webdriver.Remote,
             package_names: List[List[str]],
             device: Device,
-            weights: str,
             instance_num: int= 0,
         ):
         self.driver = driver
         self.device = device.info()
-        print(f"{self.device=}")
         self.ip = self.device.ip
         self.transport_id = self.device.transport_id
         self.arc_version = self.device.arc_version
@@ -244,7 +243,7 @@ class AppValidator:
         self.cur_act = None
         # Filepath that our detector is going to lookat to detect an object from.
         self.test_img_fp = f"{self.ip}_test.png"
-        self.weights = weights
+        self.weights = WEIGHTS
         self.detector = ObjDetector(self.test_img_fp, [self.weights])
         self.ID = f"{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}-{self.ip.split(':')[0]}"
         self.__name_span_text = ''
@@ -678,7 +677,7 @@ class AppValidator:
             elif CONTINUE in results:
                 # TODO Remove the button once we click it, so we dont keep clicking the same element.
                 print("Click Continue        <-------")
-                input("Click Continue...")
+                # input("Click Continue...")
                 results[CONTINUE], tapped = self.click_button(results[CONTINUE])
                 del results[CONTINUE]
                 actions += 1
@@ -939,7 +938,6 @@ class AppValidator:
         '''
         already_installed = False  # Potentailly already isntalled
         err = False
-        print(f"{self.device_name=}, {DEVICES.HELIOS.value=}")
         try:
             # input("About to search for 1st install")
             if self.is_emu:
@@ -1002,9 +1000,8 @@ class AppValidator:
             # However, on emualtors, we can still check for the install button since it is not the same as other devices
             # If Install btn not found, PRice or Update not present, check for "Install on more devices" button, if found we are
             #   most liekly on an emulator and we can click install.
-            raise Exception(
-                f"Program installed incorrect package,\
-                    {install_package_name} was not actually installed")
+            print(f"Program may have installed an incorrect package, {install_package_name} was not actually installed")
+            raise Exception(f"{install_package_name} was not installed.")
         # We have successfully clicked an install buttin
         # 1. We wait for it to download. We will catch if its the correct package or not after installation.
         if not self.is_installed_UI():  # Waits up to 7mins to find install button.
@@ -1089,25 +1086,25 @@ class AppValidator:
 
                     reason = ""
                     if self.check_playstore_invalid(app_package_name):
-                        reason = "App package is invalid, update/ remove from list."
+                        reason = "Package is invalid and was removed from the list."
                         print(f"{reason=}")
                         self.bad_apps[app_package_name] = app_title
                     elif not app_title == self.check_playstore_name(app_package_name, app_title):
-                        reason = f"App package name {app_title} does not match the current name on the playstore {self.__name_span_text}"
+                        reason = f"[{app_title} !=  {self.__name_span_text}] App name does not match the current name on the playstore"
                         self.update_app_names[app_package_name] = self.__name_span_text
 
                     self.report.update_status(app_package_name, ValidationReport.FAIL, error)
-                    self.update_report_history(app_package_name, f"Failed to install app. {reason}")
+                    self.update_report_history(app_package_name, f"{reason}")
                     self.cleanup_run(app_package_name)
                     continue
 
                 if not open_app(app_package_name, self.transport_id, self.arc_version):
                     reason = ''
                     if self.check_playstore_invalid(app_package_name):
-                        reason = "App package is invalid, update/ remove from list."
+                        reason = "Package is invalid and was removed from the list."
                         self.bad_apps[app_package_name] = app_title
                     elif not app_title == self.check_playstore_name(app_package_name, app_title):
-                        reason = f"App package name {app_package_name} does not match the current name on the playstore {self.__name_span_text}"
+                        reason = f"[{app_title} !=  {self.__name_span_text}] App name does not match the current name on the playstore"
                         self.update_app_names[app_package_name] = self.__name_span_text
 
                     elif not self.is_installed(app_package_name):
@@ -1152,14 +1149,13 @@ class FacebookApp:
 
         This will be ran before the main valdiation process.
     '''
-    def __init__(self, driver: webdriver.Remote,  device: Device, weights: str):
+    def __init__(self, driver: webdriver.Remote,  device: Device):
         self.app_name = FACEBOOK_APP_NAME
         self.package_name = FACEBOOK_PACKAGE_NAME
         self.validator = AppValidator(
             driver,
             [[self.app_name, self.package_name],],
-            device,
-            weights
+            device
         )
 
     def install_and_login(self):

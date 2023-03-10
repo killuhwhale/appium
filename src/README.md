@@ -44,6 +44,13 @@ Prep work for Chromebook:
 
 
 # Major TODOs
+    - Add new list tracking for potential bad apps.
+        - When we fail to install and they arent misnamed or invalid.
+
+    - Multi Run:
+        - Add a toggle for split run or full run
+            - Currently we split the list of apps across all devices evenly.
+            - we will need to test all apps on ea device....
 
     - install button - def install_app_UI()
         - Need to verify if stable build is different than other builds
@@ -52,16 +59,20 @@ Prep work for Chromebook:
                 - on non stable we use button.text == install query
 
     - Random errors with Appium/ UIAutomator
-        - Might need to explore checking UIAutomator server?
+        -1. Might need to explore checking UIAutomator server?
             - UiAutomator2 server because the instrumentation process is not running (probably crashed)
 
-        192.168.1.238:5555 -  Error taking SS:  Message: An unknown server-side error occurred while processing the command. Original error: 'GET /screenshot' cannot be proxied to UiAutomator2 server because the instrumentation process is not running (probably crashed). Check the server log and/or the logcat output for more details
-        Stacktrace:
-        UnknownError: An unknown server-side error occurred while processing the command. Original error: 'GET /screenshot' cannot be proxied to UiAutomator2 server because the instrumentation process is not running (probably crashed). Check the server log and/or the logcat output for more details
-            at UIA2Proxy.command (/home/killuh/.nvm/versions/node/v18.7.0/lib/node_modules/appium/node_modules/appium-base-driver/lib/jsonwp-proxy/proxy.js:274:13)
-            at processTicksAndRejections (node:internal/process/task_queues:95:5)
-            at AndroidUiautomator2Driver.commands.getScreenshot (/home/killuh/.nvm/versions/node/v18.7.0/lib/node_modules/appium/node_modules/appium-uiautomator2-driver/lib/commands/screenshot.js:14:10)
-        192.168.1.238:5555 -  Error taking SS:  /home/killuh/ws_p38/appium/src
+            192.168.1.238:5555 -  Error taking SS:  Message: An unknown server-side error occurred while processing the command. Original error: 'GET /screenshot' cannot be proxied to UiAutomator2 server because the instrumentation process is not running (probably crashed). Check the server log and/or the logcat output for more details
+            Stacktrace:
+            UnknownError: An unknown server-side error occurred while processing the command. Original error: 'GET /screenshot' cannot be proxied to UiAutomator2 server because the instrumentation process is not running (probably crashed). Check the server log and/or the logcat output for more details
+                at UIA2Proxy.command (/home/killuh/.nvm/versions/node/v18.7.0/lib/node_modules/appium/node_modules/appium-base-driver/lib/jsonwp-proxy/proxy.js:274:13)
+                at processTicksAndRejections (node:internal/process/task_queues:95:5)
+                at AndroidUiautomator2Driver.commands.getScreenshot (/home/killuh/.nvm/versions/node/v18.7.0/lib/node_modules/appium/node_modules/appium-uiautomator2-driver/lib/commands/screenshot.js:14:10)
+            192.168.1.238:5555 -  Error taking SS:  /home/killuh/ws_p38/appium/src
+
+        -2.   raise exception_class(message, screen, stacktrace)
+            selenium.common.exceptions.WebDriverException: Message: An unknown server-side error occurred while processing the command.
+            Original error: Could not proxy command to the remote server. Original error: socket hang up
 
 
     - Improve model

@@ -10,6 +10,12 @@ from typing import AnyStr, Dict, List, Tuple
 import cv2
 import numpy as np
 
+weights = 'notebooks/yolov5/runs/train/exp007/weights/best_309.pt'
+weights = 'notebooks/yolov5/runs/train/exp4/weights/best.pt'  # Lastest RoboFlow Model V1
+weights = 'notebooks/yolov5/runs/train/exp6/weights/best.pt'  # Lastest RoboFlow Model V2
+weights = 'notebooks/yolov5/runs/train/exp7/weights/best.pt'  # Lastest RoboFlow Model V3
+WEIGHTS = 'notebooks/yolov5/runs/train/exp8/weights/best.pt'  # Lastest RoboFlow Model V4
+
 # Ip Address of machien Running Appium Server
 EXECUTOR = 'http://192.168.0.175:4723/wd/hub'
 PLAYSTORE_PACKAGE_NAME = "com.android.vending"
@@ -46,6 +52,7 @@ class ArcVersions(Enum):
     '''
         Enumeration for each Android Version we intend to support.
     '''
+    UNKNOWN = -1
     ARC_P = 1
     ARC_R = 2
 
@@ -312,7 +319,10 @@ class Device:
             'wxh': self.__get_display_size(),
             'arc_build': self.__get_arc_build(),
         })
-        print(self.__device_info)
+        print(self)
+
+    def __str__(self):
+        return f"{self.__device_info.device_name}({self.__device_info.arc_version.value}): {self.__device_info.channel} - {self.__device_info.arc_build}"
 
     def is_connected(self):
         return self.__is_connected
@@ -405,6 +415,8 @@ class Device:
                 return ArcVersions.ARC_P
             elif res == "11":
                 return ArcVersions.ARC_R
+            else:
+                return ArcVersions.UNKNOWN
         except Exception as err:
             print("Cannot find Android Version", err)
         return None
@@ -467,7 +479,7 @@ class Device:
 
         pass
 
-    def info(self):
+    def info(self) -> __DeviceInfo:
         return self.__device_info
 
 class ErrorDetector:
@@ -621,7 +633,7 @@ class ErrorDetector:
 
 
 class TSV:
-    ''' Tranformation layer between persisted storage of list to pytonic list.
+    ''' Tranformation layer between persisted storage of list to python list.
 
         Creates python list from a file is users home dir named self.__filename.
 
@@ -675,7 +687,6 @@ class TSV:
         '''
         # Rm bad apps from app_list
         updated_list = [[app_name, package_name] for app_name, package_name in self.__app_list if not package_name in bad_apps]
-        print('Exporting... ', bad_apps, updated_list[:5])
         # Update app_list
         if not len(self.__app_list) == len(updated_list):
             self.__app_list = updated_list

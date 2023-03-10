@@ -1,13 +1,13 @@
 import collections
+from copy import deepcopy
 from appium import webdriver
 from collections import defaultdict
 from multiprocessing import Process, Queue
 from time import sleep
 from typing import List
 from utils.utils import (
-    PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, Device, android_des_caps)
+    PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, WEIGHTS, Device, android_des_caps)
 from playstore.playstore import AppValidator, ValidationReport
-
 import signal
 import sys
 
@@ -16,12 +16,11 @@ def validate_task(queue: Queue, packages: List[List[str]], ip: str, instance_num
     '''
         A single task to validate apps on a given device.
     '''
-    weights = 'notebooks/yolov5/runs/train/exp7/weights/best.pt'  # Lastest RoboFlow Model V3
     device = Device(ip)
     if not device.is_connected:
         queue.put({})
         return
-
+    print("Creating driver.....")
     driver = webdriver.Remote(
         "http://localhost:4723/wd/hub",
         android_des_caps(
@@ -37,31 +36,40 @@ def validate_task(queue: Queue, packages: List[List[str]], ip: str, instance_num
         driver,
         packages,
         device,
-        weights,
         instance_num
     )
     validator.uninstall_multiple()
     validator.run()
     print("Putting valdiator")
+    queue.put(AppValidatorPickle(validator))
     driver.quit()
-    queue.put(validator)
 
+class AppValidatorPickle:
+    ''' Bundles the information needed to pass through the queue.
 
+        ObjDetector uses yolo code and it has lambdas, cannot pickle entire class.
+
+     '''
+    def __init__(self, validator: AppValidator):
+        self.report = deepcopy(validator.report.report)
+        self.update_app_names = deepcopy(validator.update_app_names)
+        self.bad_apps = deepcopy(validator.bad_apps)
 
 class MultiprocessTaskRunner:
     '''
         Starts running valdiate_task on each device/ ip.
     '''
-    def __init__(self, ips: List[str], packages: List[List[str]]):
+    def __init__(self, ips: List[str], packages: List[List[str]], ):
         self.queue = Queue()
         self.drivers: List[webdriver.Remote] = []
         self.valdiators: List[AppValidator] = []
         self.ips = ips
         self.packages = packages
         self.processes = []
+        self.__merged_report = None
         self.packages_recvd = defaultdict(list)
-        self.update_app_names = collections.defaultdict(str)
-        self.bad_apps = collections.defaultdict(str)
+        self.update_app_names = collections.defaultdict(str)  # Collects apps to update
+        self.bad_apps = collections.defaultdict(str)  # Collects apps to be removed
         signal.signal(signal.SIGINT, self.handle_sigint)
 
     def handle_sigint(self, _signal, _frame):
@@ -95,16 +103,18 @@ class MultiprocessTaskRunner:
         while validators < len(self.ips):
             # Check if there is a message in the queue
             if not self.queue.empty():
-                validator: AppValidator = self.queue.get()
-                merged_reports.update(validator.report.report)
+
+                validator: AppValidatorPickle = self.queue.get()
+                merged_reports.update(validator.report)
                 self.update_app_names.update(validator.update_app_names)
                 self.bad_apps.update(validator.bad_apps)
-
                 validators += 1
+                print(f"Validators: {validators=}")
             sleep(1.2)
-        print("Reports recv'd: ", validators, len(self.ips))
-        # input("Finished running")
-        ValidationReport.print_report(merged_reports)
+        self.__merged_report = merged_reports
+
+    def get_final_report(self):
+        return self.__merged_report
 
     def clear_processes(self):
         '''
