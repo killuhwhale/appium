@@ -1,3 +1,4 @@
+import collections
 from appium import webdriver
 from collections import defaultdict
 from multiprocessing import Process, Queue
@@ -41,9 +42,9 @@ def validate_task(queue: Queue, packages: List[List[str]], ip: str, instance_num
     )
     validator.uninstall_multiple()
     validator.run()
-    print("Putting driver & valdiator")
+    print("Putting valdiator")
     driver.quit()
-    queue.put(validator.report.report)
+    queue.put(validator)
 
 
 
@@ -59,6 +60,8 @@ class MultiprocessTaskRunner:
         self.packages = packages
         self.processes = []
         self.packages_recvd = defaultdict(list)
+        self.update_app_names = collections.defaultdict(str)
+        self.bad_apps = collections.defaultdict(str)
         signal.signal(signal.SIGINT, self.handle_sigint)
 
     def handle_sigint(self, _signal, _frame):
@@ -67,16 +70,16 @@ class MultiprocessTaskRunner:
         '''
         print("CTRL+C pressed. Exiting program.",  _signal, _frame)
         # self.report.print()
-        try:
-            merged_reports = {}
-            for driver, validator in zip(self.drivers, self.valdiators):
-                merged_reports.update(validator.report.report)
-                driver.quit()
-            print("Merged reports", merged_reports)
-            self.clear_processes()
-            ValidationReport.print_report(merged_reports)
-        except Exception as err:
-            print("Error: ", err)
+        # try:
+        #     merged_reports = {}
+        #     for driver, validator in zip(self.drivers, self.valdiators):
+        #         merged_reports.update(validator.report.report)
+        #         driver.quit()
+        #     print("Merged reports", merged_reports)
+        #     self.clear_processes()
+        #     ValidationReport.print_report(merged_reports)
+        # except Exception as err:
+        #     print("Error: ", err)
         sys.exit(1)
 
     def run(self):
@@ -88,15 +91,18 @@ class MultiprocessTaskRunner:
 
         print("started running, waiting for drivers and validators")
         merged_reports = {}
-        reports = 0
-        while reports < len(self.ips):
+        validators = 0
+        while validators < len(self.ips):
             # Check if there is a message in the queue
             if not self.queue.empty():
-                report = self.queue.get()
-                merged_reports.update(report)
-                reports += 1
+                validator: AppValidator = self.queue.get()
+                merged_reports.update(validator.report.report)
+                self.update_app_names.update(validator.update_app_names)
+                self.bad_apps.update(validator.bad_apps)
+
+                validators += 1
             sleep(1.2)
-        print("Reports recv'd: ", reports, len(self.ips))
+        print("Reports recv'd: ", validators, len(self.ips))
         # input("Finished running")
         ValidationReport.print_report(merged_reports)
 

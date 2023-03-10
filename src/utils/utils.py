@@ -620,6 +620,96 @@ class ErrorDetector:
         self.__start_time = self.__get_start_time()
 
 
+class TSV:
+    ''' Tranformation layer between persisted storage of list to pytonic list.
+
+        Creates python list from a file is users home dir named self.__filename.
+
+        We can replace this with another class to interact with another data source.
+
+        1. We just read from the data source, in the beginning.
+        2. We valdiate apps
+        3. At the end, we update the data source wit any new changes.
+            So, if we wanted to use a database instead, we just write a new class with same methods:
+                - get_apps() -> List
+                - update_list(updated_names: Dict)
+    '''
+
+    def __init__(self):
+        self.__app_list = list()
+        self.__filename = "app_list.tsv"
+        self.__badfilename = "bad_app_list.tsv"
+        self.__all_bad_apps = dict()
+        self.__home_dir = os.path.expanduser( '~' )
+        self.__read_file()
+        self.__read_bad_apps()
+
+    def get_apps(self):
+        ''' Returns 2D list of apps that will be tested. '''
+        return self.__app_list
+
+    def __read_file(self):
+        with open(f"{self.__home_dir}/{self.__filename}", 'r' ) as f:
+            [self.__app_list.append([w.strip() for w in line.split("\t")]) for line in f.readlines()]
+
+    def __read_bad_apps(self):
+        create_file_if_not_exists(f"{self.__home_dir}/{self.__badfilename}")
+        with open(f"{self.__home_dir}/{self.__badfilename}", 'r' ) as f:
+            bad_apps = {}
+            for line in f.readlines():
+                app_name, package_name = line.split("\t")
+                bad_apps[package_name] = app_name
+            self.__all_bad_apps = bad_apps
+
+    def __write_bad_apps(self):
+        with open(f"{self.__home_dir}/{self.__badfilename}", 'w') as f:
+            pass  # Clear contents
+
+        with open(f"{self.__home_dir}/{self.__badfilename}", 'w') as f:
+            for package_name, app_name  in self.__all_bad_apps.items():
+                f.write(f"{app_name.strip()}\t{package_name.strip()}\n")
+
+    def export_bad_apps(self, bad_apps: Dict):
+        '''
+            Updates instance app_list by removing apps that are also in @bad_apps and then writes entire list to file.
+        '''
+        # Rm bad apps from app_list
+        updated_list = [[app_name, package_name] for app_name, package_name in self.__app_list if not package_name in bad_apps]
+        print('Exporting... ', bad_apps, updated_list[:5])
+        # Update app_list
+        if not len(self.__app_list) == len(updated_list):
+            self.__app_list = updated_list
+            # input("Writing new app_list w/out bad apps", updated_list)
+            self.__write_file()
+
+        # Update bad list
+        self.__all_bad_apps.update(bad_apps)
+        self.__write_bad_apps()
+
+    def update_list(self, updated_names: Dict):
+        ''' Updates instance app_list with new names and then writes entire list to file. '''
+        i = 0
+        end  = len(self.__app_list)
+        num_updated = 0
+        while i < end:
+            _app_name, package_name = self.__app_list[i]
+            # print(f"{app_name} {package_name} {len(package_name)=} {package_name in updated_names}")
+            if package_name in updated_names:
+                self.__app_list[i][0] = updated_names[package_name]
+                num_updated += 1
+            i += 1
+
+        print(f"Updated app_list: {num_updated=}")
+        if num_updated:
+            self.__write_file()
+
+    def __write_file(self):
+        with open(f"{self.__home_dir}/{self.__filename}", 'w' ) as f:
+            pass  # Clear contents
+
+        with open(f"{self.__home_dir}/{self.__filename}", 'w' ) as f:
+            [f.write(f"{app[0]}\t{app[1]}\n") for app in self.__app_list]
+
 ##      Appium config & stuff  ##
 def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: AnyStr) -> Dict:
     '''
@@ -643,6 +733,7 @@ def stop_appium_server():
     ''' Stops the Appium Server running on port 4723'''
     cmd = ["kill", "$(lsof -t -i :4723)"]
     res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
+
 
 def lazy_start_appium_server():
     ''' Attempts to start Appium server. '''
@@ -673,6 +764,13 @@ def create_dir_if_not_exists(directory):
     if not os.path.exists(directory):
         print("Creating dir: ", directory)
         os.makedirs(directory)
+
+def create_file_if_not_exists(path):
+    print("Create path if not exist", path)
+    if not file_exists(path):
+        with open(path, 'w'):
+            pass
+
 
 def file_exists(directory):
     return os.path.exists(directory)
@@ -1095,7 +1193,7 @@ PACKAGE_NAMES = [
     ['Crossy Road', 'com.yodo1.crossyroad'],
     ['com.vanced.android.youtube', 'com.vanced.android.youtube'],
     ['TradingView', 'com.tradingview.tradingviewapp'],
-    ['Slots - House of Fun', 'com.pacificinteractive.HouseOfFun'], # LAST Scarped...
+    ['Slots - House of Fun', 'com.pacificinteractive.HouseOfFun'],
     ['RISK: Global Domination', 'com.hasbro.riskbigscreen'],
     ['My Boy! Free - GBA Emulator', 'com.fastemulator.gbafree'],
     ['MARVEL Strike Force', 'com.foxnextgames.m3'],

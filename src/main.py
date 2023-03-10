@@ -5,7 +5,7 @@ import sys
 from playstore.playstore import AppValidator, FacebookApp
 from utils.parallel import MultiprocessTaskRunner
 from utils.utils import (FACEBOOK_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME,
-    TOP_500_APPS, Device, android_des_caps, dev_scrape_start_at_app,
+    TOP_500_APPS, TSV, Device, android_des_caps, dev_scrape_start_at_app,
     lazy_start_appium_server, stop_appium_server)
 
 # Starts Appium Server.
@@ -34,9 +34,15 @@ if __name__ == "__main__":
     # print("ips: ", ips)
 
     # service = lazy_start_appium_server()
+    # tsv = TSV()  # Create Globally
+    # TESTING_APPS = tsv.get_apps()
+    # name_updates = {}
 
-    # runner = MultiprocessTaskRunner(ips, TOP_500_APPS[:1] )
+    # runner = MultiprocessTaskRunner(ips, TESTING_APPS[:1] )
     # runner.run()
+
+    # name_updates.update(runner.update_app_names)  # Iterate of all App validation instances and add here.
+    # tsv.update_list(name_updates)
 
 
     ###################################
@@ -53,6 +59,14 @@ if __name__ == "__main__":
     # ip = '192.168.1.137:5555' # ARC-R Kohaku,
     ip = '192.168.1.238:5555' # ARC-R Helios,
     # ip = '192.168.1.113:5555' # ARC-P CoachZ
+
+
+    tsv = TSV()  # Create Globally
+    TESTING_APPS = tsv.get_apps()
+    name_updates = {}
+    bad_apps = {}
+
+
 
     stop_appium_server()
     service = lazy_start_appium_server()
@@ -75,20 +89,32 @@ if __name__ == "__main__":
     # fb_handle.install_and_login()
 
     starting_app = "jp.co.yahoo.gyao.android.app"
-    starting_app = "com.roblox.client"
+    starting_app = "com.facebook.orca"
+    starting_app = "com.showmax.app"
+    starting_app = "com.softinit.iquitos.whatswebscan"
 
-    start_idx = dev_scrape_start_at_app(starting_app, TOP_500_APPS)
+    start_idx = dev_scrape_start_at_app(starting_app, TESTING_APPS)
     print(f"{start_idx=} ~ {starting_app=}")
 
     validator = AppValidator(
         driver,
-        TOP_500_APPS[start_idx: start_idx + 1],
+        # TOP_500_APPS[start_idx: start_idx + 1],
+        TESTING_APPS[start_idx: start_idx + 3],
         device,
         weights
         )
 
     validator.uninstall_multiple()
     validator.run()
+
+
+
+    name_updates.update(validator.update_app_names)  # Iterate of all App validation instances and add here.
+    bad_apps.update(validator.bad_apps)
+
+    tsv.update_list(name_updates)
+    tsv.export_bad_apps(bad_apps)
+
     # validator.report.merge(fb_handle.validator.report)
     validator.report.print()
     driver.quit()

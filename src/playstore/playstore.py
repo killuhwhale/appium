@@ -181,7 +181,10 @@ class ValidationReport:
             print(ValidationReport.RESET, end="")
 
             if len(status_obj['reason']) > 0:
-                print("\n\t\t", "Status reason: ", status_obj['reason'])
+                print("\n\t", "Final status: ", end="")
+                print(ValidationReport.Green if is_good else ValidationReport.RED, end="")
+                print( status_obj['reason'], end="")
+                print(ValidationReport.RESET, end="")
 
             # Print History
             print(ValidationReport.Yellow, end="")
@@ -227,6 +230,10 @@ class AppValidator:
         self.current_package = None
         self.err_detector = ErrorDetector(self.transport_id, self.arc_version)
         self.report = ValidationReport(f'{self.device_name}_{self.ip}')
+
+        self.update_app_names = collections.defaultdict(str)
+        self.bad_apps = collections.defaultdict(str)
+
         self.steps = [
             'Click search icon',
             'Send keys for search',
@@ -353,16 +360,18 @@ class AppValidator:
             # self.dprint(response.text)
             soup = BeautifulSoup(response.text, 'html.parser')
             error_section = soup.find('div', {'id': 'error-section'})
-            if error_section:
+            if error_section and error_section.text == "We're sorry, the requested URL was not found on this server.":
                 return True
             else:
                 return False
         else:
             return True
 
-    def check_playstore_name(self, package_name) -> bool:
+    def check_playstore_name(self, package_name, app_title) -> str:
         ''' Checks an app's name via Google playstore URL
-            Returns the apps name from the playstore.
+
+            Returns:
+                - the apps name from the playstore.
         '''
 
         url = f'https://play.google.com/store/apps/details?id={package_name}'
@@ -372,8 +381,8 @@ class AppValidator:
             soup = BeautifulSoup(response.text, 'html.parser')
 
             error_section = soup.find('div', {'id': 'error-section'})
-            if error_section:
-                return ""
+            if error_section and error_section.text == "We're sorry, the requested URL was not found on this server.":
+                return app_title
 
             name_span_parent = soup.find('h1', {'itemprop': 'name'})
             name_span = name_span_parent.findChild('span')
@@ -382,9 +391,10 @@ class AppValidator:
                 self.__name_span_text = name_span.text
                 return name_span.text
             else:
-                return ""
+                return app_title
         else:
-            return ""
+            return app_title  # returning app title essentially means there was no change found.
+
 
 
     ##  Buttons
@@ -789,6 +799,7 @@ class AppValidator:
                 if t > max_wait * 0.25:
                     self.check_playstore_crash()
                 sleep(0.5)
+            self.driver.orientation = 'PORTRAIT'
         return ready
 
     def needs_purchase(self) -> bool:
@@ -1041,7 +1052,6 @@ class AppValidator:
                 raise Exception(error)
             else:
                 self.update_report_history(install_package_name, f"Discovery/ install failure: {self.steps[last_step]}")
-                input("WAiting...")
                 # Debug
                 self.dprint("\n\n",
                     title,
@@ -1076,11 +1086,15 @@ class AppValidator:
                 self.dprint(f"Installed? {installed}   err: {error}")
 
                 if not installed and not error is None:
+
                     reason = ""
                     if self.check_playstore_invalid(app_package_name):
                         reason = "App package is invalid, update/ remove from list."
-                    elif not app_title == self.check_playstore_name(app_package_name):
+                        print(f"{reason=}")
+                        self.bad_apps[app_package_name] = app_title
+                    elif not app_title == self.check_playstore_name(app_package_name, app_title):
                         reason = f"App package name {app_title} does not match the current name on the playstore {self.__name_span_text}"
+                        self.update_app_names[app_package_name] = self.__name_span_text
 
                     self.report.update_status(app_package_name, ValidationReport.FAIL, error)
                     self.update_report_history(app_package_name, f"Failed to install app. {reason}")
@@ -1091,9 +1105,10 @@ class AppValidator:
                     reason = ''
                     if self.check_playstore_invalid(app_package_name):
                         reason = "App package is invalid, update/ remove from list."
-
-                    elif not app_title == self.check_playstore_name(app_package_name):
+                        self.bad_apps[app_package_name] = app_title
+                    elif not app_title == self.check_playstore_name(app_package_name, app_title):
                         reason = f"App package name {app_package_name} does not match the current name on the playstore {self.__name_span_text}"
+                        self.update_app_names[app_package_name] = self.__name_span_text
 
                     elif not self.is_installed(app_package_name):
                         reason = "Failed to open because the package was not installed."

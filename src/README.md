@@ -45,13 +45,13 @@ Prep work for Chromebook:
 
 # Major TODOs
 
-    # install button - def install_app_UI()
+    - install button - def install_app_UI()
         - Need to verify if stable build is different than other builds
         - Seems two methods work depending on BUILD.
                 - on stable we use ACCESSIBILITY ID query
                 - on non stable we use button.text == install query
 
-    # Random errors with Appium/ UIAutomator
+    - Random errors with Appium/ UIAutomator
         - Might need to explore checking UIAutomator server?
             - UiAutomator2 server because the instrumentation process is not running (probably crashed)
 
@@ -63,14 +63,13 @@ Prep work for Chromebook:
             at AndroidUiautomator2Driver.commands.getScreenshot (/home/killuh/.nvm/versions/node/v18.7.0/lib/node_modules/appium/node_modules/appium-uiautomator2-driver/lib/commands/screenshot.js:14:10)
         192.168.1.238:5555 -  Error taking SS:  /home/killuh/ws_p38/appium/src
 
-    - Create a file to store the apps list
-        - we encountering an app that we cant find on the playstore, we check the web for region or name issue
-            - Region issue, we move to another file/ list and remove from current list
-            - Name issue, simply update the name in the OG file.
-
 
     - Improve model
-        *** Update to YOLOv7? slight increase in accuracy ~3% (from what I've read)
+        - recently labeled FBAuth in Dataset, in v5 from Roboflow, we will have NEW LABELS
+            - Will need to update coco128.yaml with new labels.
+                - FBAuth
+                - Two (Age Verification)
+
 
         -1. Explore Age verification
             - input age or slider
@@ -79,7 +78,9 @@ Prep work for Chromebook:
                 - click in center of view
             - Empty form fields to type age will probably be the trickiest...
 
-        -3. Most likely will need to scrape same image set from multiple devices w/ varying screen sizes.
+        NOTE:
+        *** Update to YOLOv7? slight increase in accuracy ~3% (from what I've read)
+        *** Most likely will need to scrape same image set from multiple devices w/ varying screen sizes.
 
 
     Future TODOs
