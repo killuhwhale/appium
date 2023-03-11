@@ -1,31 +1,40 @@
-import __main__
 import collections
-from copy import deepcopy
 import os
 import re
+import subprocess
+from copy import deepcopy
+from datetime import datetime
+from time import sleep, time
+from typing import Dict, List
+
+import __main__
 import cv2
 import requests
-import subprocess
-from datetime import datetime
-from appium import webdriver
 from appium.webdriver.common.appiumby import AppiumBy
 from bs4 import BeautifulSoup
-from selenium.common.exceptions import (StaleElementReferenceException, NoSuchElementException,
-                                        WebDriverException, ScreenshotException)
+from selenium.common.exceptions import (NoSuchElementException,
+                                        ScreenshotException,
+                                        StaleElementReferenceException,
+                                        WebDriverException)
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.actions import interaction
 from selenium.webdriver.common.actions.action_builder import ActionBuilder
 from selenium.webdriver.common.actions.pointer_input import PointerInput
-from time import sleep, time
-from typing import Dict, List
 
-
+from appium import webdriver
 from objdetector.objdetector import ObjDetector
-from utils.utils import (
-    ACCOUNTS, ADB_KEYCODE_DEL, DEVICES, FACEBOOK_APP_NAME, FACEBOOK_PACKAGE_NAME, SIGN_IN, WEIGHTS, AppInfo, ArcVersions, CONTINUE, BuildChannels, CrashTypes, GOOGLE_AUTH, IMAGE_LABELS, LOGIN,
-    PASSWORD, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, ADB_KEYCODE_ENTER, Device, ErrorDetector, check_amace,
-    close_app, create_dir_if_not_exists, get_cur_activty, get_root_path, get_views,
-     is_download_in_progress, open_app, save_resized_image, transform_coord_from_resized)
+from utils.utils import (ACCOUNTS, ADB_KEYCODE_DEL, ADB_KEYCODE_ENTER, CONFIG,
+                         CONTINUE, DEVICES, FACEBOOK_APP_NAME,
+                         FACEBOOK_PACKAGE_NAME, GOOGLE_AUTH, IMAGE_LABELS,
+                         LOGIN, PASSWORD, PLAYSTORE_MAIN_ACT,
+                         PLAYSTORE_PACKAGE_NAME, SIGN_IN, WEIGHTS, AppInfo,
+                         ArcVersions, BuildChannels, CrashTypes, Device,
+                         ErrorDetector, check_amace, close_app,
+                         create_dir_if_not_exists, get_cur_activty,
+                         get_root_path, get_views, is_download_in_progress,
+                         open_app, save_resized_image,
+                         transform_coord_from_resized)
+
 
 class ANRThrownException(Exception):
     pass
@@ -33,6 +42,33 @@ class ANRThrownException(Exception):
 class ValidationReport:
     '''
         A simple class to format the status report of AppValidator.
+
+        = {
+            package_name: {
+                'status': -1,
+                'reason': "",
+                'name': "",
+                'report_title': "",
+                'history': [],
+            }
+        }
+
+        THis is good for a single merged report by app name but we now want
+
+        = {
+            device_name: {
+                package_name: {
+                    'status': -1,
+                    'reason': "",
+                    'name': "",
+                    'report_title': "",
+                    'history': [],
+                }
+            },
+            device_name2: {
+
+            }
+        }
     '''
     PASS = 0
     FAIL = 1
@@ -72,24 +108,31 @@ class ValidationReport:
             'history': [],
         }
 
-    def __init__(self, report_title: str):
-        self.report = collections.defaultdict(ValidationReport.default_dict)
+    def __init__(self, device: Device):
         # Device and Session information for the report.
-        self.report_title = report_title
+        self.device = device.info()
+        self.report_title = f'{self.device.device_name}_{self.device.ip}'
+        self.report = {self.report_title: collections.defaultdict(ValidationReport.default_dict)}
+        # self.report = collections.defaultdict(ValidationReport.default_dict)
 
     def add_app(self, package_name: str, app_name: str):
         ''' Adds an app to the report. '''
-        if self.report[package_name]['status'] == -1:
-            self.report[package_name]['name'] = app_name
-            self.report[package_name]['report_title'] = self.report_title
-            self.report[package_name]['status'] = 0
+        if self.report[self.report_title][package_name]['status'] == -1:
+            self.report[self.report_title][package_name]['name'] = app_name
+            self.report[self.report_title][package_name]['report_title'] = self.report_title
+            self.report[self.report_title][package_name]['status'] = 0
 
     def update_status(self, package_name: str, status: int, reason: str):
-        self.report[package_name]['status'] = status
-        self.report[package_name]['reason'] = reason
+        self.report[self.report_title][package_name]['status'] = status
+        self.report[self.report_title][package_name]['reason'] = reason
 
     def add_history(self,package_name: str, history_msg: str, img_path: str=""):
-        self.report[package_name]['history'].append({'msg':history_msg, 'img': img_path })
+        self.report[self.report_title][package_name]['history'].append({'msg':history_msg, 'img': img_path })
+
+    def merge(self, oreport: 'ValidationReport'):
+        ''' Merges on report title, used to merge pre-process Facebook login report. '''
+        title_to_merge_on = self.report_title
+        self.report[title_to_merge_on].update(deepcopy(oreport.report[title_to_merge_on]))
 
     @staticmethod
     def ascii_starting(color=None):
@@ -98,9 +141,9 @@ class ValidationReport:
             color = ValidationReport.Green
         print(color)
         print('''
-              _  _     _  _     _  _     _____ _             _   _                         _  _     _  _     _  _
-            _| || |_ _| || |_ _| || |_  /  ___| |           | | (_)                      _| || |_ _| || |_ _| || |_
-           |_  __  _|_  __  _|_  __  _| \ `--.| |_ __ _ _ __| |_ _ _ __   __ _          |_  __  _|_  __  _|_  __  _|
+              _  _     _  _     _  _     _____ _            _   _                         _  _     _  _     _  _
+            _| || |_ _| || |_ _| || |_  /  ___| |          | | (_)                      _| || |_ _| || |_ _| || |_
+           |_  __  _|_  __  _|_  __  _| \ `--.| |___ _ _ __| |_ _ _ __   __ _          |_  __  _|_  __  _|_  __  _|
            _| || |_ _| || |_ _| || |_   `--. \ __/ _` | '__| __| | '_ \ / _` |          _| || |_ _| || |_ _| || |_
           |_  __  _|_  __  _|_  __  _| /\__/ / || (_| | |  | |_| | | | | (_| |  _ _ _  |_  __  _|_  __  _|_  __  _|
             |_||_|   |_||_|   |_||_|   \____/ \__\__,_|_|   \__|_|_| |_|\__, | (_|_|_)   |_||_|   |_||_|   |_||_|
@@ -151,57 +194,90 @@ class ValidationReport:
         print(ValidationReport.RESET)
 
     @staticmethod
-    def sorted_name(p: List):
-        ''' Serializable method to use for sorting. '''
+    def sorted_package_name(p: List):
+        ''' Serializable method to use for sorting. Sorts by package_name '''
         return p[0]
 
     @staticmethod
-    def print_report(report: collections.defaultdict, with_history: bool=False):
-        '''  Prints all apps from a given report. '''
-        # Sorted by packge name
-        ValidationReport.ascii_header()
-        for package_name, status_obj in sorted(report.items(), key=ValidationReport.sorted_name):
-            is_good = status_obj['status'] == ValidationReport.PASS
-            status_color = ValidationReport.Green if is_good else ValidationReport.RED
-            # print("Status obj: ", status_obj, status_color, is_good)
-            print(ValidationReport.Blue, end="")
-            print(f"{status_obj['name']} ", end="")
-            print(ValidationReport.RESET, end="")
+    def sorted_app_name(p: List):
+        ''' Serializable method to use for sorting. Sorts by app_name '''
+        return p[1]['name']
 
-            print(ValidationReport.Cyan, end="")
-            print(f"{package_name} ", end="")
-            print(ValidationReport.RESET, end="")
+    @staticmethod
+    def sorted_device_name(p: List):
+        ''' Serializable method to use for sorting. '''
+        return p['report_title']
 
-            print(status_color, end="")
-            print("PASSED" if is_good else "FAILED", end="")
-            print(ValidationReport.RESET, end="")
+    @staticmethod
+    def print_app_report(package_name: str, status_obj: Dict):
+        is_good = status_obj['status'] == ValidationReport.PASS
+        status_color = ValidationReport.Green if is_good else ValidationReport.RED
+        # print("Status obj: ", status_obj, status_color, is_good)
+        print(ValidationReport.Blue, end="")
+        print(f"{status_obj['name']} ", end="")
+        print(ValidationReport.RESET, end="")
 
-            print(ValidationReport.Purple, end="")
-            print(f" - [{status_obj['report_title']}]", end="")
-            print(ValidationReport.RESET, end="")
+        print(ValidationReport.Cyan, end="")
+        print(f"{package_name} ", end="")
+        print(ValidationReport.RESET, end="")
 
-            if len(status_obj['reason']) > 0:
-                print("\n\t", "Final status: ", end="")
-                print(ValidationReport.Green if is_good else ValidationReport.RED, end="")
-                print( status_obj['reason'], end="")
-                print(ValidationReport.RESET, end="")
-                print()
+        print(status_color, end="")
+        print("PASSED" if is_good else "FAILED", end="")
+        print(ValidationReport.RESET, end="")
 
-            # Print History
-            print(ValidationReport.Yellow, end="")
-            for hist in status_obj['history']:
-                print("\t", hist['msg'])
-                print("\t\t", f"Img: {hist['img']}")
+        print(ValidationReport.Purple, end="")
+        print(f" - [{status_obj['report_title']}]", end="")
+        print(ValidationReport.RESET, end="")
+
+        if len(status_obj['reason']) > 0:
+            print("\n\t", "Final status: ", end="")
+            print(ValidationReport.Green if is_good else ValidationReport.RED, end="")
+            print( status_obj['reason'], end="")
             print(ValidationReport.RESET, end="")
             print()
+
+        # Print History
+        print(ValidationReport.Yellow, end="")
+        for hist in status_obj['history']:
+            print("\t", hist['msg'])
+            print("\t\t", f"Img: {hist['img']}")
+        print(ValidationReport.RESET, end="")
+        print()
+
+    @staticmethod
+    def print_report(report: 'ValidationReport', with_history: bool=False):
+        '''  Prints all apps from a single report. '''
+        # Sorted by packge name
+        ValidationReport.ascii_header()
+        for package_name, status_obj in sorted(report.report[report.report_title].items(), key=ValidationReport.sorted_package_name):
+            ValidationReport.print_app_report(package_name, status_obj)
         ValidationReport.ascii_footer()
 
     def print(self):
         ''' Prints 'self' report.'''
-        ValidationReport.print_report(self.report)
+        ValidationReport.print_report(self)
 
-    def merge(self, oreport: 'ValidationReport'):
-        self.report.update(deepcopy(oreport.report))
+    def print_reports(reports: List['ValidationReport']):
+        ValidationReport.ascii_header()
+        for report in reports:
+            for package_name, status_obj in sorted(report.report[report.report_title].items(), key=ValidationReport.sorted_package_name):
+                ValidationReport.print_app_report(package_name, status_obj)
+        ValidationReport.ascii_footer()
+
+    @staticmethod
+    def print_reports_by_app(reports: List['ValidationReport']):
+        all_reports = collections.defaultdict(list)
+        for report_instance in reports:
+            for package_name, status_obj in report_instance.report[report_instance.report_title].items():
+                all_reports[package_name].append(status_obj)
+                all_reports[package_name] = sorted(all_reports[package_name], key=ValidationReport.sorted_device_name)
+
+        print("Reports::::: ", all_reports)
+        ValidationReport.ascii_header()
+        for package_name, status_objs in sorted(all_reports.items(), key=ValidationReport.sorted_package_name):
+            for status_obj in status_objs:
+                ValidationReport.print_app_report(package_name, status_obj)
+        ValidationReport.ascii_footer()
 
 
 class AppValidator:
@@ -216,7 +292,7 @@ class AppValidator:
             driver: webdriver.Remote,
             package_names: List[List[str]],
             device: Device,
-            instance_num: int= 0,
+            instance_num: int,
         ):
         self.driver = driver
         self.device = device.info()
@@ -228,7 +304,7 @@ class AppValidator:
         self.package_names = package_names  # List of packages to test as [app_title, app_package_name]
         self.current_package = None
         self.err_detector = ErrorDetector(self.transport_id, self.arc_version)
-        self.report = ValidationReport(f'{self.device_name}_{self.ip}')
+        self.report = ValidationReport(device)
 
         self.update_app_names = collections.defaultdict(str)
         self.bad_apps = collections.defaultdict(str)
@@ -247,14 +323,13 @@ class AppValidator:
         self.detector = ObjDetector(self.test_img_fp, [self.weights])
         self.ID = f"{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}-{self.ip.split(':')[0]}"
         self.__name_span_text = ''
-        self.instance_num = instance_num
+        self.instance_num = instance_num if instance_num else 0
         self.dev_ss_count = 320
 
     def dprint(self, *args):
-        color = self.report.COLORS[2:][self.instance_num % len(self.report.COLORS)]
+        color = self.report.COLORS[2:][self.instance_num % len(self.report.COLORS[2:])]
         print(color,end="")
         print(f"{self.ip} - ", *args, end="")
-        print(color,end="")
         print(self.report.RESET)
 
     ##  ADB app management
@@ -317,7 +392,7 @@ class AppValidator:
             Returns True once app is fianlly unisntalled.
             Returns False if it takes too long to unisntall or some other unexpected error.
         '''
-        if  package_name in [FACEBOOK_PACKAGE_NAME, PLAYSTORE_PACKAGE_NAME] and not force_rm:
+        if  package_name in [PLAYSTORE_PACKAGE_NAME] and not force_rm:
             print(f"Not uninstalling {package_name}")
             return False
 
@@ -513,7 +588,7 @@ class AppValidator:
                 msg: A message to commit to history.
         '''
         try:
-            num = len(self.report.report[package_name]['history'])
+            num = len(self.report.report[self.report.report_title][package_name]['history'])
             path = f"{get_root_path()}/images/history/{self.ip}/{package_name}"
             create_dir_if_not_exists(path)
             full_path = f"{path}/{num}.png"
@@ -599,6 +674,7 @@ class AppValidator:
             On a given page we will look at it and perform an action, if there is one .
         '''
         # Do
+        empty_retries = 2
         self.is_new_activity() ## Init current activty
         if not self.get_test_ss():
             return False, login_entered, password_entered
@@ -615,30 +691,17 @@ class AppValidator:
             # 1. Click Google Auth
             # 2. Filling out Email and Password
             # 3. Click Continue button to attempt to get to a page with #1 or #2
-        actions = 0 # At most, we should take 3 actions on a single page [may not be necessary but is a hard limit to prevent loops.]
         # Find Email, Password and Login button.
 
 
         CONTINUE_SUBMITTED = False
         tapped = False
-        total_actions = 0
-        while actions < 4 and not CONTINUE_SUBMITTED and total_actions < 4:
-
-
+        detect_attempt = 0
+        while not (CONTINUE_SUBMITTED and login_entered and password_entered) and detect_attempt < 3:
             if CONTINUE_SUBMITTED and login_entered and password_entered:
                 return True, True, True
 
-            # if self.is_new_activity() or tapped:
-            if self.is_new_activity():
-                if not self.get_test_ss():
-                    return False, login_entered, password_entered
-                self.dprint("\n\n New Activity \n", self.prev_act, "\n", self.cur_act, '\n\n' )
-                results = self.detector.detect()
-                if results is None:
-                    return False, login_entered, password_entered
-                tapped = False
 
-            self.dprint(f"Action : {actions} -- results: ", results)
             if GOOGLE_AUTH in results:
                 # We have A google Auth button presents lets press it
                 results[GOOGLE_AUTH], tapped = self.click_button(results[GOOGLE_AUTH])
@@ -656,7 +719,6 @@ class AppValidator:
                 else:
                     print(f"Login info not created for {app_package_name}")
 
-                actions += 1
                 login_entered = True
 
             elif PASSWORD in results and not password_entered:
@@ -670,7 +732,6 @@ class AppValidator:
                     password_entered = True
                 else:
                     print(f"Password info not created for {app_package_name}")
-                actions += 1
                 sleep(3)
                 if self.is_new_activity():
                     return True, login_entered, password_entered
@@ -680,7 +741,6 @@ class AppValidator:
                 # input("Click Continue...")
                 results[CONTINUE], tapped = self.click_button(results[CONTINUE])
                 del results[CONTINUE]
-                actions += 1
 
                 print("App is game: ", is_game)
                 if is_game:
@@ -692,15 +752,24 @@ class AppValidator:
                     sleep(5)  # Wait for a possible login to happen
                     return True, login_entered, password_entered
 
-            total_actions += 1
-            if len(results.keys()) == 0:
+            if self.is_new_activity():
+                if not self.get_test_ss():
+                    return False, login_entered, password_entered
+                self.dprint("\n\n New Activity \n", self.prev_act, "\n", self.cur_act, '\n\n' )
+                results = self.detector.detect()
+                if results is None:
+                    return False, login_entered, password_entered
+                tapped = False
+                self.dprint(f"Results: ", results)
+            elif len(results.keys()) == 0 and empty_retries > 0:
+                empty_retries -= 1
                 print("Empty results, grabbing new SS and processing...")
                 sleep(2)
                 # Get a new SS, ir error return
                 if not self.get_test_ss():
                     return False, login_entered, password_entered
                 results = self.detector.detect()
-            # input("End of login action...")
+            detect_attempt += 1
         return False, login_entered, password_entered
 
     def attempt_login(self, app_title: str, app_package_name: str, is_game: bool):
@@ -711,7 +780,7 @@ class AppValidator:
         logged_in = False
         login_entered = False
         password_entered = False
-        while not logged_in and login_attemps < 6:
+        while not logged_in and login_attemps < 2:
             CrashType, crashed_act, msg = self.err_detector.check_crash()
             if(not CrashType == CrashTypes.SUCCESS):
                 self.update_report_history(app_package_name, f"{CrashTypes.value}: {crashed_act} - {msg}")
@@ -735,6 +804,7 @@ class AppValidator:
                                         password_entered,
                                         is_game,
                                         app_package_name)
+                    break
                 login_attemps += 1
 
             except ANRThrownException as error_obj:
@@ -1149,20 +1219,27 @@ class FacebookApp:
 
         This will be ran before the main valdiation process.
     '''
-    def __init__(self, driver: webdriver.Remote,  device: Device):
+    def __init__(self, driver: webdriver.Remote,  device: Device, instance_num: int):
         self.app_name = FACEBOOK_APP_NAME
         self.package_name = FACEBOOK_PACKAGE_NAME
+        self.device = device
         self.validator = AppValidator(
             driver,
             [[self.app_name, self.package_name],],
-            device
+            device,
+            instance_num
         )
 
     def install_and_login(self):
         ''' Runs app valdiator to install, launch and login to Facebook.
         '''
+        if not CONFIG.login_facebook:
+            print(f"Skipping pre-process FB install {CONFIG.login_facebook=}")
+            return
         self.validator.uninstall_app(self.package_name, force_rm=True)
         self.validator.run()
+        sleep(3)
+        close_app(self.package_name, self.device.info().transport_id)
 
 if __name__ == "__main__":
     pass

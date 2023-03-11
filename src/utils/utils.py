@@ -10,6 +10,14 @@ from typing import AnyStr, Dict, List, Tuple
 import cv2
 import numpy as np
 
+
+class _CONFIG:
+    login_facebook =  True
+    multi_split_packages = False
+
+
+CONFIG = _CONFIG()
+
 weights = 'notebooks/yolov5/runs/train/exp007/weights/best_309.pt'
 weights = 'notebooks/yolov5/runs/train/exp4/weights/best.pt'  # Lastest RoboFlow Model V1
 weights = 'notebooks/yolov5/runs/train/exp6/weights/best.pt'  # Lastest RoboFlow Model V2
@@ -53,8 +61,8 @@ class ArcVersions(Enum):
         Enumeration for each Android Version we intend to support.
     '''
     UNKNOWN = -1
-    ARC_P = 1
-    ARC_R = 2
+    ARC_P = 9
+    ARC_R = 11
 
 class BuildChannels(Enum):
     '''
@@ -101,6 +109,30 @@ class DEVICES(Enum):
     CAROLINE = "caroline"
     KOHAKU = "kohaku"
     KRANE = "krane"
+    UNKNOWN = "unknown"
+
+
+    @staticmethod
+    def get_device(device_name: str) -> 'DEVICES':
+        if device_name == DEVICES.KEVIN.value:
+            return DEVICES.KEVIN
+        elif device_name == DEVICES.COACHZ.value:
+            return DEVICES.COACHZ
+        elif device_name == DEVICES.EVE.value:
+            return DEVICES.EVE
+        elif device_name == DEVICES.HELIOS.value:
+            return DEVICES.HELIOS
+        elif device_name == DEVICES.TAIMEN.value:
+            return DEVICES.TAIMEN
+        elif device_name == DEVICES.CAROLINE.value:
+            return DEVICES.CAROLINE
+        elif device_name == DEVICES.KOHAKU.value:
+            return DEVICES.KOHAKU
+        elif device_name == DEVICES.KRANE.value:
+            return DEVICES.KRANE
+        else:
+            return DEVICES.UNKNOWN
+
 
 # APK & Manifest stuff
 class AppInfo:
@@ -301,10 +333,13 @@ class Device:
             self.transport_id = info['transport_id']
             self.is_emu = info['is_emu']
             self.arc_version = info['arc_version']
-            self.device_name = info['device_name']
+            self.device_name: DEVICES = DEVICES.get_device(info['device_name'])
             self.channel = info['channel']
             self.wxh = info['wxh']
             self.arc_build = info['arc_build']
+            self.product_name = info['product_name']
+            # TODO() add board name like hatch strongbad
+
 
     def __init__(self, ip: str):
         self.__is_connected = self.__adb_connect(ip)
@@ -318,11 +353,12 @@ class Device:
             'channel': self.__get_device_build_channel(),
             'wxh': self.__get_display_size(),
             'arc_build': self.__get_arc_build(),
+            'product_name': self.__get_product_name(),
         })
         print(self)
 
     def __str__(self):
-        return f"{self.__device_info.device_name}({self.__device_info.arc_version.value}): {self.__device_info.channel} - {self.__device_info.arc_build}"
+        return f"{self.__device_info.device_name.value}({self.__device_info.arc_version.value}): {self.__device_info.channel} - {self.__device_info.arc_build} - {self.__device_info.product_name}"
 
     def is_connected(self):
         return self.__is_connected
@@ -477,7 +513,16 @@ class Device:
             print("Cannot find display size", err)
         return None
 
-        pass
+    def __get_product_name(self):
+        '''ro.product.name'''
+        cmd = ('adb','-t', self.__transport_id, 'shell', 'getprop', "ro.product.name")
+        try:
+            res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
+            return res
+        except Exception as err:
+            print("Cannot find display size", err)
+        return None
+
 
     def info(self) -> __DeviceInfo:
         return self.__device_info
@@ -924,11 +969,11 @@ def close_app(package_name: str, transport_id: int):
             transport_id: The transport id of the connected android device.
     '''
     try:
-        cmd = None
-        if package_name == FACEBOOK_PACKAGE_NAME:
-            cmd = ('adb', '-t', transport_id, 'shell', 'am', 'broadcast', "-a", "android.intent.action.ACTION_SHUTDOWN")
-        else:
-            cmd = ('adb', '-t', transport_id, 'shell', 'am', 'force-stop', package_name)
+        if "badidea" == FACEBOOK_PACKAGE_NAME:
+            # E Security-LocalReporter: category=InternalIntentScope, message=Access denied. com.facebook.katana cannot receive broadcasts from no_app_identity, cause=java.lang.SecurityException: Access denied. com.facebook.katana cannot receive broadcasts from no_app_identity
+            cmd = ('adb', '-t', transport_id, 'shell', 'am', 'broadcast', "-a", "android.intent.action.ACTION_SHUTDOWN")  # throws erro and security exception
+
+        cmd = ('adb', '-t', transport_id, 'shell', 'am', 'force-stop', package_name)
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
                                 capture_output=True).stdout.strip()
         print(f"Closed {package_name}...")
@@ -1091,7 +1136,7 @@ def dev_scrape_start_at_app(start_package_name: str, app_list: List[List[str]]) 
         app_name, package_name = app
         if start_package_name == package_name:
             return i
-    raise Exception("package name not in the list.")
+    raise Exception(f"{start_package_name} not in the list.")
 
 PACKAGE_NAMES = [
     # [ "Twitter", "com.twitter.android"],

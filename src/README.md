@@ -35,22 +35,24 @@ Prep work for Chromebook:
     - cannot interact with PWAs.
 5. Can Detect if an app is a game.
 5. Open app and detect crashing upon opening.
-6. History report for each app w/ images at ea step.
-7. Summary report of all apps.
+6. Attempt login using Object Detection via YOLOv5
+6. History report for each app w/ screenshots at ea step.
+7. Summary report of all apps from each device.
 
 # What we need to do but cant yet
 1. Detect app if an app is O4C
 
 
 
-# Major TODOs
+# TODOs
+
     - Add new list tracking for potential bad apps.
         - When we fail to install and they arent misnamed or invalid.
 
-    - Multi Run:
-        - Add a toggle for split run or full run
-            - Currently we split the list of apps across all devices evenly.
-            - we will need to test all apps on ea device....
+    - Strategy when we have two continue buttons and one is disabled but has the higher probability
+        - we should try to click all of them unless something happens?
+            - Check new activity, might need to clean up the handle_login
+                - Make it try more continue buttons before takinga new screenshot...
 
     - install button - def install_app_UI()
         - Need to verify if stable build is different than other builds
@@ -94,7 +96,23 @@ Prep work for Chromebook:
         *** Most likely will need to scrape same image set from multiple devices w/ varying screen sizes.
 
 
-    Future TODOs
+
+
+    Future TODOs:
+
+     - Reporting that apps not logged in when in fact, we did log in and have the SS to prove.
+       - We are logged into facebook at first.
+       - So now, we do not need to enter an email or a password or press GAuth or FBAuth.
+        - Hard to detect if we logged in without going through these steps.
+        - Since we are logged in via FB already, we just need to open app and coninue/ confirm we want to log in with the same account.
+            Messenger com.facebook.orca PASSED - [DEVICES.COACHZ_192.168.1.113:5555]
+            Final status: Not logged in.
+
+        - Small problem, only affect facebook apps like Messenger.
+            - we should be able to find a small workout around.
+                - Hard code behavior for com.facebook.* packages.
+
+
     - Create a few sample app APKs that will do a specific crash/ throw ANR.
         - I cant seem to figure out how to reproduce:
             - WIN_DEATH = "Win Death"
