@@ -13,9 +13,9 @@ Prep work for Chromebook:
 - Host device
     - Setup environment
         - bash ins_and_stu.sh
-        - bash setup.sh (run twice if npm was not already installed.)
+        - bash setup.sh (run twice if npm is not already installed.)
     - python3 main.py [ips]
-    - python3 main.py python3 main.py 192.168.1.113:5555 192.168.1.238:5555 192.168.1.248:5555
+    - python3 main.py 192.168.1.113:5555 192.168.1.238:5555 192.168.1.248:5555
 
 
 # What we can do
@@ -26,7 +26,7 @@ Prep work for Chromebook:
                     const char* env_max_s = getenv("ADB_LOCAL_TRANSPORT_MAX_PORT");
                     ....
                 }
-    - 10Gb of disk space
+    - min 15Gb of disk space
 2. Supports ARC-P and ARC-R
     - improving model to work across varying screen sizes
 3. Discover and Install Apps from Playstore
@@ -37,9 +37,10 @@ Prep work for Chromebook:
 5. Can Detect if an app is a game.
 5. Open app and detect crashing upon opening.
 6. Attempt login using Object Detection via YOLOv5
-7. Log misnamed apps, invalid apps and failed apps to file.
-8. History report for each app w/ screenshots at ea step.
-9. Summary report of all apps from each device.
+7. Detect if app was logged in if we are able to send username/ password or click on Google/ Facebook sign in without subsequent crash.
+8. Log misnamed apps, invalid apps and failed apps to file.
+9. History report for each app w/ screenshots at ea step.
+10. Summary report of all apps from each device.
 
 # What we need to do but cant yet
 1. Detect if an app is O4C
@@ -49,18 +50,11 @@ Prep work for Chromebook:
 # TODOs
     -Issue with setup.sh
         - detects env setup when its not, i think...
-
-    - Add a stats report
-        - Number of apps tested
-            - Number passed
-            - Number failed
-            - Number invalid
-            - Number misnamed
-
+        - Needed to install requirements.txt manually.
 
     - Strategy when we have two continue buttons and one is disabled but has the higher probability
         - we should try to click all of them unless something happens?
-            - Make it try more continue buttons before takinga new screenshot...
+            - Make it try more continue buttons before takinga new screenshot...??
 
     - Improve model
         - recently labeled FBAuth in Dataset, in v5 from Roboflow, we will have NEW LABELS

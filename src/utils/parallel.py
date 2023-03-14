@@ -281,6 +281,8 @@ class MultiprocessTaskRunner:
        |_  __  _|_  __  _|_  __  _| /\__/ / || (_| | |_\__ \ |_  __  _|_  __  _|_  __  _|
          |_||_|   |_||_|   |_||_|   \____/ \__\__,_|\__|___/   |_||_|   |_||_|   |_||_|  """
         p_cyan(HEADER, "\n\n")
+        num_passed_apps = len(self.packages) - len(self.failed_apps.keys()) - len(self.bad_apps.keys())
         p_blue(f"\tApps tested:",end=""); print(len(self.packages));
+        p_blue(f"\tPassed apps:",end=""); print(num_passed_apps);
         p_blue(f"\tFailed apps:",end=""); print(len(self.failed_apps.keys()));
         p_blue(f"\tInvalid apps apps:",end=""); print(len(self.bad_apps.keys()));
