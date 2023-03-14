@@ -8,7 +8,7 @@ from multiprocessing import Process, Queue
 from time import sleep
 from typing import Dict, List
 from utils.utils import (
-    BASE_PORT, CONFIG, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, WEIGHTS, Device, android_des_caps)
+    BASE_PORT, CONFIG, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, WEIGHTS, Device, android_des_caps, p_blue, p_cyan, p_red)
 from playstore.playstore import AppValidator, FacebookApp, ValidationReport
 import signal
 import sys
@@ -195,6 +195,8 @@ class MultiprocessTaskRunner:
                 validators += 1
                 print(f"Validators: {validators=}")
             sleep(1.2)
+        print('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n')
+        self.print_stats()
 
 
     def get_final_reports(self):
@@ -268,3 +270,17 @@ class MultiprocessTaskRunner:
             start = end
 
             self.__start_process(service_item.ip, service_item.port, packages_to_test)
+
+    def print_stats(self):
+        ''' Prints number of apps tested, invalid apps and failed apps. '''
+        HEADER = """
+          _  _     _  _     _  _     _____ _        _           _  _     _  _     _  _
+        _| || |_ _| || |_ _| || |_  /  ___| |      | |        _| || |_ _| || |_ _| || |_
+       |_  __  _|_  __  _|_  __  _| \ `--.| |_ __ _| |_ ___  |_  __  _|_  __  _|_  __  _|
+        _| || |_ _| || |_ _| || |_   `--. \ __/ _` | __/ __|  _| || |_ _| || |_ _| || |_
+       |_  __  _|_  __  _|_  __  _| /\__/ / || (_| | |_\__ \ |_  __  _|_  __  _|_  __  _|
+         |_||_|   |_||_|   |_||_|   \____/ \__\__,_|\__|___/   |_||_|   |_||_|   |_||_|  """
+        p_cyan(HEADER, "\n\n")
+        p_blue(f"\tApps tested:",end=""); print(len(self.packages));
+        p_blue(f"\tFailed apps:",end=""); print(len(self.failed_apps.keys()));
+        p_blue(f"\tInvalid apps apps:",end=""); print(len(self.bad_apps.keys()));

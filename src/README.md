@@ -47,6 +47,17 @@ Prep work for Chromebook:
 
 
 # TODOs
+    -Issue with setup.sh
+        - detects env setup when its not, i think...
+
+    - Add a stats report
+        - Number of apps tested
+            - Number passed
+            - Number failed
+            - Number invalid
+            - Number misnamed
+
+
     - Strategy when we have two continue buttons and one is disabled but has the higher probability
         - we should try to click all of them unless something happens?
             - Make it try more continue buttons before takinga new screenshot...

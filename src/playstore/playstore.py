@@ -32,7 +32,7 @@ from utils.utils import (ACCOUNTS, ADB_KEYCODE_DEL, ADB_KEYCODE_ENTER, CONFIG,
                          ErrorDetector, check_amace, close_app,
                          create_dir_if_not_exists, get_cur_activty,
                          get_root_path, get_views, is_download_in_progress,
-                         open_app, save_resized_image,
+                         open_app, p_alert, p_blue, p_cyan, p_green, p_purple, p_red, p_yellow, save_resized_image,
                          transform_coord_from_resized)
 
 
@@ -42,20 +42,7 @@ class ANRThrownException(Exception):
 class ValidationReport:
     '''
         A simple class to format the status report of AppValidator.
-
-        = {
-            package_name: {
-                'status': -1,
-                'reason': "",
-                'name': "",
-                'report_title': "",
-                'history': [],
-            }
-        }
-
-        THis is good for a single merged report by app name but we now want
-
-        = {
+         = {
             device_name: {
                 package_name: {
                     'status': -1,
@@ -63,37 +50,23 @@ class ValidationReport:
                     'name': "",
                     'report_title': "",
                     'history': [],
-                }
+                },
+                ...,
             },
             device_name2: {
-
+                package_name: {
+                    'status': -1,
+                    'reason': "",
+                    'name': "",
+                    'report_title': "",
+                    'history': [],
+                },
+                ...,
             }
         }
     '''
     PASS = 0
     FAIL = 1
-    RED = "\033[31m"
-    Black = "\033[30m"
-    Green = "\033[32m"
-    Yellow = "\033[33m"
-    Blue = "\033[34m"
-    Purple = "\033[35m"
-    Cyan = "\033[36m"
-    White = "\033[37m"
-    RESET = "\033[0m"
-
-    COLORS = [
-        Black,
-        White,
-        RED,
-        Green,
-        Yellow,
-        Blue,
-        Purple,
-        Cyan,
-    ]
-
-    REPEAT_TIMES = 2*len(COLORS)
 
     @staticmethod
     def default_dict():
@@ -137,10 +110,8 @@ class ValidationReport:
     @staticmethod
     def ascii_starting(color=None):
         ''' Report decoration.'''
-        if color is None:
-            color = ValidationReport.Green
-        print(color)
-        print('''
+
+        p_green('''
               _  _     _  _     _  _     _____ _            _   _                         _  _     _  _     _  _
             _| || |_ _| || |_ _| || |_  /  ___| |          | | (_)                      _| || |_ _| || |_ _| || |_
            |_  __  _|_  __  _|_  __  _| \ `--.| |___ _ _ __| |_ _ _ __   __ _          |_  __  _|_  __  _|_  __  _|
@@ -150,23 +121,19 @@ class ValidationReport:
                                                                          __/ |
                                                                         |___/
         ''')
-        print(ValidationReport.RESET)
 
     @staticmethod
     def anim_starting():
         ''' Report decoration.'''
         print("\033[2J")  # clear the screen
-        for i in range(ValidationReport.REPEAT_TIMES):
-            color = ValidationReport.COLORS[i % 3]
-            print("\033[0;0H")  # move cursor to top-left corner
-            ValidationReport.ascii_starting(color)
-            sleep(0.075)
+        print("\033[0;0H")  # move cursor to top-left corner
+        ValidationReport.ascii_starting()
 
     @staticmethod
     def ascii_header():
         ''' Report decoration.'''
-        print(ValidationReport.Green)
-        print('''
+
+        p_green('''
               _  _     _  _     _  _    ______                      _       _  _     _  _     _  _
             _| || |_ _| || |_ _| || |_  | ___ \                    | |    _| || |_ _| || |_ _| || |_
            |_  __  _|_  __  _|_  __  _| | |_/ /___ _ __   ___  _ __| |_  |_  __  _|_  __  _|_  __  _|
@@ -176,14 +143,11 @@ class ValidationReport:
                                                 | |
                                                 |_|
         ''')
-        print(ValidationReport.RESET)
 
     @staticmethod
     def ascii_footer():
         ''' Report decoration.'''
-        print(ValidationReport.Green)
-
-        print('''
+        p_green('''
                _  _     _  _     _  _     _   ___ _ _       _       _    _ _           _  _____     _  _     _  _     _  _
              _| || |_ _| || |_ _| || |_  | | / (_) | |     | |     | |  | | |         | ||____ |  _| || |_ _| || |_ _| || |_
             |_  __  _|_  __  _|_  __  _| | |/ / _| | |_   _| |__   | |  | | |__   __ _| |    / / |_  __  _|_  __  _|_  __  _|
@@ -191,7 +155,6 @@ class ValidationReport:
             |_  __  _|_  __  _|_  __  _| | |\  \ | | | |_| | | | | \  /\  / | | | (_| | |.___/ / |_  __  _|_  __  _|_  __  _|
               |_||_|   |_||_|   |_||_|   \_| \_/_|_|_|\__,_|_| |_|  \/  \/|_| |_|\__,_|_|\____/    |_||_|   |_||_|   |_||_|
         ''')
-        print(ValidationReport.RESET)
 
     @staticmethod
     def sorted_package_name(p: List):
@@ -211,37 +174,19 @@ class ValidationReport:
     @staticmethod
     def print_app_report(package_name: str, status_obj: Dict):
         is_good = status_obj['status'] == ValidationReport.PASS
-        status_color = ValidationReport.Green if is_good else ValidationReport.RED
-        # print("Status obj: ", status_obj, status_color, is_good)
-        print(ValidationReport.Blue, end="")
-        print(f"{status_obj['name']} ", end="")
-        print(ValidationReport.RESET, end="")
-
-        print(ValidationReport.Cyan, end="")
-        print(f"{package_name} ", end="")
-        print(ValidationReport.RESET, end="")
-
-        print(status_color, end="")
-        print("PASSED" if is_good else "FAILED", end="")
-        print(ValidationReport.RESET, end="")
-
-        print(ValidationReport.Purple, end="")
-        print(f" - [{status_obj['report_title']}]", end="")
-        print(ValidationReport.RESET, end="")
+        p_blue(f"{status_obj['name']} ", end="")
+        p_cyan(f"{package_name} ", end="")
+        p_green("PASSED", end="") if is_good else p_red("FAILED", end="")
+        p_purple(f" - [{status_obj['report_title']}]", end="")
 
         if len(status_obj['reason']) > 0:
             print("\n\t", "Final status: ", end="")
-            print(ValidationReport.Green if is_good else ValidationReport.RED, end="")
-            print( status_obj['reason'], end="")
-            print(ValidationReport.RESET, end="")
-            print()
+            p_green( status_obj['reason'], end="") if is_good else p_red( status_obj['reason'])
 
         # Print History
-        print(ValidationReport.Yellow, end="")
         for hist in status_obj['history']:
-            print("\t", hist['msg'])
-            print("\t\t", f"Img: {hist['img']}")
-        print(ValidationReport.RESET, end="")
+            p_yellow("\t", hist['msg'])
+            p_yellow("\t\t", f"Img: {hist['img']}")
         print()
 
     @staticmethod
@@ -327,11 +272,19 @@ class AppValidator:
         self.dev_ss_count = 320
 
     def dprint(self, *args):
-        color = self.report.COLORS[2:][self.instance_num % len(self.report.COLORS[2:])]
-        print(color,end="")
-        print(f"{self.ip} - ", *args, end="")
-        print(self.report.RESET)
-
+        n = self.instance_num % 6  # 6 colors to pick from
+        if(n == 0):
+            p_red(f"{self.ip} - ", *args, end="")
+        elif(n == 1):
+            p_green(f"{self.ip} - ", *args, end="")
+        elif(n == 2):
+            p_yellow(f"{self.ip} - ", *args, end="")
+        elif(n == 3):
+            p_blue(f"{self.ip} - ", *args, end="")
+        elif(n == 4):
+            p_purple(f"{self.ip} - ", *args, end="")
+        elif(n == 5):
+            p_cyan(f"{self.ip} - ", *args, end="")
 
     ##  ADB app management
     def is_open(self, package_name: str) -> bool:
@@ -782,7 +735,7 @@ class AppValidator:
         logged_in = False
         login_entered = False
         password_entered = False
-        while not logged_in and login_attemps < 2:
+        while not logged_in and login_attemps < 4:
             CrashType, crashed_act, msg = self.err_detector.check_crash()
             if(not CrashType == CrashTypes.SUCCESS):
                 self.update_report_history(app_package_name, f"{CrashTypes.value}: {crashed_act} - {msg}")
@@ -1239,7 +1192,7 @@ class FacebookApp:
         ''' Runs app valdiator to install, launch and login to Facebook.
         '''
         if not CONFIG.login_facebook:
-            print(f"Skipping pre-process FB install {CONFIG.login_facebook=}")
+            p_alert(f"Skipping pre-process FB install {CONFIG.login_facebook=}")
             return
         self.validator.uninstall_app(self.package_name, force_rm=True)
         self.validator.run()

@@ -761,7 +761,6 @@ class TSV:
                 num_updated += 1
             i += 1
 
-        print(f"Updated app_list: {num_updated=}")
         if num_updated:
             self.__write_file()
 
@@ -793,6 +792,44 @@ class TSV:
         with open(path, 'w') as f:
             for key in failed_apps:
                 f.write(f"{failed_apps[key]}\t{key}\n")
+
+
+##     Colored printing     ##
+Red = "\033[31m"
+Black = "\033[30m"
+Green = "\033[32m"
+Yellow = "\033[33m"
+Blue = "\033[34m"
+Purple = "\033[35m"
+Cyan = "\033[36m"
+White = "\033[37m"
+RESET = "\033[0m"
+
+def p_red(*args, end='\n'):
+    print(Red, *args, RESET, end=end)
+def p_green(*args, end='\n'):
+    print(Green, *args, RESET, end=end)
+def p_yellow(*args, end='\n'):
+    print(Yellow, *args, RESET, end=end)
+def p_blue(*args, end='\n'):
+    print(Blue, *args, RESET, end=end)
+def p_purple(*args, end='\n'):
+    print(Blue, *args, RESET, end=end)
+def p_cyan(*args, end='\n'):
+    print(Cyan, *args, RESET, end=end)
+def p_alert(msg):
+    art = r"""
+          _ ._  _ , _ ._
+        (_ ' ( `  )_  .__)
+      ( (  (    )   `)  ) _)
+     (__ (_   (_ . _) _) ,__)
+         `~~`\ ' . /`~~`
+              ;   ;
+              /   \
+_____________/_ __ \_____________"""
+    p_red(art)
+    p_blue(msg)
+    print()
 
 
 ##      Appium config & stuff  ##
