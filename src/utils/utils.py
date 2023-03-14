@@ -12,7 +12,7 @@ import numpy as np
 
 
 class _CONFIG:
-    login_facebook =  True
+    login_facebook =  False
     multi_split_packages = False
 
 

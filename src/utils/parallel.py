@@ -120,6 +120,7 @@ class AppValidatorPickle:
         self.report = deepcopy(ValidationReportPickle(validator.report))
         self.update_app_names = deepcopy(validator.update_app_names)
         self.bad_apps = deepcopy(validator.bad_apps)
+        self.failed_apps = deepcopy(validator.failed_apps)
 
 class MultiprocessTaskRunner:
     '''
@@ -189,7 +190,7 @@ class MultiprocessTaskRunner:
                 self.__all_reports.append(validator.report)
                 self.update_app_names.update(validator.update_app_names)
                 self.bad_apps.update(validator.bad_apps)
-                self.__combine_dicts(self.failed_apps)
+                self.__combine_dicts(validator.failed_apps)
 
                 validators += 1
                 print(f"Validators: {validators=}")
