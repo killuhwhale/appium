@@ -272,7 +272,6 @@ class ValidationReport:
                 all_reports[package_name].append(status_obj)
                 all_reports[package_name] = sorted(all_reports[package_name], key=ValidationReport.sorted_device_name)
 
-        print("Reports::::: ", all_reports)
         ValidationReport.ascii_header()
         for package_name, status_objs in sorted(all_reports.items(), key=ValidationReport.sorted_package_name):
             for status_obj in status_objs:
@@ -308,6 +307,7 @@ class AppValidator:
 
         self.update_app_names = collections.defaultdict(str)
         self.bad_apps = collections.defaultdict(str)
+        self.failed_apps = collections.defaultdict(str)
 
         self.steps = [
             'Click search icon',
@@ -331,6 +331,7 @@ class AppValidator:
         print(color,end="")
         print(f"{self.ip} - ", *args, end="")
         print(self.report.RESET)
+
 
     ##  ADB app management
     def is_open(self, package_name: str) -> bool:
@@ -421,6 +422,7 @@ class AppValidator:
             package_name = app_info[1]
             self.uninstall_app(package_name)
 
+
     ##  Http Get
     def check_playstore_invalid(self, package_name) -> bool:
         ''' Checks if an app's package_name is invalid via Google playstore URL
@@ -468,7 +470,6 @@ class AppValidator:
                 return app_title
         else:
             return app_title  # returning app title essentially means there was no change found.
-
 
 
     ##  Buttons
@@ -658,6 +659,7 @@ class AppValidator:
         self.driver.orientation = 'PORTRAIT'
 
 
+    ## Logging in.
     def sleep_while_in_progress(self, app_package_name: str):
         ''' Sleeps while in download is in progress.
 
@@ -1162,6 +1164,9 @@ class AppValidator:
                     elif not app_title == self.check_playstore_name(app_package_name, app_title):
                         reason = f"[{app_title} !=  {self.__name_span_text}] App name does not match the current name on the playstore"
                         self.update_app_names[app_package_name] = self.__name_span_text
+                    else:
+                        reason = f"[{app_title} {error}"
+                        self.failed_apps[app_package_name] = app_title
 
                     self.report.update_status(app_package_name, ValidationReport.FAIL, error)
                     self.update_report_history(app_package_name, f"{reason}")
@@ -1176,14 +1181,14 @@ class AppValidator:
                     elif not app_title == self.check_playstore_name(app_package_name, app_title):
                         reason = f"[{app_title} !=  {self.__name_span_text}] App name does not match the current name on the playstore"
                         self.update_app_names[app_package_name] = self.__name_span_text
-
                     elif not self.is_installed(app_package_name):
                         reason = "Failed to open because the package was not installed."
+                        self.failed_apps[app_package_name] = app_title
                     else:
                         reason = "Failed to open"
+                        self.failed_apps[app_package_name] = app_title
 
                     self.report.update_status(app_package_name, ValidationReport.FAIL, reason)
-                    print("Failed", self.report.report[app_package_name]['reason'])
                     self.cleanup_run(app_package_name)
                     continue
 

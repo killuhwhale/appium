@@ -1,5 +1,5 @@
 #!/user/bin/bash
-
+echo "Chromebook users: press enter to submit sudo password"
 sudo apt -y install default-jre
 
 RED="\033[31m"

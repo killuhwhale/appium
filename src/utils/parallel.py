@@ -1,18 +1,66 @@
+from appium.webdriver.appium_service import AppiumService
 import collections
 from copy import deepcopy
+from dataclasses import dataclass
 from appium import webdriver
 from collections import defaultdict
 from multiprocessing import Process, Queue
 from time import sleep
-from typing import List
+from typing import Dict, List
 from utils.utils import (
-    CONFIG, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, WEIGHTS, Device, android_des_caps)
+    BASE_PORT, CONFIG, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, WEIGHTS, Device, android_des_caps)
 from playstore.playstore import AppValidator, FacebookApp, ValidationReport
 import signal
 import sys
 
+@dataclass
+class AppiumServiceItem:
+    ip: str
+    port: int
+    service: AppiumService
 
-def validate_task(queue: Queue, packages: List[List[str]], ip: str, device: Device, instance_num: int):
+    def __del__(self):
+        self.service.stop()
+
+
+
+class AppiumServiceManager:
+    '''
+      Given list of ips, create a list of objects to group ip, port number and service.
+
+      Server(we/hub/4723) -> driver(4723) -> ip/device1
+      Server(we/hub/4724) -> driver(4724) -> ip/device2
+      Server(we/hub/4725) -> driver(4725) -> ip/device3
+    '''
+    def __init__(self, ips: List[str]):
+        self.__ips = ips
+        self.__base_port = BASE_PORT
+        self.services: List[AppiumServiceItem] = []
+        self.__start_services()
+
+    def __start_services(self):
+        print(f"starting services for {self.__ips=}")
+        for i, ip in enumerate(self.__ips):
+            try:
+                port = self.__base_port + i + 1
+                print(f"Starting service: {port=} for device at {ip=}")
+                service = AppiumService()
+                service.start(args=['--address', '0.0.0.0', '-p', str(port), '--base-path', '/wd/hub'])
+                # For some reason, interacting with service before returning has prevented random errors like:
+                # Failed to establish a new connection: [Errno 111] Connection refused
+                # Remote end closed
+                while not service.is_listening or not service.is_running:
+                    print("Waiting for appium service to listen...")
+
+                self.services.append(AppiumServiceItem(ip, port, service))
+            except Exception as error:
+                print("Error starting appium server", str(error))
+
+
+
+
+
+def validate_task(queue: Queue, packages: List[List[str]], ip: str, device: Device, port: int):
     '''
         A single task to validate apps on a given device.
     '''
@@ -20,9 +68,10 @@ def validate_task(queue: Queue, packages: List[List[str]], ip: str, device: Devi
         queue.put({})
         return
 
-    print(f"Creating driver for isntance {instance_num}.....")
+
+    print(f"Creating driver for isntance {port}.....")
     driver = webdriver.Remote(
-        "http://localhost:4723/wd/hub",
+        f"http://localhost:{port}/wd/hub",
         android_des_caps(
             ip,
             PLAYSTORE_PACKAGE_NAME,
@@ -32,14 +81,14 @@ def validate_task(queue: Queue, packages: List[List[str]], ip: str, device: Devi
     driver.implicitly_wait(5)
     driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
 
-    fb_handle = FacebookApp(driver, device, instance_num)
+    fb_handle = FacebookApp(driver, device, port)
     fb_handle.install_and_login()
 
     validator = AppValidator(
         driver,
         packages,
         device,
-        instance_num
+        port - BASE_PORT
     )
     validator.uninstall_multiple()
     validator.run()
@@ -76,7 +125,7 @@ class MultiprocessTaskRunner:
     '''
         Starts running valdiate_task on each device/ ip.
     '''
-    def __init__(self, ips: List[str], packages: List[List[str]], ):
+    def __init__(self, ips: List[str], packages: List[List[str]] ):
         self.queue = Queue()
         self.drivers: List[webdriver.Remote] = []
         self.valdiators: List[AppValidator] = []
@@ -87,8 +136,10 @@ class MultiprocessTaskRunner:
         self.processes = []
         self.__all_reports: List[ValidationReport] = []
         self.packages_recvd = defaultdict(list)
-        self.update_app_names = collections.defaultdict(str)  # Collects apps to update
-        self.bad_apps = collections.defaultdict(str)  # Collects apps to be removed
+        self.update_app_names = collections.defaultdict(str)  # Collects apps to update from all Appvalidator instances ran
+        self.bad_apps = collections.defaultdict(str)  # Collects apps to be removed from all Appvalidator instances ran
+        self.failed_apps = collections.defaultdict(str)  # Collects apps to be removed from all Appvalidator instances ran
+        self.appiumServiceManager = AppiumServiceManager(ips)
         signal.signal(signal.SIGINT, self.handle_sigint)
 
     def handle_sigint(self, _signal, _frame):
@@ -108,6 +159,14 @@ class MultiprocessTaskRunner:
         # except Exception as err:
         #     print("Error: ", err)
         sys.exit(1)
+
+    def __combine_dicts(self, odict: Dict):
+        ''' Updates instace dict failed_apps with commons keys from another dict.'''
+        if not len(self.failed_apps.keys()):
+            self.failed_apps = deepcopy(odict)
+            return
+        common = self.failed_apps.keys() & odict.keys()
+        self.failed_apps =  {key: self.failed_apps[key] for key in common}
 
     def run(self):
         '''
@@ -130,6 +189,8 @@ class MultiprocessTaskRunner:
                 self.__all_reports.append(validator.report)
                 self.update_app_names.update(validator.update_app_names)
                 self.bad_apps.update(validator.bad_apps)
+                self.__combine_dicts(self.failed_apps)
+
                 validators += 1
                 print(f"Validators: {validators=}")
             sleep(1.2)
@@ -160,16 +221,28 @@ class MultiprocessTaskRunner:
         for d in self.devices:
             print(f'\t{d}\n')
 
+
+    def __start_process(self, ip, port_number, apps: List[List[str]]):
+        device = Device(ip)
+        self.devices.append(device)
+        process = Process(target=validate_task, args=(self.queue, apps, ip, device, port_number))
+        process.start()
+        self.processes.append(process)
+
     def start_runs(self) -> List[webdriver.Remote]:
         '''
             Starts ea process w/ all pacakages in list.
         '''
-        for i, ip in enumerate(self.ips):
-            device = Device(ip)
-            self.devices.append(device)
-            process = Process(target=validate_task, args=(self.queue, self.packages, ip, device, i))
-            process.start()
-            self.processes.append(process)
+
+
+        # for i, ip in enumerate(self.ips):
+        for i, service_item in enumerate(self.appiumServiceManager.services):
+            self.__start_process(service_item.ip, service_item.port, self.packages)
+            # device = Device(ip)
+            # self.devices.append(device)
+            # process = Process(target=validate_task, args=(self.queue, self.packages, ip, device, i))
+            # process.start()
+            # self.processes.append(process)
 
     def start_runs_split(self) -> List[webdriver.Remote]:
         '''
@@ -179,7 +252,8 @@ class MultiprocessTaskRunner:
         num_packages_ea = total_packages // len(self.ips)
         rem_packages = total_packages % len(self.ips)
         start = 0
-        for i, ip in enumerate(self.ips):
+        # for i, ip in enumerate(self.ips):
+        for i, service_item in enumerate(self.appiumServiceManager.services):
             end = start + num_packages_ea
             if rem_packages > 0:
                 end += 1
@@ -188,12 +262,8 @@ class MultiprocessTaskRunner:
             else:
                 packages_to_test = self.packages[start: end]
 
-            print(f"Gave {ip} start - end: {start} - {end}")
-            self.packages_recvd[ip] = [start, end]
+            print(f"Gave {service_item.ip} start - end: {start} - {end}")
+            self.packages_recvd[service_item.ip] = [start, end]
             start = end
 
-            device = Device(ip)
-            self.devices.append(device)
-            process = Process(target=validate_task, args=(self.queue, packages_to_test, ip, device, i))
-            process.start()
-            self.processes.append(process)
+            self.__start_process(service_item.ip, service_item.port, packages_to_test)

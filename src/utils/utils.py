@@ -17,6 +17,7 @@ class _CONFIG:
 
 
 CONFIG = _CONFIG()
+BASE_PORT = 4723
 
 weights = 'notebooks/yolov5/runs/train/exp007/weights/best_309.pt'
 weights = 'notebooks/yolov5/runs/train/exp4/weights/best.pt'  # Lastest RoboFlow Model V1
@@ -321,9 +322,6 @@ class AppInfo:
             app_info['is_game'] = self.__has_surface_name()
             return app_info
         return None
-
-
-
 
 class Device:
 
@@ -696,8 +694,9 @@ class TSV:
         self.__app_list = list()
         self.__filename = "app_list.tsv"
         self.__badfilename = "bad_app_list.tsv"
+        self.__failed_app_filename = "failed_app_list.tsv"
         self.__all_bad_apps = dict()
-        self.__home_dir = os.path.expanduser( '~' )
+        self.__home_dir = users_home_dir()
         self.__read_file()
         self.__read_bad_apps()
 
@@ -728,7 +727,10 @@ class TSV:
 
     def export_bad_apps(self, bad_apps: Dict):
         '''
-            Updates instance app_list by removing apps that are also in @bad_apps and then writes entire list to file.
+            After test run is completed, updates instance app_list by removing apps that are also in @bad_apps and then writes entire list to file.
+
+            Args:
+                - bad_apps: List of apps that are deemed invalid during test run.
         '''
         # Rm bad apps from app_list
         updated_list = [[app_name, package_name] for app_name, package_name in self.__app_list if not package_name in bad_apps]
@@ -743,7 +745,11 @@ class TSV:
         self.__write_bad_apps()
 
     def update_list(self, updated_names: Dict):
-        ''' Updates instance app_list with new names and then writes entire list to file. '''
+        '''  After test run is completed, updates instance app_list with new names and then writes entire list to file.
+
+            Args:
+            - updated_names: List of apps that are had mismatched names as compared to the Playstore via web.
+        '''
         i = 0
         end  = len(self.__app_list)
         num_updated = 0
@@ -766,6 +772,29 @@ class TSV:
         with open(f"{self.__home_dir}/{self.__filename}", 'w' ) as f:
             [f.write(f"{app[0]}\t{app[1]}\n") for app in self.__app_list]
 
+    def write_failed_apps(self, failed_apps: Dict):
+        '''
+            Logs failed apps per run that failed on all device tested during the run. Not updated each run.
+
+            Failed apps will inlcude apps that aren't available in the region or where the app doesn't appear as the first result or
+             if the app shares similar names to other apps like: solitaire
+
+            Args:
+             - failed_apps: Apps that failed during test run but are not named wrong and available on playstore.
+        '''
+        if not len(failed_apps.keys()):
+            return
+
+        path = f'{self.__home_dir}/{self.__failed_app_filename}'
+        create_file_if_not_exists(path)
+        with open(path, 'w'):
+            pass
+
+        with open(path, 'w') as f:
+            for key in failed_apps:
+                f.write(f"{failed_apps[key]}\t{key}\n")
+
+
 ##      Appium config & stuff  ##
 def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: AnyStr) -> Dict:
     '''
@@ -782,21 +811,14 @@ def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: An
         'appium:newCommandTimeout': 3600,
         'appium:connectHardwareKeyboard': "true",
         'appium:noReset': True,
-        "appium:uiautomator2ServerInstallTimeout": 60000
+        "appium:uiautomator2ServerInstallTimeout": 60000,
     }
 
-def stop_appium_server():
-    ''' Stops the Appium Server running on port 4723'''
-    cmd = ["kill", "$(lsof -t -i :4723)"]
-    res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
-
-
-def lazy_start_appium_server():
+def lazy_start_appium_server(port: int):
     ''' Attempts to start Appium server. '''
-    print("Starting Server")
     try:
         service = AppiumService()
-        service.start(args=['--address', '0.0.0.0', '-p', str(4723), '--base-path', '/wd/hub'])
+        service.start(args=['--address', '0.0.0.0', '-p', str(port), '--base-path', '/wd/hub'])
         # For some reason, interacting with service before returning has prevented random errors like:
         # Failed to establish a new connection: [Errno 111] Connection refused
         # Remote end closed
@@ -827,10 +849,11 @@ def create_file_if_not_exists(path):
         with open(path, 'w'):
             pass
 
-
 def file_exists(directory):
     return os.path.exists(directory)
 
+def users_home_dir():
+    return os.path.expanduser( '~' )
 
 ##              App stuff           ##
 

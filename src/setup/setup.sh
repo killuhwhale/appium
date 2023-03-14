@@ -10,7 +10,7 @@ Cyan="\033[36m"
 White="\033[37m"
 RESET="\033[0m"
 
-
+echo "Chromebook users: press enter to submit sudo password"
 sudo apt -y install default-jre
 sudo apt -y install libnss3-dev libgdk-pixbuf2.0-dev libgtk-3-dev libxss-dev
 
@@ -36,8 +36,8 @@ else
     echo -e "\n\n $Blue Installed NVM $RESET \n\n"
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 
-    echo "If nvm or npm not command seen, run "
-    echo -e "\n\n $Cyan If nvm or npm not command seen, Run: \n\t $Red exec bash $RESET \n $Cyan and rerun script! $RESET \n\n"
+    echo "If nvm or npm command not seen, run "
+    echo -e "\n\n $Cyan If nvm or npm command not seen, Run: \n\t $Red exec bash $RESET \n $Cyan and rerun script! $RESET \n\n"
 
     source ~/.bashrc
     echo -e "\n\n $Blue Installing Node 18.7.0 $RESET \n\n"
