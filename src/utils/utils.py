@@ -55,10 +55,9 @@ IMAGE_LABELS = [
 ]
 
 ACCOUNTS = None
-with open('accounts.json', 'r') as f:
+with open(f"{os.path.expanduser( '~' )}/accounts.json", 'r') as f:
     ACCOUNTS = json.load(f)
-
-print(f"{ACCOUNTS}")
+print(f"{ACCOUNTS=}")
 class ArcVersions(Enum):
     '''
         Enumeration for each Android Version we intend to support.
