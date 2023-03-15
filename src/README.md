@@ -92,7 +92,7 @@ Prep work for Chromebook:
 
     - Detect AMAC-e (determine if app is O4C) -> impossible feat so far unless building test image.
         - AMAC-E overlays will not actually interfere with our process.
-        - When sending comands via ADB, it essentially ignore those windows/ overlays.
+        - When sending comands via ADB, it essentially ignores those windows/ overlays.
 
 
 

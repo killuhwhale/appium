@@ -15,9 +15,18 @@ test:  # test images (optional)
 
 # Old Classes | Login Field, Password Field, Continue, Google Auth, Facebook Auth, Sign In
 # Classes | 'Close', 'Continue', 'GoogleAuth', 'loginfield', 'passwordfield'
+# names:
+#   0: Close
+#   1: Continue
+#   2: GoogleAuth
+#   3: loginfield
+#   4: passwordfield
 names:
   0: Close
-  1: Continue
-  2: GoogleAuth
-  3: loginfield
-  4: passwordfield
+  1: code
+  2: Continue
+  3: FBAuth
+  4: GoogleAuth
+  5: loginfield
+  6: passwordfield
+  7: Two

@@ -28,10 +28,9 @@ weights = 'notebooks/yolov5/runs/train/exp007/weights/best_309.pt'
 weights = 'notebooks/yolov5/runs/train/exp4/weights/best.pt'  # Lastest RoboFlow Model V1
 weights = 'notebooks/yolov5/runs/train/exp6/weights/best.pt'  # Lastest RoboFlow Model V2
 weights = 'notebooks/yolov5/runs/train/exp7/weights/best.pt'  # Lastest RoboFlow Model V3
-WEIGHTS = 'notebooks/yolov5/runs/train/exp8/weights/best.pt'  # Lastest RoboFlow Model V4
+weights = 'notebooks/yolov5/runs/train/exp8/weights/best.pt'  # Lastest RoboFlow Model V4
+WEIGHTS = 'notebooks/yolov5/runs/train/exp9/weights/best.pt'  # Lastest RoboFlow Model V5
 
-# Ip Address of machien Running Appium Server
-EXECUTOR = 'http://192.168.0.175:4723/wd/hub'
 PLAYSTORE_PACKAGE_NAME = "com.android.vending"
 PLAYSTORE_MAIN_ACT = "com.google.android.finsky.activities.MainActivity"
 FACEBOOK_PACKAGE_NAME = "com.facebook.katana"
