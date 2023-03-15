@@ -1,5 +1,6 @@
 from copy import deepcopy
 from dataclasses import dataclass
+import json
 import logging
 from appium.webdriver.appium_service import AppiumService
 import __main__
@@ -53,14 +54,11 @@ IMAGE_LABELS = [
     SIGN_IN
 ]
 
-ACCOUNTS = {
-    'com.roblox.client': ['testminnie000', 'testminnie123'],
-    'com.facebook.orca': ['testminnie001@gmail.com', 'testminnie123'],
-    'com.facebook.talk': ['testminnie001@gmail.com', 'testminnie123'],
-    FACEBOOK_PACKAGE_NAME: ['testminnie001@gmail.com', 'testminnie123'],
+ACCOUNTS = None
+with open('accounts.json', 'r') as f:
+    ACCOUNTS = json.load(f)
 
-}
-
+print(f"{ACCOUNTS}")
 class ArcVersions(Enum):
     '''
         Enumeration for each Android Version we intend to support.
@@ -748,9 +746,9 @@ class TSV:
 
     def __init__(self):
         self.__app_list = list()
-        self.__filename = "app_list.tsv"
-        self.__badfilename = "bad_app_list.tsv"
-        self.__failed_app_filename = "failed_app_list.tsv"
+        self.__filename = "app_list.tsv" # This file should be place in the home dir on linux ~/
+        self.__badfilename = "bad_app_list.tsv" # This will be created in the home dir ~/
+        self.__failed_app_filename = "failed_app_list.tsv" # This will be created in the home dir ~/
         self.__all_bad_apps = dict()
         self.__home_dir = users_home_dir()
         self.__read_file()
