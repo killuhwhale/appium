@@ -1,3 +1,6 @@
+from copy import deepcopy
+from dataclasses import dataclass
+import logging
 from appium.webdriver.appium_service import AppiumService
 import __main__
 from datetime import datetime
@@ -6,7 +9,7 @@ import re
 import subprocess
 from enum import Enum
 from time import time
-from typing import AnyStr, Dict, List, Tuple
+from typing import AnyStr, Dict, List, Tuple, Union
 import cv2
 import numpy as np
 
@@ -14,6 +17,7 @@ import numpy as np
 class _CONFIG:
     login_facebook =  False
     multi_split_packages = False
+    debug_print = False
 
 
 CONFIG = _CONFIG()
@@ -135,15 +139,56 @@ class DEVICES(Enum):
             return DEVICES.UNKNOWN
 
 
+
 # APK & Manifest stuff
+@dataclass(frozen=True)
+class AppData:
+    ''' Represents app information to capture. '''
+    name: str
+    versionCode: str
+    versionName: str
+    compileSdkVersion: str
+    compileSdkVersionCodename: str
+    is_pwa: bool
+    is_game: bool
+
 class AppInfo:
+    '''
+        Manages the process of pulling APK from device, extracting the
+         manifest text and parsing the manifest text for the information in @
+         dataclass AppData
+
+        package: name='air.com.lunime.gachaclub' versionCode='1001001' versionName='1.1.0'
+
+        package: name='com.plexapp.android' versionCode='855199985' versionName='9.15.0.38159' compileSdkVersion='33' compileSdkVersionCodename='13'
+        package: name='com.tumblr' versionCode='1280200110' versionName='28.2.0.110' compileSdkVersion='33' compileSdkVersionCodename='13'
+
+        .split(" ") => ['package:', "name='com.tumblr'", "versionCode='855199985'"]
+        skip index=0
+        split("=") => ["name", "'com.tumblr'"]
+        remove quotes from index 1
+        .replace("'", "")
+        Then create a dict from the list of lists.
+    '''
     def __init__(self, transport_id: str, package_name: str):
         self.transport_id = transport_id
         self.package_name = package_name
+        self.__info = {
+                'name': '',
+                'versionCode': '',
+                'versionName': '',
+                'compileSdkVersion': '',
+                'compileSdkVersionCodename': '',
+                'is_pwa': False,
+                'is_game': False
+            }
+        self.__process_app()
 
-    def __get_aapt_version(self ):
-        '''
-            Returns path of the latest version of aapt installed on host device.
+    def __get_aapt_version(self) -> str:
+        ''' Get the latest version of aapt on host device.
+
+            Returns:
+             - path of the latest version of aapt installed on host device.
         '''
         android_home = os.environ.get("ANDROID_HOME")
         # aapt = f"{android_home}/build-tools/*/aapt"
@@ -155,7 +200,15 @@ class AppInfo:
             return  os.path.join(aapt, item, "aapt")
         return ""
 
-    def __check_chromium_webapk(self, manifest: str):
+    def __check_chromium_webapk(self, manifest: str) -> bool:
+        ''' Checks app's manifest to detect if the app is a PWA.
+
+            Args:
+             - manifest: A str containing the entire manifest text.
+
+            Returns:
+             - True if org.chromium.webapk.shell_apk is present in the manifest text.
+        '''
         pattern = r".*org\.chromium\.webapk\.shell_apk.*"
         matches = re.findall(pattern, manifest, flags=re.MULTILINE)
         print(f"{matches=}")
@@ -176,7 +229,8 @@ class AppInfo:
             Grabs APK via ADB PULL /path/to/apk
             and stores it in /apks/<package_name>
 
-            Returns True when APK is in required location. False otherwise.
+            Returns:
+             - True when APK is in required location. False otherwise.
         '''
         print("Gettign APK ", self.package_name)
 
@@ -212,8 +266,12 @@ class AppInfo:
 
         return True
 
-    def __download_manifest(self):
-        ''' Grabs the APK Manifest from ...  '''
+    def __download_manifest(self) -> str:
+        ''' Grabs Manifest from the APK using aapt dump bading.
+
+            Returns:
+                - the manifest text.
+        '''
         # /Android/Sdk/tools/bin/apkanalyzer manifest print /path/to/app.apk
         #     N: android=http://schemas.android.com/apk/res/android
         #   E: manifest (line=0)
@@ -248,36 +306,34 @@ class AppInfo:
 
         return manifest
 
-    def __get_app_info(self, manifest_text: str)  -> dict:
-        ''' Grabs the App version from ...
+    def __populate_app_info(self, manifest_text: str)  -> dict:
+        ''' Populates the App information from manifest text.
+
+            Args:
+             - manifest_text: Text from the apps manifest file in the APK.
         '''
         if not manifest_text:
             return Dict()
         info_line = manifest_text.split("\n")[0]
-        # Define the regular expression pattern
-        pattern = r"name='(?P<name>.*?)' versionCode='(?P<versionCode>.*?)' versionName='(?P<versionName>.*?)' compileSdkVersion='(?P<compileSdkVersion>.*?)' compileSdkVersionCodename='(?P<compileSdkVersionCodename>.*?)'"
 
-        # Search for the pattern in the string
-        match = re.search(pattern, info_line)
+        try:
+            parts = info_line.split(" ")[1: ]
+            for part in parts:
+                pieces = part.split("=")
+                pieces[1].replace("'", "")
+                self.__info[pieces[0]] = pieces[1]
+        except Exception as error:
+            print("Error w/ __get_app_info: ", error)
 
-        # Extract the groups
-        if match:
-            info = {
-                'name': match.group("name"),
-                'versionCode': match.group("versionCode"),
-                'versionName': match.group("versionName"),
-                'compileSdkVersion': match.group("compileSdkVersion"),
-                'compileSdkVersionCodename': match.group("compileSdkVersionCodename"),
-                'is_pwa': self.__check_chromium_webapk(manifest_text)
-            }
+        self.__info['is_pwa'] = self.__check_chromium_webapk(manifest_text)
 
-            # print(f'Match found!  {info}')
-            return info
-        else:
-            print("No match found.")
-        return dict()
 
-    def __has_surface_name(self) -> str:
+    def __has_surface_name(self) -> bool:
+        ''' Checks SurfaceFlinger for a surface matching the package name.
+
+            Returns:
+                - True if there is a matching surface name.
+        '''
         pattern_with_surface = rf"""^SurfaceView\s*-\s*(?P<package>{self.package_name})/[\w.#]*$"""                    # Surface window
         re_surface = re.compile(pattern_with_surface, re.MULTILINE | re.IGNORECASE | re.VERBOSE)
         cmd = ('adb', '-t', self.transport_id, 'shell', 'dumpsys', 'SurfaceFlinger', '--list')
@@ -310,39 +366,40 @@ class AppInfo:
         #     return True
         return False
 
-    def gather_app_info(self):
-        '''
-        Downloads APK & manifest from App and extracts information from Manifest.
+    def __process_app(self) -> Union[AppData, None]:
+        ''' Downloads APK & manifest from App and extracts information from Manifest.
+
+            Returns:
+                - A dict containing the app's information.
         '''
         if self.__get_apk():
             manifest = self.__download_manifest()
             if not manifest:
+                p_alert("No manifest found.")
                 return None
-            app_info = self.__get_app_info(manifest)
-            app_info['is_game'] = self.__has_surface_name()
-            return app_info
-        return None
+            self.__info = self.__populate_app_info(manifest)
+            self.__info['is_game'] = self.__has_surface_name()
+
+    def info(self):
+        return AppData(**self.__info)
+
+@dataclass(frozen=True)
+class DeviceData:
+    ip: str
+    transport_id: str
+    is_emu: bool
+    arc_version: str
+    device_name: str
+    channel: str
+    wxh: str
+    arc_build: str
+    product_name: str
 
 class Device:
-
-    class __DeviceInfo:
-        def __init__(self, info):
-            self.ip = info['ip']
-            self.transport_id = info['transport_id']
-            self.is_emu = info['is_emu']
-            self.arc_version = info['arc_version']
-            self.device_name: DEVICES = DEVICES.get_device(info['device_name'])
-            self.channel = info['channel']
-            self.wxh = info['wxh']
-            self.arc_build = info['arc_build']
-            self.product_name = info['product_name']
-            # TODO() add board name like hatch strongbad
-
-
     def __init__(self, ip: str):
         self.__is_connected = self.__adb_connect(ip)
         self.__transport_id = self.__find_transport_id(ip)
-        self.__device_info = self.__DeviceInfo({
+        self.__device_info = {
             'ip': ip,
             'transport_id': self.__transport_id,
             'is_emu': self.__is_emulator(),
@@ -352,11 +409,10 @@ class Device:
             'wxh': self.__get_display_size(),
             'arc_build': self.__get_arc_build(),
             'product_name': self.__get_product_name(),
-        })
-        print(self)
+        }
 
     def __str__(self):
-        return f"{self.__device_info.device_name.value}({self.__device_info.arc_version.value}): {self.__device_info.channel} - {self.__device_info.arc_build} - {self.__device_info.product_name}"
+        return f"{self.__device_info['device_name']}({self.__device_info['arc_version']}): {self.__device_info['channel']} - {self.__device_info['arc_build']} - {self.__device_info['product_name']}"
 
     def is_connected(self):
         return self.__is_connected
@@ -522,8 +578,8 @@ class Device:
         return None
 
 
-    def info(self) -> __DeviceInfo:
-        return self.__device_info
+    def info(self) -> DeviceData:
+        return DeviceData(**self.__device_info)
 
 class ErrorDetector:
     ''' Detects crashes from Logcat and ANRs from Dumpsys activity.
@@ -793,6 +849,34 @@ class TSV:
             for key in failed_apps:
                 f.write(f"{failed_apps[key]}\t{key}\n")
 
+filename = 'latest_report.txt'
+logger = logging.getLogger('my_logger')
+logger.setLevel(logging.DEBUG)
+
+# Create a file handler for the logger
+with open(filename, 'w'):
+    pass
+
+file_handler = logging.FileHandler(filename)
+file_handler.setLevel(logging.DEBUG)
+
+# Create a formatter for the file handler
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+
+# Add the file handler to the logger
+logger.addHandler(file_handler)
+
+
+# Define a custom print function that logs the message and prints it to the console
+def log(*args, **kwargs):
+    message = ' '.join(map(str, args)) + kwargs['end']
+    logger.info(message)
+
+def print_log(*args, **kwargs):
+    message = ' '.join(map(str, args))
+    logger.info(message)
+    print(message)
 
 ##     Colored printing     ##
 Red = "\033[31m"
@@ -805,18 +889,26 @@ Cyan = "\033[36m"
 White = "\033[37m"
 RESET = "\033[0m"
 
+
 def p_red(*args, end='\n'):
     print(Red, *args, RESET, end=end)
+    log(*args, end=end)
 def p_green(*args, end='\n'):
     print(Green, *args, RESET, end=end)
+    log(*args, end=end)
 def p_yellow(*args, end='\n'):
     print(Yellow, *args, RESET, end=end)
+    log(*args, end=end)
 def p_blue(*args, end='\n'):
     print(Blue, *args, RESET, end=end)
+    log(*args, end=end)
 def p_purple(*args, end='\n'):
     print(Blue, *args, RESET, end=end)
+    log(*args, end=end)
 def p_cyan(*args, end='\n'):
     print(Cyan, *args, RESET, end=end)
+    log(*args, end=end)
+
 def p_alert(msg):
     art = r"""
           _ ._  _ , _ ._

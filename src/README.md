@@ -48,9 +48,6 @@ Prep work for Chromebook:
 
 
 # TODOs
-    -Issue with setup.sh
-        - detects env setup when its not, i think...
-        - Needed to install requirements.txt manually.
 
     - Strategy when we have two continue buttons and one is disabled but has the higher probability
         - we should try to click all of them unless something happens?

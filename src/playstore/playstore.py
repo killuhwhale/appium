@@ -32,7 +32,7 @@ from utils.utils import (ACCOUNTS, ADB_KEYCODE_DEL, ADB_KEYCODE_ENTER, CONFIG,
                          ErrorDetector, check_amace, close_app,
                          create_dir_if_not_exists, get_cur_activty,
                          get_root_path, get_views, is_download_in_progress,
-                         open_app, p_alert, p_blue, p_cyan, p_green, p_purple, p_red, p_yellow, save_resized_image,
+                         open_app, p_alert, p_blue, p_cyan, p_green, p_purple, p_red, p_yellow, print_log, save_resized_image,
                          transform_coord_from_resized)
 
 
@@ -180,14 +180,14 @@ class ValidationReport:
         p_purple(f" - [{status_obj['report_title']}]", end="")
 
         if len(status_obj['reason']) > 0:
-            print("\n\t", "Final status: ", end="")
+            print_log("\n\t", "Final status: ", end="")
             p_green( status_obj['reason'], end="") if is_good else p_red( status_obj['reason'])
 
         # Print History
         for hist in status_obj['history']:
             p_yellow("\t", hist['msg'])
             p_yellow("\t\t", f"Img: {hist['img']}")
-        print()
+        print_log()
 
     @staticmethod
     def print_report(report: 'ValidationReport', with_history: bool=False):
@@ -272,6 +272,9 @@ class AppValidator:
         self.dev_ss_count = 320
 
     def dprint(self, *args):
+        if not CONFIG.debug_print:
+            return
+
         n = self.instance_num % 6  # 6 colors to pick from
         if(n == 0):
             p_red(f"{self.ip} - ", *args, end="")
@@ -1158,10 +1161,10 @@ class AppValidator:
                 self.update_report_history(app_package_name, "App launch successful.")
                 # self.dev_SS_loop()
 
-                info = AppInfo(self.transport_id, app_package_name).gather_app_info()
+                info = AppInfo(self.transport_id, app_package_name).info()
                 print(f"App {info=}")
-                if info and not info['is_pwa']:
-                    logged_in = self.attempt_login(app_title, app_package_name, info['is_game'])
+                if info and not info.is_pwa:
+                    logged_in = self.attempt_login(app_title, app_package_name, info.is_game)
                     print(f"Attempt loging: {logged_in=}")
 
                 self.cleanup_run(app_package_name)

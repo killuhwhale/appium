@@ -8,10 +8,11 @@ from multiprocessing import Process, Queue
 from time import sleep
 from typing import Dict, List
 from utils.utils import (
-    BASE_PORT, CONFIG, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, WEIGHTS, Device, android_des_caps, p_blue, p_cyan, p_red)
+    BASE_PORT, CONFIG, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, WEIGHTS, Device, android_des_caps, p_blue, p_cyan, p_red, print_log)
 from playstore.playstore import AppValidator, FacebookApp, ValidationReport
 import signal
 import sys
+
 
 @dataclass
 class AppiumServiceItem:
@@ -21,8 +22,6 @@ class AppiumServiceItem:
 
     def __del__(self):
         self.service.stop()
-
-
 
 class AppiumServiceManager:
     '''
@@ -220,9 +219,9 @@ class MultiprocessTaskRunner:
         _| || |_ _| || |_ _| || |_  | | | / _ \ \ / / |/ __/ _ \/ __|  _| || |_ _| || |_ _| || |_
        |_  __  _|_  __  _|_  __  _| | |/ /  __/\ V /| | (_|  __/\__ \ |_  __  _|_  __  _|_  __  _|
          |_||_|   |_||_|   |_||_|   |___/ \___| \_/ |_|\___\___||___/   |_||_|   |_||_|   |_||_|  \n\n\n'''
-        print(BANNER)
+        print_log(BANNER)
         for d in self.devices:
-            print(f'\t{d}\n')
+            print_log(f'\t{d}\n')
 
 
     def __start_process(self, ip, port_number, apps: List[List[str]]):
@@ -251,6 +250,7 @@ class MultiprocessTaskRunner:
         '''
             Splits up the packages to each ea task and starts ea process.
         '''
+        print_log(f"Spliting apps across devices. {CONFIG.multi_split_packages=}")
         total_packages = len(self.packages)
         num_packages_ea = total_packages // len(self.ips)
         rem_packages = total_packages % len(self.ips)
@@ -282,7 +282,7 @@ class MultiprocessTaskRunner:
          |_||_|   |_||_|   |_||_|   \____/ \__\__,_|\__|___/   |_||_|   |_||_|   |_||_|  """
         p_cyan(HEADER, "\n\n")
         num_passed_apps = len(self.packages) - len(self.failed_apps.keys()) - len(self.bad_apps.keys())
-        p_blue(f"\tApps tested:",end=""); print(len(self.packages));
-        p_blue(f"\tPassed apps:",end=""); print(num_passed_apps);
-        p_blue(f"\tFailed apps:",end=""); print(len(self.failed_apps.keys()));
-        p_blue(f"\tInvalid apps apps:",end=""); print(len(self.bad_apps.keys()));
+        p_blue(f"\tApps tested:",end=""); print_log(len(self.packages));
+        p_blue(f"\tPassed apps:",end=""); print_log(num_passed_apps);
+        p_blue(f"\tFailed apps:",end=""); print_log(len(self.failed_apps.keys()));
+        p_blue(f"\tInvalid apps apps:",end=""); print_log(len(self.bad_apps.keys()));
