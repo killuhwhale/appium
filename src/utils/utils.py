@@ -16,9 +16,9 @@ import numpy as np
 
 
 class _CONFIG:
-    login_facebook =  False
-    multi_split_packages = False
-    debug_print = False
+    login_facebook =  False  # Discover, install and sign into Facebook before running AppValidator.
+    multi_split_packages = False  # MultiprocessTaskRunner, splits apps across devices or not
+    debug_print = False # Playstore.py, debug color printing by device.
 
 
 CONFIG = _CONFIG()
@@ -29,7 +29,7 @@ weights = 'notebooks/yolov5/runs/train/exp4/weights/best.pt'  # Lastest RoboFlow
 weights = 'notebooks/yolov5/runs/train/exp6/weights/best.pt'  # Lastest RoboFlow Model V2
 weights = 'notebooks/yolov5/runs/train/exp7/weights/best.pt'  # Lastest RoboFlow Model V3
 weights = 'notebooks/yolov5/runs/train/exp8/weights/best.pt'  # Lastest RoboFlow Model V4
-WEIGHTS = 'notebooks/yolov5/runs/train/exp9/weights/best.pt'  # Lastest RoboFlow Model V5
+WEIGHTS = 'notebooks/yolov5/runs/train/exp10/weights/best.pt'  # Lastest RoboFlow Model V5
 
 PLAYSTORE_PACKAGE_NAME = "com.android.vending"
 PLAYSTORE_MAIN_ACT = "com.google.android.finsky.activities.MainActivity"
@@ -37,26 +37,45 @@ FACEBOOK_PACKAGE_NAME = "com.facebook.katana"
 FACEBOOK_APP_NAME = "Facebook"
 
 # Labels for YOLOv5
+'''names:
+  0: Close
+  1: Continue
+  2: FBAuth
+  3: GoogleAuth
+  4: Two
+  5: code
+  6: loginfield
+  7: passwordfield'''
+
+CLOSE = 'Close'
+CONTINUE = 'Continue'
+FB_ATUH = 'FBAuth'
+GOOGLE_AUTH = 'GoogleAuth'
+TWO = 'Two'
+CODE = 'code'
 LOGIN = 'loginfield'
 PASSWORD = 'passwordfield'
-CONTINUE = 'Continue'
-GOOGLE_AUTH = 'GoogleAuth'
-FB_ATUH = 'Facebook Auth'
-SIGN_IN = 'Sign In'
+
 
 IMAGE_LABELS = [
+    CLOSE,
+    CONTINUE,
+    FB_ATUH,
+    GOOGLE_AUTH,
+    TWO,
+    CODE,
     LOGIN,
     PASSWORD,
-    CONTINUE,
-    GOOGLE_AUTH,
-    FB_ATUH,
-    SIGN_IN
 ]
 
+def users_home_dir():
+    return os.path.expanduser( '~' )
+
 ACCOUNTS = None
-with open(f"{os.path.expanduser( '~' )}/accounts.json", 'r') as f:
+with open(f"{users_home_dir()}/accounts.json", 'r') as f:
     ACCOUNTS = json.load(f)
-print(f"{ACCOUNTS=}")
+
+
 class ArcVersions(Enum):
     '''
         Enumeration for each Android Version we intend to support.
@@ -145,6 +164,7 @@ class AppData:
     versionName: str
     compileSdkVersion: str
     compileSdkVersionCodename: str
+    platformBuildVersionName: str
     is_pwa: bool
     is_game: bool
 
@@ -175,6 +195,7 @@ class AppInfo:
                 'versionName': '',
                 'compileSdkVersion': '',
                 'compileSdkVersionCodename': '',
+                'platformBuildVersionName' : '',
                 'is_pwa': False,
                 'is_game': False
             }
@@ -209,6 +230,44 @@ class AppInfo:
         matches = re.findall(pattern, manifest, flags=re.MULTILINE)
         print(f"{matches=}")
         return True if matches else False
+
+    def __has_surface_name(self) -> bool:
+        ''' Checks SurfaceFlinger for a surface matching the package name.
+
+            Returns:
+                - True if there is a matching surface name.
+        '''
+        pattern_with_surface = rf"""^SurfaceView\s*-\s*(?P<package>{self.package_name})/[\w.#]*$"""                    # Surface window
+        re_surface = re.compile(pattern_with_surface, re.MULTILINE | re.IGNORECASE | re.VERBOSE)
+        cmd = ('adb', '-t', self.transport_id, 'shell', 'dumpsys', 'SurfaceFlinger', '--list')
+        surfaces_list = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+        last = None
+        for match in re_surface.finditer(surfaces_list):
+            print(f"Found match: ", match)
+            last = match
+        if last:
+            if self.package_name != last.group('package'):
+                return False
+            # UE4 games have at least two SurfaceView surfaces. The one
+            # that seems to in the foreground is the last one.
+            # return last.group()
+            return True
+
+        # Some apps will report a surface in use but will not have a SurfaceView.
+        # E.g. Facebook messenger has surfaces views present while the user is on the login screen but it does not report a 'SurfaceView'
+
+        # pattern_without_surface = rf"""^(?P<package>{package_name})/[\w.#]*$"""
+        # re_without_surface = re.compile(pattern_without_surface, re.MULTILINE | re.IGNORECASE | re.VERBOSE)
+        # # Fallback: SurfaceView was not found.
+        # matches_without_surface = re_without_surface.search(surfaces_list)
+        # if matches_without_surface:
+        #     if package_name != matches_without_surface.group('package'):
+        #         return False
+        #         # return (f'Surface not found for package {package_name}. '
+        #         #                 'Please ensure the app is running.')
+        #     # return matches_without_surface.group()
+        #     return True
+        return False
 
     def __get_apk(self) -> bool:
         ''' Grabs the APK from device.
@@ -302,7 +361,7 @@ class AppInfo:
 
         return manifest
 
-    def __populate_app_info(self, manifest_text: str)  -> dict:
+    def __populate_app_info(self, manifest_text: str):
         ''' Populates the App information from manifest text.
 
             Args:
@@ -315,52 +374,21 @@ class AppInfo:
         try:
             parts = info_line.split(" ")[1: ]
             for part in parts:
+                print(f"AppInfo: {part=}")
                 pieces = part.split("=")
-                pieces[1].replace("'", "")
-                self.__info[pieces[0]] = pieces[1]
+                pieces[1] = pieces[1].replace("'", "")
+                print(f"Pieces: {pieces=}")
+                # Add the app information that we are looking for
+                if pieces[0] in self.__info:
+                    self.__info[pieces[0]] = pieces[1]
+                else:
+                    # Skips adding additional information found to avoid an error
+                    # When creating AppData w/ extra keys/ keyword args....
+                    print(f"Found extra app info {part=}")
         except Exception as error:
             print("Error w/ __get_app_info: ", error)
-
         self.__info['is_pwa'] = self.__check_chromium_webapk(manifest_text)
-
-
-    def __has_surface_name(self) -> bool:
-        ''' Checks SurfaceFlinger for a surface matching the package name.
-
-            Returns:
-                - True if there is a matching surface name.
-        '''
-        pattern_with_surface = rf"""^SurfaceView\s*-\s*(?P<package>{self.package_name})/[\w.#]*$"""                    # Surface window
-        re_surface = re.compile(pattern_with_surface, re.MULTILINE | re.IGNORECASE | re.VERBOSE)
-        cmd = ('adb', '-t', self.transport_id, 'shell', 'dumpsys', 'SurfaceFlinger', '--list')
-        surfaces_list = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
-        last = None
-        for match in re_surface.finditer(surfaces_list):
-            print(f"Found match: ", match)
-            last = match
-        if last:
-            if self.package_name != last.group('package'):
-                return False
-            # UE4 games have at least two SurfaceView surfaces. The one
-            # that seems to in the foreground is the last one.
-            # return last.group()
-            return True
-
-        # Some apps will report a surface in use but will not have a SurfaceView.
-        # E.g. Facebook messenger has surfaces views present while the user is on the login screen but it does not report a 'SurfaceView'
-
-        # pattern_without_surface = rf"""^(?P<package>{package_name})/[\w.#]*$"""
-        # re_without_surface = re.compile(pattern_without_surface, re.MULTILINE | re.IGNORECASE | re.VERBOSE)
-        # # Fallback: SurfaceView was not found.
-        # matches_without_surface = re_without_surface.search(surfaces_list)
-        # if matches_without_surface:
-        #     if package_name != matches_without_surface.group('package'):
-        #         return False
-        #         # return (f'Surface not found for package {package_name}. '
-        #         #                 'Please ensure the app is running.')
-        #     # return matches_without_surface.group()
-        #     return True
-        return False
+        self.__info['is_game'] = self.__has_surface_name()
 
     def __process_app(self) -> Union[AppData, None]:
         ''' Downloads APK & manifest from App and extracts information from Manifest.
@@ -373,8 +401,7 @@ class AppInfo:
             if not manifest:
                 p_alert("No manifest found.")
                 return None
-            self.__info = self.__populate_app_info(manifest)
-            self.__info['is_game'] = self.__has_surface_name()
+            self.__populate_app_info(manifest)
 
     def info(self):
         return AppData(**self.__info)
@@ -848,7 +875,7 @@ class TSV:
 
 class __AppLogger:
     def __init__(self):
-        filename = 'latest_report.txt'
+        filename = f'{users_home_dir()}/latest_report.txt'
         logger = logging.getLogger('my_logger')
         logger.setLevel(logging.DEBUG)
 
@@ -875,7 +902,7 @@ class __AppLogger:
     def print_log(self, *args, **kwargs):
         message = ' '.join(map(str, args))
         self.logger.info(message)
-        print(message)
+        print(message, end=kwargs['end'] if 'end' in kwargs else '\n')
 
 logger = __AppLogger()
 ##     Colored printing     ##
@@ -981,8 +1008,7 @@ def create_file_if_not_exists(path):
 def file_exists(directory):
     return os.path.exists(directory)
 
-def users_home_dir():
-    return os.path.expanduser( '~' )
+
 
 ##              App stuff           ##
 

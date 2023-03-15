@@ -21,12 +21,13 @@ test:  # test images (optional)
 #   2: GoogleAuth
 #   3: loginfield
 #   4: passwordfield
+
 names:
   0: Close
-  1: code
-  2: Continue
-  3: FBAuth
-  4: GoogleAuth
-  5: loginfield
-  6: passwordfield
-  7: Two
+  1: Continue
+  2: FBAuth
+  3: GoogleAuth
+  4: Two
+  5: code
+  6: loginfield
+  7: passwordfield

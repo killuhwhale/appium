@@ -27,7 +27,7 @@ from utils.utils import (ACCOUNTS, ADB_KEYCODE_DEL, ADB_KEYCODE_ENTER, CONFIG,
                          CONTINUE, DEVICES, FACEBOOK_APP_NAME,
                          FACEBOOK_PACKAGE_NAME, GOOGLE_AUTH, IMAGE_LABELS,
                          LOGIN, PASSWORD, PLAYSTORE_MAIN_ACT,
-                         PLAYSTORE_PACKAGE_NAME, SIGN_IN, WEIGHTS, AppInfo,
+                         PLAYSTORE_PACKAGE_NAME, WEIGHTS, AppInfo,
                          ArcVersions, BuildChannels, CrashTypes, Device,
                          ErrorDetector, check_amace, close_app,
                          create_dir_if_not_exists, get_cur_activty,
@@ -177,11 +177,11 @@ class ValidationReport:
         p_blue(f"{status_obj['name']} ", end="")
         p_cyan(f"{package_name} ", end="")
         p_green("PASSED", end="") if is_good else p_red("FAILED", end="")
-        p_purple(f" - [{status_obj['report_title']}]", end="")
+        p_purple(f" - [{status_obj['report_title']}]", end="\n")
 
         if len(status_obj['reason']) > 0:
-            logger.print_log("\n\t", "Final status: ", end="")
-            p_green( status_obj['reason'], end="") if is_good else p_red( status_obj['reason'])
+            logger.print_log("\t", "Final status: ", end="")
+            p_green( status_obj['reason']) if is_good else p_red( status_obj['reason'])
 
         # Print History
         for hist in status_obj['history']:

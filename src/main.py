@@ -34,7 +34,7 @@ if __name__ == "__main__":
     TESTING_APPS = tsv.get_apps()
 
 
-    runner = MultiprocessTaskRunner(ips, TESTING_APPS[0:6] )
+    runner = MultiprocessTaskRunner(ips, TESTING_APPS[0:1] )
     runner.run()
 
     tsv.update_list(runner.update_app_names)
