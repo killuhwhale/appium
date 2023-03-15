@@ -8,7 +8,7 @@ from multiprocessing import Process, Queue
 from time import sleep
 from typing import Dict, List
 from utils.utils import (
-    BASE_PORT, CONFIG, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, WEIGHTS, Device, android_des_caps, p_blue, p_cyan, p_red, print_log)
+    BASE_PORT, CONFIG, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, WEIGHTS, Device, android_des_caps, p_blue, p_cyan, p_red, logger)
 from playstore.playstore import AppValidator, FacebookApp, ValidationReport
 import signal
 import sys
@@ -219,9 +219,9 @@ class MultiprocessTaskRunner:
         _| || |_ _| || |_ _| || |_  | | | / _ \ \ / / |/ __/ _ \/ __|  _| || |_ _| || |_ _| || |_
        |_  __  _|_  __  _|_  __  _| | |/ /  __/\ V /| | (_|  __/\__ \ |_  __  _|_  __  _|_  __  _|
          |_||_|   |_||_|   |_||_|   |___/ \___| \_/ |_|\___\___||___/   |_||_|   |_||_|   |_||_|  \n\n\n'''
-        print_log(BANNER)
+        logger.print_log(BANNER)
         for d in self.devices:
-            print_log(f'\t{d}\n')
+            logger.print_log(f'\t{d}\n')
 
 
     def __start_process(self, ip, port_number, apps: List[List[str]]):
@@ -282,7 +282,7 @@ class MultiprocessTaskRunner:
          |_||_|   |_||_|   |_||_|   \____/ \__\__,_|\__|___/   |_||_|   |_||_|   |_||_|  """
         p_cyan(HEADER, "\n\n")
         num_passed_apps = len(self.packages) - len(self.failed_apps.keys()) - len(self.bad_apps.keys())
-        p_blue(f"\tApps tested:",end=""); print_log(len(self.packages));
-        p_blue(f"\tPassed apps:",end=""); print_log(num_passed_apps);
-        p_blue(f"\tFailed apps:",end=""); print_log(len(self.failed_apps.keys()));
-        p_blue(f"\tInvalid apps apps:",end=""); print_log(len(self.bad_apps.keys()));
+        p_blue(f"\tApps tested:",end=""); logger.print_log(len(self.packages));
+        p_blue(f"\tPassed apps:",end=""); logger.print_log(num_passed_apps);
+        p_blue(f"\tFailed apps:",end=""); logger.print_log(len(self.failed_apps.keys()));
+        p_blue(f"\tInvalid apps apps:",end=""); logger.print_log(len(self.bad_apps.keys()));

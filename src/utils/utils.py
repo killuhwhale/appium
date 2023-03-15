@@ -849,35 +849,39 @@ class TSV:
             for key in failed_apps:
                 f.write(f"{failed_apps[key]}\t{key}\n")
 
-filename = 'latest_report.txt'
-logger = logging.getLogger('my_logger')
-logger.setLevel(logging.DEBUG)
 
-# Create a file handler for the logger
-with open(filename, 'w'):
-    pass
+class __AppLogger:
+    def __init__(self):
+        filename = 'latest_report.txt'
+        logger = logging.getLogger('my_logger')
+        logger.setLevel(logging.DEBUG)
 
-file_handler = logging.FileHandler(filename)
-file_handler.setLevel(logging.DEBUG)
+        # Create a file handler for the logger
+        with open(filename, 'w'):
+            pass
 
-# Create a formatter for the file handler
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
+        file_handler = logging.FileHandler(filename)
+        file_handler.setLevel(logging.DEBUG)
 
-# Add the file handler to the logger
-logger.addHandler(file_handler)
+        # Create a formatter for the file handler
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+
+        # Add the file handler to the logger
+        logger.addHandler(file_handler)
+        self.logger = logger
 
 
-# Define a custom print function that logs the message and prints it to the console
-def log(*args, **kwargs):
-    message = ' '.join(map(str, args)) + kwargs['end']
-    logger.info(message)
+    def log(self, *args, **kwargs):
+        message = ' '.join(map(str, args)) + kwargs['end']
+        self.logger.info(message)
 
-def print_log(*args, **kwargs):
-    message = ' '.join(map(str, args))
-    logger.info(message)
-    print(message)
+    def print_log(self, *args, **kwargs):
+        message = ' '.join(map(str, args))
+        self.logger.info(message)
+        print(message)
 
+logger = __AppLogger()
 ##     Colored printing     ##
 Red = "\033[31m"
 Black = "\033[30m"
@@ -892,22 +896,22 @@ RESET = "\033[0m"
 
 def p_red(*args, end='\n'):
     print(Red, *args, RESET, end=end)
-    log(*args, end=end)
+    logger.log(*args, end=end)
 def p_green(*args, end='\n'):
     print(Green, *args, RESET, end=end)
-    log(*args, end=end)
+    logger.log(*args, end=end)
 def p_yellow(*args, end='\n'):
     print(Yellow, *args, RESET, end=end)
-    log(*args, end=end)
+    logger.log(*args, end=end)
 def p_blue(*args, end='\n'):
     print(Blue, *args, RESET, end=end)
-    log(*args, end=end)
+    logger.log(*args, end=end)
 def p_purple(*args, end='\n'):
     print(Blue, *args, RESET, end=end)
-    log(*args, end=end)
+    logger.log(*args, end=end)
 def p_cyan(*args, end='\n'):
     print(Cyan, *args, RESET, end=end)
-    log(*args, end=end)
+    logger.log(*args, end=end)
 
 def p_alert(msg):
     art = r"""
