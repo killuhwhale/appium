@@ -34,7 +34,7 @@ from utils.utils import (ACCOUNTS, ADB_KEYCODE_DEL, ADB_KEYCODE_ENTER, CONFIG,
                          create_dir_if_not_exists, get_cur_activty,
                          get_root_path, get_views, is_download_in_progress, logger,
                          open_app, p_alert, p_blue, p_cyan, p_green, p_purple, p_red, p_yellow, save_resized_image,
-                         transform_coord_from_resized)
+                         transform_coord_from_resized, users_home_dir)
 
 
 class ANRThrownException(Exception):
@@ -230,22 +230,28 @@ class ValidationReport:
         ValidationReport.ascii_footer()
 
     @staticmethod
-    def print_reports_by_app(reports: List['ValidationReport']):
-        ''' Reorders the reports so that all apps are printed grouped together.
-
-            Makes for better view in summary report, we can compare each app's final status.
-        '''
+    def group_reports_by_app(reports: List['ValidationReport']) -> collections.defaultdict(list):
         all_reports = collections.defaultdict(list)
         for report_instance in reports:
             for package_name, status_obj in report_instance.report[report_instance.report_title].items():
                 all_reports[package_name].append(status_obj)
                 all_reports[package_name] = sorted(all_reports[package_name], key=ValidationReport.sorted_device_name)
+        return all_reports
+
+    @staticmethod
+    def print_reports_by_app(reports: List['ValidationReport']):
+        ''' Reorders the reports so that all apps are printed grouped together.
+
+            Makes for better view in summary report, we can compare each app's final status.
+        '''
+        all_reports = ValidationReport.group_reports_by_app(reports)
 
         ValidationReport.ascii_header()
         for package_name, status_objs in sorted(all_reports.items(), key=ValidationReport.sorted_package_name):
             for status_obj in status_objs:
                 ValidationReport.print_app_report(package_name, status_obj)
         ValidationReport.ascii_footer()
+
 
 
 @dataclass
@@ -256,6 +262,8 @@ class ValidationReportStats:
     reports: List[ValidationReport] = field(default_factory=list)
     stats_by_device: collections.defaultdict(Any) = field(default_factory=collections.defaultdict)
     stats: Dict = field(default_factory=dict)
+    __failed_app_filename = f"{users_home_dir()}/failed_apps_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.tsv"
+
 
     @staticmethod
     def default_item():
@@ -313,11 +321,75 @@ class ValidationReportStats:
             'all_invalid': all_invalid,
         }
 
+    def write_failed_apps(self):
+        # Grouped by package_name = []
+        app_reports = ValidationReport.group_reports_by_app(self.reports)
+        with open(f"{self.__failed_app_filename}", 'w') as f:
+            f.write(f"App name\tPackage name\tReport title\tReason\tFailure\n")
+            for package_name, status_objs in sorted(app_reports.items(), key=ValidationReport.sorted_package_name):
+                for status_obj in status_objs:
+                    if status_obj['status'] == ValidationReport.FAIL:
+                        failure = status_obj['new_name'] if status_obj['new_name'] else ''
+                        failure = failure if failure else "Playstore NA" if status_obj['invalid'] else ''
+                        f.write(f"{status_obj['name']}\t{package_name}\t{status_obj['report_title'].split(':')[0]}\t{status_obj['reason']}\t{failure}\n")
+
+
 
     def print_stats(self):
-        print("TODO, print stats total and by device....")
-        print(f"{self.stats_by_device=}")
-        print(f"{self.stats=}")
+        '''
+        self.stats_by_device=defaultdict({
+            'helios_192.168.1.238:5555': {
+                'total_apps': 3, 'total_misnamed': 1, 'total_invalid': 1, 'total_failed': 2
+            },
+            'coachz_192.168.1.113:5555': {
+                'total_apps': 3, 'total_misnamed': 1, 'total_invalid': 1, 'total_failed': 2
+            },
+            'eve_192.168.1.125:5555': {
+                'total_apps': 3, 'total_misnamed': 1, 'total_invalid': 1, 'total_failed': 2
+            }
+        })
+
+        self.stats={
+            'total_apps': 9,
+            'total_misnamed': 1,
+            'total_invalid': 1,
+            'total_failed': 6,
+            'all_misnamed': defaultdict({
+                'com.facebook.orca': 'Messenger'
+            }),
+            'all_invalid': defaultdict({
+                'com.softinit.iquitos.whatswebscan': 'Whats Web Scan'
+            })
+        }
+
+        '''
+        HEADER = """
+          _  _     _  _     _  _     _____ _        _           _  _     _  _     _  _
+        _| || |_ _| || |_ _| || |_  /  ___| |      | |        _| || |_ _| || |_ _| || |_
+       |_  __  _|_  __  _|_  __  _| \ `--.| |_ __ _| |_ ___  |_  __  _|_  __  _|_  __  _|
+        _| || |_ _| || |_ _| || |_   `--. \ __/ _` | __/ __|  _| || |_ _| || |_ _| || |_
+       |_  __  _|_  __  _|_  __  _| /\__/ / || (_| | |_\__ \ |_  __  _|_  __  _|_  __  _|
+         |_||_|   |_||_|   |_||_|   \____/ \__\__,_|\__|___/   |_||_|   |_||_|   |_||_|  """
+
+        p_cyan(HEADER, "\n\n")
+        for key, val in self.stats.items():
+            if isinstance(val, int):
+                name = key.replace("_", " ").title()
+                # Absoulte, if app failed, it failed on all devices
+                if key in ['total_misnamed', 'total_invalid']:
+                    p_cyan(f"\t{name}: {val * len(self.stats_by_device.items())} ({val})")
+                else:
+                    p_cyan(f"\t{name}: {val}")
+        p_cyan(f"\tTotal passed: {self.stats['total_apps'] - self.stats['total_failed']}")
+
+
+        p_blue("\n\n\tStats by device\n")
+        for device_name, stats in self.stats_by_device.items():
+            p_purple(f"\t{device_name}")
+            for key, val in stats.items():
+                name = key.replace("_", " ").title()
+                p_cyan(f"\t\t{name}: {val}")
+            p_cyan(f"\t\tTotal passed: {stats['total_apps'] - stats['total_failed']}")
 
 class AppValidator:
     ''' Main class to validate a broken app. Discovers, installs, opens and
