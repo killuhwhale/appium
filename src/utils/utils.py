@@ -29,8 +29,8 @@ weights = 'notebooks/yolov5/runs/train/exp007/weights/best_309.pt'
 weights = 'notebooks/yolov5/runs/train/exp4/weights/best.pt'  # Lastest RoboFlow Model V1
 weights = 'notebooks/yolov5/runs/train/exp6/weights/best.pt'  # Lastest RoboFlow Model V2
 weights = 'notebooks/yolov5/runs/train/exp7/weights/best.pt'  # Lastest RoboFlow Model V3
-weights = 'notebooks/yolov5/runs/train/exp8/weights/best.pt'  # Lastest RoboFlow Model V4
 WEIGHTS = 'notebooks/yolov5/runs/train/exp10/weights/best.pt'  # Lastest RoboFlow Model V5
+WEIGHTS = 'notebooks/yolov5/runs/train/exp8/weights/best.pt'  # Lastest RoboFlow Model V4
 
 PLAYSTORE_PACKAGE_NAME = "com.android.vending"
 PLAYSTORE_MAIN_ACT = "com.google.android.finsky.activities.MainActivity"
