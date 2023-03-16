@@ -6,7 +6,7 @@ import sys
 from playstore.playstore import AppValidator, FacebookApp, ValidationReport
 from utils.parallel import MultiprocessTaskRunner
 from utils.utils import (PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME,
-    TSV, Device, android_des_caps, dev_scrape_start_at_app,
+    AppListTSV, Device, android_des_caps, dev_scrape_start_at_app,
     lazy_start_appium_server, p_blue, p_green, p_red, p_yellow)
 
 # Starts Appium Server.
@@ -23,25 +23,26 @@ if __name__ == "__main__":
             # 'emulator-5554',
             # '192.168.1.248:5555', # Morphius AMD ARC-P        Yellow,
             # '192.168.1.128:5555',  # Kevin ARM ARC-p          Blue,
-            # '192.168.1.238:5555', # Helios x86 intel ARC-R   RED,
-            # '192.168.1.113:5555', # CoachZ snapdragon ARC-P   Green,
+            '192.168.1.238:5555', # Helios x86 intel ARC-R   RED,
+            '192.168.1.113:5555', # CoachZ snapdragon ARC-P   Green,
             '192.168.1.125:5555',  # ARC-R Eve
         ]
     print("ips: ", ips)
 
 
-    tsv = TSV()  # Create Globally
+    tsv = AppListTSV()  # Create Globally
     TESTING_APPS = tsv.get_apps()
 
 
-    runner = MultiprocessTaskRunner(ips, TESTING_APPS[0:1] )
+    runner = MultiprocessTaskRunner(ips, TESTING_APPS[0:3] )
     runner.run()
 
-    tsv.update_list(runner.update_app_names)
-    tsv.export_bad_apps(runner.bad_apps)
-    tsv.write_failed_apps(runner.failed_apps)
     runner.print_devices()
-    ValidationReport.print_reports_by_app(runner.get_final_reports())
+    report_stats = runner.get_final_report_stats()
+    report_stats.print_stats()
+    tsv.update_list(report_stats.stats['all_misnamed'])
+    tsv.export_bad_apps(report_stats.stats['all_invalid'])
+    ValidationReport.print_reports_by_app(report_stats.reports)
 
 
     ###################################
@@ -108,13 +109,6 @@ if __name__ == "__main__":
     # validator.run()
 
 
-
-    # name_updates.update(validator.update_app_names)  # Iterate of all App validation instances and add here.
-    # bad_apps.update(validator.bad_apps)
-
-    # tsv.update_list(name_updates)
-    # tsv.export_bad_apps(bad_apps)
-    # tsv.write_failed_apps(validator.failed_apps)
 
     # validator.report.merge(fb_handle.validator.report)
     # validator.report.print()

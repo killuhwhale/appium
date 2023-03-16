@@ -1,3 +1,4 @@
+import collections
 from copy import deepcopy
 from dataclasses import dataclass
 import json
@@ -86,7 +87,7 @@ class ArcVersions(Enum):
 
 class BuildChannels(Enum):
     '''
-        Enumeration for each build channel on for ChromeOS.
+        Enumeration for each build channel for ChromeOS.
     '''
     STABLE = 'stable'
     BETA = 'beta'
@@ -154,11 +155,60 @@ class DEVICES(Enum):
             return DEVICES.UNKNOWN
 
 
+# @dataclass
+# class StatsData:
+#     device_name: str
+#     total_apps:int
+#     update_app_names = collections.defaultdict(str)
+#     invalid_apps = collections.defaultdict(str)
+#     failed_apps = collections.defaultdict(str)
+
+
+# @dataclass
+# class Stats:
+#     stats: List[StatsData] = list()
+#     total_apps: int
+#     total_update_app_names: int
+#     total_invalid_apps: int
+#     total_failed_apps: int
+#     all_updated_names = collections.defaultdict(str)
+#     all_invalid_apps = collections.defaultdict(str)
+#     all_failed_apps = list()
+
+
+#     def add(self, stats_data: StatsData):
+#         if stats_data:
+#             self.stats.append(stats_data)
+
+
+#     def calc_stats(self):
+#         ''' Calculates total stats for all StatsData in self.stats.
+
+#         '''
+#         # updated names should be condensed from all devices, single srouce of truth -> playstore web
+#         all_updated_names = collections.defaultdict(str)
+#         # invalid names should be condensed from all devices, single srouce of truth -> playstore web
+#         all_invalid_apps = collections.defaultdict(str)
+
+#         for data in self.stats:
+#             all_updated_names.update(data.update_app_names) # collect into single dict
+#             all_invalid_apps.update(data.invalid_apps)  # collect into single dict
+#             self.total_apps += data.total_apps
+#             self.total_failed_apps += len(data.failed_apps.items())
+#             self.all_failed_apps.append([])
+
+#         self.total_update_app_names = len(all_updated_names)
+#         self.total_invalid_apps = len(all_invalid_apps)
+#         self.all_updated_names = all_updated_names
+#         self.all_invalid_apps = all_invalid_apps
+
+#         return self
+
 
 # APK & Manifest stuff
 @dataclass(frozen=True)
 class AppData:
-    ''' Represents app information to capture. '''
+    ''' Represents app information that may be found in the Manifest file. '''
     name: str
     versionCode: str
     versionName: str
@@ -171,20 +221,12 @@ class AppData:
 class AppInfo:
     '''
         Manages the process of pulling APK from device, extracting the
-         manifest text and parsing the manifest text for the information in @
-         dataclass AppData
+         manifest text and parsing the manifest text for the information in
+         @dataclass AppData
 
         package: name='air.com.lunime.gachaclub' versionCode='1001001' versionName='1.1.0'
-
         package: name='com.plexapp.android' versionCode='855199985' versionName='9.15.0.38159' compileSdkVersion='33' compileSdkVersionCodename='13'
         package: name='com.tumblr' versionCode='1280200110' versionName='28.2.0.110' compileSdkVersion='33' compileSdkVersionCodename='13'
-
-        .split(" ") => ['package:', "name='com.tumblr'", "versionCode='855199985'"]
-        skip index=0
-        split("=") => ["name", "'com.tumblr'"]
-        remove quotes from index 1
-        .replace("'", "")
-        Then create a dict from the list of lists.
     '''
     def __init__(self, transport_id: str, package_name: str):
         self.transport_id = transport_id
@@ -408,6 +450,7 @@ class AppInfo:
 
 @dataclass(frozen=True)
 class DeviceData:
+    ''' Holds device information. '''
     ip: str
     transport_id: str
     is_emu: bool
@@ -419,6 +462,7 @@ class DeviceData:
     product_name: str
 
 class Device:
+    ''' Simple class to connect and query a device for its information. '''
     def __init__(self, ip: str):
         self.__is_connected = self.__adb_connect(ip)
         self.__transport_id = self.__find_transport_id(ip)
@@ -754,26 +798,19 @@ class ErrorDetector:
         self.__start_time = self.__get_start_time()
 
 
-class TSV:
+class AppListTSV:
     ''' Tranformation layer between persisted storage of list to python list.
 
         Creates python list from a file is users home dir named self.__filename.
 
-        We can replace this with another class to interact with another data source.
-
-        1. We just read from the data source, in the beginning.
-        2. We valdiate apps
-        3. At the end, we update the data source wit any new changes.
-            So, if we wanted to use a database instead, we just write a new class with same methods:
-                - get_apps() -> List
-                - update_list(updated_names: Dict)
+        This also cleans/ filters the list. It will update misnamed apps and remove invalid package names.
+        We can replace this with another class to interact with another data storage.
     '''
 
     def __init__(self):
         self.__app_list = list()
         self.__filename = "app_list.tsv" # This file should be place in the home dir on linux ~/
         self.__badfilename = "bad_app_list.tsv" # This will be created in the home dir ~/
-        self.__failed_app_filename = "failed_app_list.tsv" # This will be created in the home dir ~/
         self.__all_bad_apps = dict()
         self.__home_dir = users_home_dir()
         self.__read_file()
@@ -793,7 +830,7 @@ class TSV:
             bad_apps = {}
             for line in f.readlines():
                 app_name, package_name = line.split("\t")
-                bad_apps[package_name] = app_name
+                bad_apps[package_name.replace("\n", "")] = app_name
             self.__all_bad_apps = bad_apps
 
     def __write_bad_apps(self):
@@ -850,30 +887,11 @@ class TSV:
         with open(f"{self.__home_dir}/{self.__filename}", 'w' ) as f:
             [f.write(f"{app[0]}\t{app[1]}\n") for app in self.__app_list]
 
-    def write_failed_apps(self, failed_apps: Dict):
-        '''
-            Logs failed apps per run that failed on all device tested during the run. Not updated each run.
 
-            Failed apps will inlcude apps that aren't available in the region or where the app doesn't appear as the first result or
-             if the app shares similar names to other apps like: solitaire
-
-            Args:
-             - failed_apps: Apps that failed during test run but are not named wrong and available on playstore.
-        '''
-        if not len(failed_apps.keys()):
-            return
-
-        path = f'{self.__home_dir}/{self.__failed_app_filename}'
-        create_file_if_not_exists(path)
-        with open(path, 'w'):
-            pass
-
-        with open(path, 'w') as f:
-            for key in failed_apps:
-                f.write(f"{failed_apps[key]}\t{key}\n")
 
 
 class __AppLogger:
+    ''' Logs major events and summary reporting for the latest run. '''
     def __init__(self):
         filename = f'{users_home_dir()}/latest_report.txt'
         logger = logging.getLogger('my_logger')

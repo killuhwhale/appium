@@ -9,7 +9,7 @@ from time import sleep
 from typing import Dict, List
 from utils.utils import (
     BASE_PORT, CONFIG, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, WEIGHTS, Device, android_des_caps, p_blue, p_cyan, p_red, logger)
-from playstore.playstore import AppValidator, FacebookApp, ValidationReport
+from playstore.playstore import AppValidator, FacebookApp, ValidationReport, ValidationReportStats
 import signal
 import sys
 
@@ -93,8 +93,6 @@ def validate_task(queue: Queue, packages: List[List[str]], ip: str, device: Devi
     validator.run()
 
 
-    # Need to add the Facebook report...
-    # - Write a merge method to update the inner dict on device key...
     validator.report.merge(fb_handle.validator.report)
     print("Putting validator")
     queue.put(AppValidatorPickle(validator))
@@ -117,9 +115,7 @@ class AppValidatorPickle:
      '''
     def __init__(self, validator: AppValidator):
         self.report = deepcopy(ValidationReportPickle(validator.report))
-        self.update_app_names = deepcopy(validator.update_app_names)
-        self.bad_apps = deepcopy(validator.bad_apps)
-        self.failed_apps = deepcopy(validator.failed_apps)
+
 
 class MultiprocessTaskRunner:
     '''
@@ -134,11 +130,10 @@ class MultiprocessTaskRunner:
         self.devices: List[Device] = []
 
         self.processes = []
-        self.__all_reports: List[ValidationReport] = []
+
+        self.validationReportStats = ValidationReportStats()
         self.packages_recvd = defaultdict(list)
-        self.update_app_names = collections.defaultdict(str)  # Collects apps to update from all Appvalidator instances ran
-        self.bad_apps = collections.defaultdict(str)  # Collects apps to be removed from all Appvalidator instances ran
-        self.failed_apps = collections.defaultdict(str)  # Collects apps to be removed from all Appvalidator instances ran
+
         self.appiumServiceManager = AppiumServiceManager(ips)
         signal.signal(signal.SIGINT, self.handle_sigint)
 
@@ -160,13 +155,7 @@ class MultiprocessTaskRunner:
         #     print("Error: ", err)
         sys.exit(1)
 
-    def __combine_dicts(self, odict: Dict):
-        ''' Updates instace dict failed_apps with commons keys from another dict.'''
-        if not len(self.failed_apps.keys()):
-            self.failed_apps = deepcopy(odict)
-            return
-        common = self.failed_apps.keys() & odict.keys()
-        self.failed_apps =  {key: self.failed_apps[key] for key in common}
+
 
     def run(self):
         '''
@@ -186,20 +175,18 @@ class MultiprocessTaskRunner:
             if not self.queue.empty():
 
                 validator: AppValidatorPickle = self.queue.get()
-                self.__all_reports.append(validator.report)
-                self.update_app_names.update(validator.update_app_names)
-                self.bad_apps.update(validator.bad_apps)
-                self.__combine_dicts(validator.failed_apps)
+                self.validationReportStats.add(validator.report)
 
                 validators += 1
                 print(f"Validators: {validators=}")
             sleep(1.2)
         print('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n')
-        self.print_stats()
 
 
-    def get_final_reports(self):
-        return self.__all_reports
+
+    def get_final_report_stats(self):
+        self.validationReportStats.calc()
+        return self.validationReportStats
 
     def clear_processes(self):
         '''
@@ -250,7 +237,7 @@ class MultiprocessTaskRunner:
         '''
             Splits up the packages to each ea task and starts ea process.
         '''
-        print_log(f"Spliting apps across devices. {CONFIG.multi_split_packages=}")
+        logger.print_log(f"Spliting apps across devices. {CONFIG.multi_split_packages=}")
         total_packages = len(self.packages)
         num_packages_ea = total_packages // len(self.ips)
         rem_packages = total_packages % len(self.ips)
@@ -271,18 +258,3 @@ class MultiprocessTaskRunner:
 
             self.__start_process(service_item.ip, service_item.port, packages_to_test)
 
-    def print_stats(self):
-        ''' Prints number of apps tested, invalid apps and failed apps. '''
-        HEADER = """
-          _  _     _  _     _  _     _____ _        _           _  _     _  _     _  _
-        _| || |_ _| || |_ _| || |_  /  ___| |      | |        _| || |_ _| || |_ _| || |_
-       |_  __  _|_  __  _|_  __  _| \ `--.| |_ __ _| |_ ___  |_  __  _|_  __  _|_  __  _|
-        _| || |_ _| || |_ _| || |_   `--. \ __/ _` | __/ __|  _| || |_ _| || |_ _| || |_
-       |_  __  _|_  __  _|_  __  _| /\__/ / || (_| | |_\__ \ |_  __  _|_  __  _|_  __  _|
-         |_||_|   |_||_|   |_||_|   \____/ \__\__,_|\__|___/   |_||_|   |_||_|   |_||_|  """
-        p_cyan(HEADER, "\n\n")
-        num_passed_apps = len(self.packages) - len(self.failed_apps.keys()) - len(self.bad_apps.keys())
-        p_blue(f"\tApps tested:",end=""); logger.print_log(len(self.packages));
-        p_blue(f"\tPassed apps:",end=""); logger.print_log(num_passed_apps);
-        p_blue(f"\tFailed apps:",end=""); logger.print_log(len(self.failed_apps.keys()));
-        p_blue(f"\tInvalid apps apps:",end=""); logger.print_log(len(self.bad_apps.keys()));

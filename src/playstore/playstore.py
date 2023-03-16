@@ -1,11 +1,12 @@
 import collections
+from dataclasses import dataclass, field
 import os
 import re
 import subprocess
 from copy import deepcopy
 from datetime import datetime
 from time import sleep, time
-from typing import Dict, List
+from typing import Dict, List, Any
 
 import __main__
 import cv2
@@ -43,9 +44,11 @@ class ValidationReport:
     '''
         A simple class to format the status report of AppValidator.
          = {
-            device_name: {
+            report_title: {
                 package_name: {
                     'status': -1,
+                    'new_name': "",
+                    'invalid:': False,
                     'reason': "",
                     'name': "",
                     'report_title': "",
@@ -53,9 +56,11 @@ class ValidationReport:
                 },
                 ...,
             },
-            device_name2: {
+            report_title2: {
                 package_name: {
                     'status': -1,
+                    'new_name': "",
+                    'invalid:': False,
                     'reason': "",
                     'name': "",
                     'report_title': "",
@@ -75,6 +80,8 @@ class ValidationReport:
         '''
         return  {
             'status': -1,
+            'new_name': "",
+            'invalid:': False,
             'reason': "",
             'name': "",
             'report_title': "",
@@ -95,9 +102,11 @@ class ValidationReport:
             self.report[self.report_title][package_name]['report_title'] = self.report_title
             self.report[self.report_title][package_name]['status'] = 0
 
-    def update_status(self, package_name: str, status: int, reason: str):
+    def update_status(self, package_name: str, status: int, reason: str, new_name='', invalid=False):
         self.report[self.report_title][package_name]['status'] = status
         self.report[self.report_title][package_name]['reason'] = reason
+        self.report[self.report_title][package_name]['new_name'] = new_name
+        self.report[self.report_title][package_name]['invalid'] = invalid
 
     def add_history(self,package_name: str, history_msg: str, img_path: str=""):
         self.report[self.report_title][package_name]['history'].append({'msg':history_msg, 'img': img_path })
@@ -176,7 +185,14 @@ class ValidationReport:
         is_good = status_obj['status'] == ValidationReport.PASS
         p_blue(f"{status_obj['name']} ", end="")
         p_cyan(f"{package_name} ", end="")
-        p_green("PASSED", end="") if is_good else p_red("FAILED", end="")
+        if is_good:
+            p_green("PASSED", end="")
+        else:
+            p_red(f"FAILED", end="")
+            p_red(f"New  name: {status_obj['new_name']}", end="") if status_obj['new_name'] else print('', end='')
+            p_red(f"Playstore N/A", end="") if status_obj['invalid'] else print('', end='')
+
+
         p_purple(f" - [{status_obj['report_title']}]", end="\n")
 
         if len(status_obj['reason']) > 0:
@@ -190,7 +206,7 @@ class ValidationReport:
         logger.print_log()
 
     @staticmethod
-    def print_report(report: 'ValidationReport', with_history: bool=False):
+    def print_report(report: 'ValidationReport'):
         '''  Prints all apps from a single report. '''
         # Sorted by packge name
         ValidationReport.ascii_header()
@@ -203,6 +219,10 @@ class ValidationReport:
         ValidationReport.print_report(self)
 
     def print_reports(reports: List['ValidationReport']):
+        ''' Prints app reports from a list of ValidationReport.
+            This results in each device's report being print one after the other.
+            So apps will not be grouped together.
+        '''
         ValidationReport.ascii_header()
         for report in reports:
             for package_name, status_obj in sorted(report.report[report.report_title].items(), key=ValidationReport.sorted_package_name):
@@ -211,6 +231,10 @@ class ValidationReport:
 
     @staticmethod
     def print_reports_by_app(reports: List['ValidationReport']):
+        ''' Reorders the reports so that all apps are printed grouped together.
+
+            Makes for better view in summary report, we can compare each app's final status.
+        '''
         all_reports = collections.defaultdict(list)
         for report_instance in reports:
             for package_name, status_obj in report_instance.report[report_instance.report_title].items():
@@ -224,10 +248,80 @@ class ValidationReport:
         ValidationReport.ascii_footer()
 
 
-class AppValidator:
+@dataclass
+class ValidationReportStats:
+    ''' Given a list of reports, calculate stats section.
+
     '''
-        Main class to validate a broken app. Discovers, installs, opens and
-        logs in to apps.
+    reports: List[ValidationReport] = field(default_factory=list)
+    stats_by_device: collections.defaultdict(Any) = field(default_factory=collections.defaultdict)
+    stats: Dict = field(default_factory=dict)
+
+    @staticmethod
+    def default_item():
+        return {
+            'total_apps': 0,
+            'total_misnamed': 0,
+            'total_invalid': 0,
+            'total_failed': 0,
+        }
+
+    def add(self, report: ValidationReport):
+        self.reports.append(report)
+
+    def calc(self):
+        total_apps = 0
+        all_misnamed = collections.defaultdict(str)
+        total_misnamed = 0
+        all_invalid = collections.defaultdict(str)
+        total_invalid = 0
+        total_failed = 0
+
+        devices = collections.defaultdict(ValidationReportStats.default_item)
+
+        for report in self.reports:
+            dreport = report.report[report.report_title]  # dict
+            for package_name, status_obj in dreport.items():
+                total_apps += 1
+                devices[report.report_title]['total_apps'] += 1
+
+                if status_obj['new_name']:
+                    all_misnamed[package_name] = status_obj['new_name']
+                    devices[report.report_title]['total_misnamed'] += 1
+
+                elif status_obj['invalid']:
+                    all_invalid[package_name] = status_obj['name']
+                    devices[report.report_title]['total_invalid'] += 1
+
+                if status_obj['status'] == ValidationReport.FAIL:
+                    total_failed += 1
+                    devices[report.report_title]['total_failed'] += 1
+
+
+
+        total_misnamed = len(all_misnamed.keys())
+        total_invalid = len(all_invalid.keys())
+
+        self.stats_by_device = devices
+
+        self.stats = {
+            'total_apps': total_apps,
+            'total_misnamed': total_misnamed,
+            'total_invalid': total_invalid,
+            'total_failed': total_failed,
+            'all_misnamed': all_misnamed,
+            'all_invalid': all_invalid,
+        }
+
+
+    def print_stats(self):
+        print("TODO, print stats total and by device....")
+        print(f"{self.stats_by_device=}")
+        print(f"{self.stats=}")
+
+class AppValidator:
+    ''' Main class to validate a broken app. Discovers, installs, opens and
+          logs in to apps.
     '''
 
     PICUTRES = "/home/killuh/Pictures"
@@ -250,9 +344,6 @@ class AppValidator:
         self.err_detector = ErrorDetector(self.transport_id, self.arc_version)
         self.report = ValidationReport(device)
 
-        self.update_app_names = collections.defaultdict(str)
-        self.bad_apps = collections.defaultdict(str)
-        self.failed_apps = collections.defaultdict(str)
 
         self.steps = [
             'Click search icon',
@@ -270,6 +361,7 @@ class AppValidator:
         self.__name_span_text = ''
         self.instance_num = instance_num if instance_num else 0
         self.dev_ss_count = 320
+        print(f"Testing packages: ", len(package_names), package_names)
 
     def dprint(self, *args):
         if not CONFIG.debug_print:
@@ -1107,24 +1199,23 @@ class AppValidator:
 
             try:
                 installed, error = self.discover_and_install(app_title, app_package_name)
-                # installed, error = True, False # Successful
                 self.dprint(f"Installed? {installed}   err: {error}")
 
+                INVALID_APP = False
+                NEW_APP_NAME = ""
                 if not installed and not error is None:
-
                     reason = ""
                     if self.check_playstore_invalid(app_package_name):
                         reason = "Package is invalid and was removed from the list."
-                        print(f"{reason=}")
-                        self.bad_apps[app_package_name] = app_title
+                        INVALID_APP = True
                     elif not app_title == self.check_playstore_name(app_package_name, app_title):
                         reason = f"[{app_title} !=  {self.__name_span_text}] App name does not match the current name on the playstore"
-                        self.update_app_names[app_package_name] = self.__name_span_text
+                        NEW_APP_NAME = self.__name_span_text
+                        self.__name_span_text = ''
                     else:
                         reason = f"[{app_title} {error}"
-                        self.failed_apps[app_package_name] = app_title
 
-                    self.report.update_status(app_package_name, ValidationReport.FAIL, error)
+                    self.report.update_status(app_package_name, ValidationReport.FAIL, error, NEW_APP_NAME, INVALID_APP)
                     self.update_report_history(app_package_name, f"{reason}")
                     self.cleanup_run(app_package_name)
                     continue
@@ -1133,18 +1224,17 @@ class AppValidator:
                     reason = ''
                     if self.check_playstore_invalid(app_package_name):
                         reason = "Package is invalid and was removed from the list."
-                        self.bad_apps[app_package_name] = app_title
+                        INVALID_APP = True
                     elif not app_title == self.check_playstore_name(app_package_name, app_title):
                         reason = f"[{app_title} !=  {self.__name_span_text}] App name does not match the current name on the playstore"
-                        self.update_app_names[app_package_name] = self.__name_span_text
+                        NEW_APP_NAME = self.__name_span_text
+                        self.__name_span_text = ''
                     elif not self.is_installed(app_package_name):
                         reason = "Failed to open because the package was not installed."
-                        self.failed_apps[app_package_name] = app_title
                     else:
                         reason = "Failed to open"
-                        self.failed_apps[app_package_name] = app_title
 
-                    self.report.update_status(app_package_name, ValidationReport.FAIL, reason)
+                    self.report.update_status(app_package_name, ValidationReport.FAIL, reason, NEW_APP_NAME, INVALID_APP)
                     self.cleanup_run(app_package_name)
                     continue
 

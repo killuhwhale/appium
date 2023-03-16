@@ -49,6 +49,7 @@ Prep work for Chromebook:
 
 # TODOs
 
+
     - Strategy when we have two continue buttons and one is disabled but has the higher probability
         - we should try to click all of them unless something happens?
             - Make it try more continue buttons before takinga new screenshot...??
