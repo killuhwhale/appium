@@ -8,7 +8,7 @@ from multiprocessing import Process, Queue
 from time import sleep
 from typing import Dict, List
 from utils.utils import (
-    BASE_PORT, CONFIG, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, WEIGHTS, Device, android_des_caps, p_blue, p_cyan, p_red, logger)
+    BASE_PORT, CONFIG, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT, WEIGHTS, AppListTSV, AppLogger, Device, android_des_caps, p_alert, p_blue, p_cyan, p_red, logger)
 from playstore.playstore import AppValidator, FacebookApp, ValidationReport, ValidationReportStats
 import signal
 import sys
@@ -56,10 +56,24 @@ class AppiumServiceManager:
                 print("Error starting appium server", str(error))
 
 
+def update_app_list(queue: Queue ):
+
+    tsv = AppListTSV()
+    while True:
+        if not queue.empty():
+            update_type, package_name, app_name = queue.get()
+            if update_type == 'misnamed':
+                tsv.update_list({package_name: app_name})
+            elif update_type == 'invalid':
+                tsv.export_bad_apps({package_name: app_name})
+            elif (update_type, package_name, app_name) == (None, None, None):
+                p_alert("Breaking from")
+                break
 
 
 
-def validate_task(queue: Queue, packages: List[List[str]], ip: str, device: Device, port: int):
+
+def validate_task(queue: Queue, app_list_queue: Queue, app_logger: AppLogger, packages: List[List[str]], ip: str, device: Device, port: int):
     '''
         A single task to validate apps on a given device.
     '''
@@ -80,14 +94,16 @@ def validate_task(queue: Queue, packages: List[List[str]], ip: str, device: Devi
     driver.implicitly_wait(5)
     driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
 
-    fb_handle = FacebookApp(driver, device, port)
+    fb_handle = FacebookApp(driver, app_logger,  device, port)
     fb_handle.install_and_login()
 
     validator = AppValidator(
         driver,
         packages,
         device,
-        port - BASE_PORT
+        port - BASE_PORT,
+        app_list_queue,
+        app_logger
     )
     validator.uninstall_multiple()
     validator.run()
@@ -123,6 +139,9 @@ class MultiprocessTaskRunner:
     '''
     def __init__(self, ips: List[str], packages: List[List[str]] ):
         self.queue = Queue()
+        self.app_list_queue = Queue()
+        self.app_list_process = None
+        self.app_logger = AppLogger()
         self.drivers: List[webdriver.Remote] = []
         self.valdiators: List[AppValidator] = []
         self.ips = ips
@@ -155,13 +174,17 @@ class MultiprocessTaskRunner:
         #     print("Error: ", err)
         sys.exit(1)
 
-
+    def start_app_list_renaming_task(self):
+        self.app_list_process = Process(target=update_app_list, args=(self.app_list_queue,))
+        self.app_list_process.start()
 
     def run(self):
         '''
             Main method to start running ea task.
         '''
         ValidationReport.anim_starting()
+        self.start_app_list_renaming_task()
+
         if CONFIG.multi_split_packages:
             self.start_runs_split()
         else:
@@ -180,6 +203,7 @@ class MultiprocessTaskRunner:
                 validators += 1
                 print(f"Validators: {validators=}")
             sleep(1.2)
+        self.app_list_process.terminate()
         print('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n')
 
 
@@ -212,9 +236,10 @@ class MultiprocessTaskRunner:
 
 
     def __start_process(self, ip, port_number, apps: List[List[str]]):
+
         device = Device(ip)
         self.devices.append(device)
-        process = Process(target=validate_task, args=(self.queue, apps, ip, device, port_number))
+        process = Process(target=validate_task, args=(self.queue, self.app_list_queue, self.app_logger, apps, ip, device, port_number))
         process.start()
         self.processes.append(process)
 

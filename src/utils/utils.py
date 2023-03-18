@@ -19,7 +19,7 @@ import numpy as np
 class _CONFIG:
     login_facebook =  False  # Discover, install and sign into Facebook before running AppValidator.
     multi_split_packages = False  # MultiprocessTaskRunner, splits apps across devices or not
-    debug_print = False # Playstore.py, debug color printing by device.
+    debug_print = True # Playstore.py, debug color printing by device.
 
 
 CONFIG = _CONFIG()
@@ -117,6 +117,7 @@ class CrashTypes(Enum):
     FORCE_RM_ACT_RECORD = "Force removed ActivityRecord"
     ANR = "App not responding"
     FDEBUG_CRASH = "F DEBUG crash"
+    FATAL_EXCEPTION = "Fatal Exception"
 
 class DEVICES(Enum):
     '''
@@ -217,6 +218,8 @@ class AppData:
     platformBuildVersionName: str
     is_pwa: bool
     is_game: bool
+
+
 
 class AppInfo:
     '''
@@ -650,6 +653,13 @@ class Device:
 
 class ErrorDetector:
     ''' Detects crashes from Logcat and ANRs from Dumpsys activity.
+
+
+       Finds logs from logcat starting at self.__start_time, which is when
+       the program starting validating the app/ package.
+
+        Each time we check for a crash, we grab the logs from the beginning and then check for
+        a variety of crash types.
     '''
     def __init__(self, transport_id: str, ArcVersion: ArcVersions):
         self.__transport_id = transport_id
@@ -751,7 +761,32 @@ class ErrorDetector:
         dumpsys_act_text = dumpysys_activity(self.__transport_id, self.__ArcVersion)
         return is_ANR(dumpsys_act_text, self.__package_name)
 
-    def check_crash(self)-> Tuple:
+    def __check_fatal_exception(self):
+        ''' Searches logs for E AndroidRuntime FatalException.
+
+            03-17 13:02:33.018 12849 12849 E AndroidRuntime: FATAL EXCEPTION: main
+            03-17 13:02:33.018 12849 12849 E AndroidRuntime: Process: com.picsart.studio, PID: 12849
+            03-17 13:02:33.018 12849 12849 E AndroidRuntime: java.lang.ExceptionInInitializerError
+
+
+            Returns:
+                A string representing the failing activity otherwise it returns an empty string.
+        '''
+        ts_pattern = rf"^\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*"
+        force_removed = rf"^\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*E AndroidRuntime: FATAL EXCEPTION.*\n.*{self.__package_name}.*\n.*\n.*$"
+        force_removed_pattern = re.compile(force_removed, re.MULTILINE)
+        match = force_removed_pattern.search(self.__logs)
+
+
+        if match:
+            no_timestamp_string = re.sub(ts_pattern, "", match.group(0), flags=re.MULTILINE)
+            failed_activity = 'Failed to open due to crash'
+            failed_msg =  '\t'.join(no_timestamp_string.split("E AndroidRuntime: ")).replace("\n", "").replace("\t\t", "\t").strip()
+            print(f"{failed_msg}")
+            return failed_activity, failed_msg
+        return "", ""
+
+    def check_crash(self)-> Tuple[CrashTypes, str, str]:
         ''' Grabs logcat logs starting at a specified time and check for crash logs.
 
             Params:
@@ -765,6 +800,10 @@ class ErrorDetector:
 
         '''
         self.__get_logs(self.__start_time)
+
+        failed_act, match = self.__check_fatal_exception()
+        if failed_act:
+            return (CrashTypes.FATAL_EXCEPTION, failed_act, match)
 
         failed_act, match = self.__check_for_win_death()
         if failed_act:
@@ -855,10 +894,10 @@ class AppListTSV:
             self.__app_list = updated_list
             # input("Writing new app_list w/out bad apps", updated_list)
             self.__write_file()
+            # Update bad list
+            self.__all_bad_apps.update(bad_apps)
+            self.__write_bad_apps()
 
-        # Update bad list
-        self.__all_bad_apps.update(bad_apps)
-        self.__write_bad_apps()
 
     def update_list(self, updated_names: Dict):
         '''  After test run is completed, updates instance app_list with new names and then writes entire list to file.
@@ -873,6 +912,10 @@ class AppListTSV:
             _app_name, package_name = self.__app_list[i]
             # print(f"{app_name} {package_name} {len(package_name)=} {package_name in updated_names}")
             if package_name in updated_names:
+                print("b4 Alrerady updated...", self.__app_list[i])
+                if self.__app_list[i][0] == updated_names[package_name]:
+                    # Already updated by another process.
+                    return
                 self.__app_list[i][0] = updated_names[package_name]
                 num_updated += 1
             i += 1
@@ -887,6 +930,54 @@ class AppListTSV:
         with open(f"{self.__home_dir}/{self.__filename}", 'w' ) as f:
             [f.write(f"{app[0]}\t{app[1]}\n") for app in self.__app_list]
 
+
+
+
+class AppLogger:
+    ''' Logs passed/ failed apps to tsv. '''
+    def __init__(self):
+        self.packages_logged = dict()
+
+        filename_failed = f'{users_home_dir()}/failed_apps_live.tsv'
+        filename_passed = f'{users_home_dir()}/passed_apps_live.tsv'
+        logger_failed = logging.getLogger('failed_apps_live')
+        logger_passed = logging.getLogger('passed_apps_live')
+        logger_failed.setLevel(logging.DEBUG)
+        logger_passed.setLevel(logging.DEBUG)
+
+        # Create a file handler for the logger
+        with open(filename_failed, 'w'):
+            pass
+        with open(filename_passed, 'w'):
+            pass
+
+        file_handler_failed = logging.FileHandler(filename_failed)
+        file_handler_failed.setLevel(logging.DEBUG)
+        file_handler_passed = logging.FileHandler(filename_passed)
+        file_handler_passed.setLevel(logging.DEBUG)
+
+        # Create a formatter for the file handler
+        formatter = logging.Formatter('%(message)s')
+        file_handler_failed.setFormatter(formatter)
+        file_handler_passed.setFormatter(formatter)
+
+        # Add the file handler to the logger
+        logger_failed.addHandler(file_handler_failed)
+        logger_passed.addHandler(file_handler_passed)
+        self.logger_failed = logger_failed
+        self.logger_passed = logger_passed
+
+
+    def log(self, *args, **kwargs):
+        # args = status, package_device_key, message args
+        print(f"{args[:2]=}")
+        if not args[1] in self.packages_logged:
+            message = '\t'.join(map(str, args[1:])).strip()
+            if args[0] == 0:
+                self.logger_passed.info(message)
+            elif args[0] == 1:
+                self.logger_failed.info(message)
+            self.packages_logged[args[1]] = True  # track logged package_device
 
 
 
@@ -954,7 +1045,7 @@ def p_cyan(*args, end='\n'):
     print(Cyan, *args, RESET, end=end)
     logger.log(*args, end=end)
 
-def p_alert(msg):
+def p_alert(*args):
     art = r"""
           _ ._  _ , _ ._
         (_ ' ( `  )_  .__)
@@ -965,7 +1056,7 @@ def p_alert(msg):
               /   \
 _____________/_ __ \_____________"""
     p_red(art)
-    p_blue(msg)
+    p_blue(*args)
     print()
 
 
@@ -1104,7 +1195,7 @@ def get_cur_activty(transport_id: str, ArcVersion: ArcVersions, package_name: st
                 "ANR_for_package": 'packge_name here'
             }
 
-        print(f"get_cur_activty: {result.group('package_name')=} {result.group('act_name')=}")
+        # print(f"get_cur_activty: {result.group('package_name')=} {result.group('act_name')=}")
         return  {
             "package_name": result.group("package_name"),
             "act_name": result.group("act_name"),
@@ -1120,14 +1211,14 @@ def get_cur_activty(transport_id: str, ArcVersion: ArcVersions, package_name: st
     }
 
 def open_app(package_name: str, transport_id: int, ArcVersion: ArcVersions = ArcVersions.ARC_R):
-    '''
-        Opens an app using ADB monkey.
+    ''' Opens an app using ADB monkey.
 
         Params:
             package_name: The name of the package to check crash logs for.
             transport_id: The transport id of the connected android device.
             ArcVersion: ArcVersion Enum for the device.
     '''
+    packages = [package_name, "com.google.android.permissioncontroller", "org.chromium.arc.applauncher"]
     try:
         cmd = ('adb','-t', transport_id, 'shell', 'monkey', '--pct-syskeys', '0', '-p', package_name, '-c', 'android.intent.category.LAUNCHER', '1')
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
@@ -1136,24 +1227,21 @@ def open_app(package_name: str, transport_id: int, ArcVersion: ArcVersions = Arc
 
         # Call get activty and wait until the package name matches....
         cur_package = ""
-        MAX_WAIT_FOR_OPEN_APP = 420  # 7 mins
+        MAX_WAIT_FOR_OPEN_APP = 25
         t = time()
         # org.chromium.arc.applauncher will be the package if a PWA is launched...
-        while (
-            cur_package != package_name and
-            cur_package != "com.google.android.permissioncontroller" and
-            cur_package != "org.chromium.arc.applauncher" and
+        while (not cur_package in packages and
             int(time() - t) < MAX_WAIT_FOR_OPEN_APP):
             try:
                 res = get_cur_activty(transport_id, ArcVersion, package_name)
                 cur_package = res['package_name']
             except Exception as err:
                 print("Err getting cur act", err)
-        print(f"open_app {outstr=}")
+                return False
     except Exception as err:
         print("Error opening app with monkey", err)
         return False
-    return True
+    return cur_package in packages
 
 def close_app(package_name: str, transport_id: int):
     '''

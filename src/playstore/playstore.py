@@ -1,5 +1,6 @@
 import collections
 from dataclasses import dataclass, field
+from multiprocessing import Queue
 import os
 import re
 import subprocess
@@ -28,7 +29,7 @@ from utils.utils import (ACCOUNTS, ADB_KEYCODE_DEL, ADB_KEYCODE_ENTER, CONFIG,
                          CONTINUE, DEVICES, FACEBOOK_APP_NAME,
                          FACEBOOK_PACKAGE_NAME, GOOGLE_AUTH, IMAGE_LABELS,
                          LOGIN, PASSWORD, PLAYSTORE_MAIN_ACT,
-                         PLAYSTORE_PACKAGE_NAME, WEIGHTS, AppInfo,
+                         PLAYSTORE_PACKAGE_NAME, WEIGHTS, AppData, AppInfo, AppLogger,
                          ArcVersions, BuildChannels, CrashTypes, Device,
                          ErrorDetector, check_amace, close_app,
                          create_dir_if_not_exists, get_cur_activty,
@@ -81,11 +82,12 @@ class ValidationReport:
         return  {
             'status': -1,
             'new_name': "",
-            'invalid:': False,
+            'invalid': False,
             'reason': "",
             'name': "",
             'report_title': "",
             'history': [],
+            'app_info': {}
         }
 
     def __init__(self, device: Device):
@@ -102,6 +104,9 @@ class ValidationReport:
             self.report[self.report_title][package_name]['report_title'] = self.report_title
             self.report[self.report_title][package_name]['status'] = 0
 
+    def update_app_info(self, package_name: str, info: AppData):
+        self.report[self.report_title][package_name]['app_info'] = info
+
     def update_status(self, package_name: str, status: int, reason: str, new_name='', invalid=False):
         self.report[self.report_title][package_name]['status'] = status
         self.report[self.report_title][package_name]['reason'] = reason
@@ -110,6 +115,9 @@ class ValidationReport:
 
     def add_history(self,package_name: str, history_msg: str, img_path: str=""):
         self.report[self.report_title][package_name]['history'].append({'msg':history_msg, 'img': img_path })
+
+    def get_status_obj_by_app(self, package_name: str):
+        return self.report[self.report_title][package_name]
 
     def merge(self, oreport: 'ValidationReport'):
         ''' Merges on report title, used to merge pre-process Facebook login report. '''
@@ -191,9 +199,9 @@ class ValidationReport:
             p_red(f"FAILED", end="")
             p_red(f"New  name: {status_obj['new_name']}", end="") if status_obj['new_name'] else print('', end='')
             p_red(f"Playstore N/A", end="") if status_obj['invalid'] else print('', end='')
-
-
         p_purple(f" - [{status_obj['report_title']}]", end="\n")
+
+        p_blue(status_obj['app_info'], end='\n')
 
         if len(status_obj['reason']) > 0:
             logger.print_log("\t", "Final status: ", end="")
@@ -258,6 +266,15 @@ class ValidationReport:
 class ValidationReportStats:
     ''' Given a list of reports, calculate stats section.
 
+
+
+    #TODO()
+       Calculate the stats as we go.
+       Multi process
+       On each clean up, we could send the result to a single queue.
+       The queue would then store report here and recalc and write to file.
+
+       In the task, we will create an instance of this class, listen on the quere, add reports, calc, write, repeat until done....
     '''
     reports: List[ValidationReport] = field(default_factory=list)
     stats_by_device: collections.defaultdict(Any) = field(default_factory=collections.defaultdict)
@@ -297,7 +314,7 @@ class ValidationReportStats:
                     all_misnamed[package_name] = status_obj['new_name']
                     devices[report.report_title]['total_misnamed'] += 1
 
-                elif status_obj['invalid']:
+                elif status_obj["invalid"]:
                     all_invalid[package_name] = status_obj['name']
                     devices[report.report_title]['total_invalid'] += 1
 
@@ -320,7 +337,7 @@ class ValidationReportStats:
             'all_misnamed': all_misnamed,
             'all_invalid': all_invalid,
         }
-
+    # obsolete
     def write_failed_apps(self):
         # Grouped by package_name = []
         app_reports = ValidationReport.group_reports_by_app(self.reports)
@@ -403,7 +420,11 @@ class AppValidator:
             package_names: List[List[str]],
             device: Device,
             instance_num: int,
+            app_list_queue: Queue,
+            app_logger: AppLogger
         ):
+        self.app_list_queue = app_list_queue
+        self.app_logger = app_logger
         self.driver = driver
         self.device = device.info()
         self.ip = self.device.ip
@@ -415,7 +436,7 @@ class AppValidator:
         self.current_package = None
         self.err_detector = ErrorDetector(self.transport_id, self.arc_version)
         self.report = ValidationReport(device)
-
+        self.cur_app_info = None
 
         self.steps = [
             'Click search icon',
@@ -441,17 +462,17 @@ class AppValidator:
 
         n = self.instance_num % 6  # 6 colors to pick from
         if(n == 0):
-            p_red(f"{self.ip} - ", *args, end="")
+            p_red(f"{self.ip} - ", *args)
         elif(n == 1):
-            p_green(f"{self.ip} - ", *args, end="")
+            p_green(f"{self.ip} - ", *args)
         elif(n == 2):
-            p_yellow(f"{self.ip} - ", *args, end="")
+            p_yellow(f"{self.ip} - ", *args)
         elif(n == 3):
-            p_blue(f"{self.ip} - ", *args, end="")
+            p_blue(f"{self.ip} - ", *args)
         elif(n == 4):
-            p_purple(f"{self.ip} - ", *args, end="")
+            p_purple(f"{self.ip} - ", *args)
         elif(n == 5):
-            p_cyan(f"{self.ip} - ", *args, end="")
+            p_cyan(f"{self.ip} - ", *args)
 
     ##  ADB app management
     def is_open(self, package_name: str) -> bool:
@@ -519,9 +540,10 @@ class AppValidator:
 
         uninstalled = False
         try:
+            print("Uninstalling ", package_name)
             cmd = ( 'adb', '-t', self.transport_id, 'uninstall', package_name)
             outstr = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
-            sleep(5)
+            sleep(1)
             uninstalled = True
         except Exception as e:
             self.dprint("Error uninstalling: ", package_name, e)
@@ -770,11 +792,16 @@ class AppValidator:
 
     def cleanup_run(self, app_package_name: str):
         print("Cleaning up")
+        status_obj = self.report.get_status_obj_by_app(app_package_name)
+        self.app_logger.log(status_obj['status'], f"{app_package_name}_{self.report.report_title}", *status_obj.items())
+
+
+
+        self.cur_app_info  = None
         self.prev_act = None
         self.cur_act = None
         close_app(app_package_name, self.transport_id)
-        # self.uninstall_app(app_package_name)  # (save space)
-        print("Skipping uninstall")
+        self.uninstall_app(app_package_name)  # (save space)
         open_app(PLAYSTORE_PACKAGE_NAME, self.transport_id, self.arc_version)
         self.driver.orientation = 'PORTRAIT'
 
@@ -905,8 +932,8 @@ class AppValidator:
         while not logged_in and login_attemps < 4:
             CrashType, crashed_act, msg = self.err_detector.check_crash()
             if(not CrashType == CrashTypes.SUCCESS):
-                self.update_report_history(app_package_name, f"{CrashTypes.value}: {crashed_act} - {msg}")
-                self.report.update_status(app_package_name, ValidationReport.FAIL, CrashTypes.value)
+                self.update_report_history(app_package_name, f"{CrashType.value}: {crashed_act} - {msg}")
+                self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
                 break
 
             try:
@@ -932,14 +959,14 @@ class AppValidator:
             except ANRThrownException as error_obj:
                 if error_obj['ANR_for_package'] == app_package_name:
                     self.update_report_history(app_package_name, "ANR thrown.")
-                    self.report.update_status(app_package_name, ValidationReport.FAIL, CrashTypes.value)
+                    self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
                     return False
 
 
         # Check for crash once more after login attempts.
         CrashType, crashed_act, msg = self.err_detector.check_crash()
         if(not CrashType == CrashTypes.SUCCESS):
-            self.update_report_history(app_package_name, f"{CrashTypes.value}: {crashed_act} - {msg}")
+            self.update_report_history(app_package_name, f"{CrashType.value}: {crashed_act} - {msg}")
             self.update_report_history(app_package_name, msg)
             return False
 
@@ -1252,6 +1279,39 @@ class AppValidator:
                 return self.return_error(last_step, error)
 
 
+    def handle_failed_open_app(self, package_name: str, app_title: str, msg: str):
+        reason = ''
+        NEW_APP_NAME = ''
+        INVALID_APP = False
+        if self.check_playstore_invalid(package_name):
+            reason = "Package is invalid and was removed from the list."
+            INVALID_APP = True
+            self.app_list_queue.put(('invalid', package_name, app_title))
+        elif not app_title == self.check_playstore_name(package_name, app_title):
+            reason = f"[{app_title} !=  {self.__name_span_text}] App name does not match the current name on the playstore"
+            NEW_APP_NAME = self.__name_span_text
+            self.app_list_queue.put(('misnamed', package_name, NEW_APP_NAME))
+            self.__name_span_text = ''
+        elif not self.is_installed(package_name):
+            reason = "Failed to open because the package was not installed."
+        else:
+            reason = msg
+
+
+        self.report.update_status(package_name, ValidationReport.FAIL, reason, NEW_APP_NAME, INVALID_APP)
+        self.update_report_history(package_name, f"{reason}")
+
+
+    def check_crash(self, package_name: str):
+        CrashType, crashed_act, msg = self.err_detector.check_crash()
+        if(not CrashType == CrashTypes.SUCCESS):
+
+            self.report.update_status(package_name, ValidationReport.FAIL, CrashType.value)
+            self.update_report_history(package_name, f"{CrashType.value}: {crashed_act} - {msg}")
+
+            return True
+        return False
+
     ##  Main Loop
     def run(self):
         '''
@@ -1261,6 +1321,7 @@ class AppValidator:
             It ensures that the playstore is open at the beginning and that
             the device orientation is returned to portrait.
         '''
+
         self.driver.orientation = 'PORTRAIT'
         for app_title, app_package_name in self.package_names:
             self.current_package = app_package_name
@@ -1273,67 +1334,43 @@ class AppValidator:
                 installed, error = self.discover_and_install(app_title, app_package_name)
                 self.dprint(f"Installed? {installed}   err: {error}")
 
-                INVALID_APP = False
-                NEW_APP_NAME = ""
                 if not installed and not error is None:
-                    reason = ""
-                    if self.check_playstore_invalid(app_package_name):
-                        reason = "Package is invalid and was removed from the list."
-                        INVALID_APP = True
-                    elif not app_title == self.check_playstore_name(app_package_name, app_title):
-                        reason = f"[{app_title} !=  {self.__name_span_text}] App name does not match the current name on the playstore"
-                        NEW_APP_NAME = self.__name_span_text
-                        self.__name_span_text = ''
-                    else:
-                        reason = f"[{app_title} {error}"
-
-                    self.report.update_status(app_package_name, ValidationReport.FAIL, error, NEW_APP_NAME, INVALID_APP)
-                    self.update_report_history(app_package_name, f"{reason}")
+                    self.handle_failed_open_app(app_package_name, app_title, f"[{app_title} {error}")
                     self.cleanup_run(app_package_name)
                     continue
+
+                info = AppInfo(self.transport_id, app_package_name).info()
+                self.report.update_app_info(app_package_name, info)
+                self.cur_app_info = info
+                print(f"App {info=}")
 
                 if not open_app(app_package_name, self.transport_id, self.arc_version):
-                    reason = ''
-                    if self.check_playstore_invalid(app_package_name):
-                        reason = "Package is invalid and was removed from the list."
-                        INVALID_APP = True
-                    elif not app_title == self.check_playstore_name(app_package_name, app_title):
-                        reason = f"[{app_title} !=  {self.__name_span_text}] App name does not match the current name on the playstore"
-                        NEW_APP_NAME = self.__name_span_text
-                        self.__name_span_text = ''
-                    elif not self.is_installed(app_package_name):
-                        reason = "Failed to open because the package was not installed."
-                    else:
-                        reason = "Failed to open"
-
-                    self.report.update_status(app_package_name, ValidationReport.FAIL, reason, NEW_APP_NAME, INVALID_APP)
+                    self.handle_failed_open_app(app_package_name, app_title, "Failed to open")
+                    self.check_crash(app_package_name)
                     self.cleanup_run(app_package_name)
                     continue
 
-
-                self.dprint("Waiting for app to start/ load...")
                 sleep(5) # ANR Period
-                CrashType, crashed_act, msg = self.err_detector.check_crash()
-                if(not CrashType == CrashTypes.SUCCESS):
-                    self.report.update_status(app_package_name, ValidationReport.FAIL, CrashTypes.value)
-                    self.update_report_history(app_package_name, f"{CrashTypes.value}: {crashed_act} - {msg}")
+
+                if self.check_crash(app_package_name):
                     self.cleanup_run(app_package_name)
                     continue
+
 
                 self.update_report_history(app_package_name, "App launch successful.")
                 # self.dev_SS_loop()
 
-                info = AppInfo(self.transport_id, app_package_name).info()
-                print(f"App {info=}")
                 if info and not info.is_pwa:
                     logged_in = self.attempt_login(app_title, app_package_name, info.is_game)
                     print(f"Attempt loging: {logged_in=}")
 
-                self.cleanup_run(app_package_name)
             except Exception as error:
-                print("Error in main RUN: ", error)
+                p_alert("Error in main RUN: ", error)
                 if error == "PLAYSTORECRASH":
                     self.dprint("restart this attemp!")
+            self.cleanup_run(app_package_name)
+
+
 
 
 class FacebookApp:
@@ -1342,7 +1379,7 @@ class FacebookApp:
 
         This will be ran before the main valdiation process.
     '''
-    def __init__(self, driver: webdriver.Remote,  device: Device, instance_num: int):
+    def __init__(self, driver: webdriver.Remote, app_logger: AppLogger,  device: Device, instance_num: int):
         self.app_name = FACEBOOK_APP_NAME
         self.package_name = FACEBOOK_PACKAGE_NAME
         self.device = device
@@ -1350,7 +1387,9 @@ class FacebookApp:
             driver,
             [[self.app_name, self.package_name],],
             device,
-            instance_num
+            instance_num,
+            Queue(),
+            app_logger
         )
 
     def install_and_login(self):

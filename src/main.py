@@ -40,7 +40,7 @@ if __name__ == "__main__":
             # 'emulator-5554',
             # '192.168.1.248:5555', # Morphius AMD ARC-P        Yellow,
             # '192.168.1.128:5555',  # Kevin ARM ARC-p          Blue,
-            '192.168.1.238:5555', # Helios x86 intel ARC-R   RED,
+            # '192.168.1.238:5555', # Helios x86 intel ARC-R   RED,
             '192.168.1.113:5555', # CoachZ snapdragon ARC-P   Green,
             '192.168.1.125:5555',  # ARC-R Eve
         ]
@@ -57,6 +57,7 @@ if __name__ == "__main__":
     # starting_app = "com.softinit.iquitos.whatswebscan"
     # starting_app = "com.facebook.orca"
     # starting_app = "com.ss.android.ugc.trill"
+    # starting_app = "com.picsart.studio"
     # start_idx = dev_scrape_start_at_app(starting_app, TESTING_APPS)
     # print(f"{start_idx=} ~ {starting_app=}")
     # package_names = TESTING_APPS[start_idx: start_idx + 1]
@@ -70,10 +71,9 @@ if __name__ == "__main__":
 
     report_stats = runner.get_final_report_stats()
     report_stats.print_stats()
-    report_stats.write_failed_apps()
 
-    tsv.update_list(report_stats.stats['all_misnamed'])
-    tsv.export_bad_apps(report_stats.stats['all_invalid'])
+    # tsv.update_list(report_stats.stats['all_misnamed'])
+    # tsv.export_bad_apps(report_stats.stats['all_invalid'])
     ValidationReport.print_reports_by_app(report_stats.reports)
 
 

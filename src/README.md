@@ -46,13 +46,58 @@ Prep work for Chromebook:
 1. Detect if an app is O4C
 
 
+# Reporting
+
+1. Passed
+2. Failed
+    - Invalid/ bad app - No longer on playstore
+    - Misnamed apps - Updated list
+    - Failed apps
+        - Not installed
+        - Crashed
+
+
+
+# Files in user home dir
+1. App list.txt
+    - List of apps to test
+2. Bad app list.txt
+    - List of apps no longer available
+    - Removed from app list and placed into bad app list
+    - Currently happens at the end of a run.
+        - This can be done live
+
+3 & 4 Will Have: device info, app info, app status info w/ reasons for failure (if app failed)
+3. Failed app.tsv (DATA SRC)
+    - Added during the run to prevent data loss during long run
+4. Passed apps.tsv (DATA SRC)
+    - Added during the run to prevent data loss during long run
+
+5. Report
+    - Human readable print after a full run.
+    - More difficult to gather in memory, not really worth the effort if we end up building out a dashboard w/ web UI.
+    - Focus on #4, 5 that is essentially our data source whereas 1 and 2 keep our testing list updated while still trakcing invalid apps.
+
+
 
 # TODOs
+
+
+    - Misnamed apps isnt updated if it also crashes - Fix it
+
+    - Change behavior:
+        - latest_report.txt
+            - Add app report to this file after its done being tested
+
+        - failed_apps_ts.tsv
+            - Also update this once its failed...
 
 
     - Strategy when we have two continue buttons and one is disabled but has the higher probability
         - we should try to click all of them unless something happens?
             - Make it try more continue buttons before takinga new screenshot...??
+            - Gacha life
+                - Cancel Agree Continue buttons are conflicting.
 
     - Improve model
         - recently labeled FBAuth in Dataset, in v5 from Roboflow, we will have NEW LABELS
