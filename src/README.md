@@ -81,18 +81,6 @@ Prep work for Chromebook:
 
 
 # TODOs
-
-
-    - Misnamed apps isnt updated if it also crashes - Fix it
-
-    - Change behavior:
-        - latest_report.txt
-            - Add app report to this file after its done being tested
-
-        - failed_apps_ts.tsv
-            - Also update this once its failed...
-
-
     - Strategy when we have two continue buttons and one is disabled but has the higher probability
         - we should try to click all of them unless something happens?
             - Make it try more continue buttons before takinga new screenshot...??

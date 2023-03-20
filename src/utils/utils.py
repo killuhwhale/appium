@@ -18,7 +18,7 @@ import numpy as np
 
 class _CONFIG:
     login_facebook =  False  # Discover, install and sign into Facebook before running AppValidator.
-    multi_split_packages = False  # MultiprocessTaskRunner, splits apps across devices or not
+    multi_split_packages = True  # MultiprocessTaskRunner, splits apps across devices or not
     debug_print = True # Playstore.py, debug color printing by device.
 
 
@@ -739,6 +739,9 @@ class ErrorDetector:
     def __check_f_debug_crash(self):
         ''' Searches logs for F DEBUG crash logs.
 
+            TODO() com.miniclip.eightballpool - Is failing - Should get more info for this crash
+                - helios_192.168.1.238:5555
+
             03-03 14:36:13.060 19417 19417 F DEBUG   : pid: 19381, tid: 19381, name: lay.KingsCastle  >>> com.PepiPlay.KingsCastle <<<
             alskdnlaksndlkasndklasnd
             03-01 15:50:25.856 22026 22026 F DEBUG   : pid: 21086, tid: 21241, name: UnityMain  >>> zombie.survival.craft.z <<<
@@ -947,6 +950,7 @@ class AppLogger:
 
         # Create a file handler for the logger
         with open(filename_failed, 'w'):
+            # Write headers...
             pass
         with open(filename_passed, 'w'):
             pass
@@ -973,6 +977,7 @@ class AppLogger:
         print(f"{args[:2]=}")
         if not args[1] in self.packages_logged:
             message = '\t'.join(map(str, args[1:])).strip()
+
             if args[0] == 0:
                 self.logger_passed.info(message)
             elif args[0] == 1:

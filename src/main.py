@@ -40,7 +40,7 @@ if __name__ == "__main__":
             # 'emulator-5554',
             # '192.168.1.248:5555', # Morphius AMD ARC-P        Yellow,
             # '192.168.1.128:5555',  # Kevin ARM ARC-p          Blue,
-            # '192.168.1.238:5555', # Helios x86 intel ARC-R   RED,
+            '192.168.1.238:5555', # Helios x86 intel ARC-R   RED,
             '192.168.1.113:5555', # CoachZ snapdragon ARC-P   Green,
             '192.168.1.125:5555',  # ARC-R Eve
         ]
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     # package_names = TESTING_APPS[start_idx: start_idx + 1]
 
     # Dev, choose startin package by index.
-    package_names = TESTING_APPS[0:3]
+    package_names = TESTING_APPS
 
     runner = MultiprocessTaskRunner(ips, package_names)
     runner.run()

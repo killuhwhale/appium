@@ -793,7 +793,25 @@ class AppValidator:
     def cleanup_run(self, app_package_name: str):
         print("Cleaning up")
         status_obj = self.report.get_status_obj_by_app(app_package_name)
-        self.app_logger.log(status_obj['status'], f"{app_package_name}_{self.report.report_title}", *status_obj.items())
+        '''
+            'status': -1,
+            'new_name': "",
+            'invalid': False,
+            'reason': "",
+            'name': "",
+            'report_title': "",
+            'history': []
+        '''
+        self.app_logger.log(
+            status_obj['status'],
+            app_package_name,
+            status_obj['report_title'],
+            status_obj['name'],
+            status_obj['reason'],
+            status_obj['new_name'],
+            status_obj['invalid'],
+            status_obj['history'],
+        )
 
 
 

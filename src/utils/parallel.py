@@ -57,7 +57,10 @@ class AppiumServiceManager:
 
 
 def update_app_list(queue: Queue ):
+    ''' Separate process that will update the main apps list.
 
+    Updating invloves renaming misnamed pacakges and removing invalid packages.
+    '''
     tsv = AppListTSV()
     while True:
         if not queue.empty():
