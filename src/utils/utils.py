@@ -18,8 +18,9 @@ import numpy as np
 
 class _CONFIG:
     login_facebook =  False  # Discover, install and sign into Facebook before running AppValidator.
-    multi_split_packages = True  # MultiprocessTaskRunner, splits apps across devices or not
+    multi_split_packages = False  # MultiprocessTaskRunner, splits apps across devices or not
     debug_print = True # Playstore.py, debug color printing by device.
+    skip_pre_multi_uninstall = True  #Skips pre process uninstalltion of all apps to be tested.
 
 
 CONFIG = _CONFIG()
@@ -333,7 +334,6 @@ class AppInfo:
              - True when APK is in required location. False otherwise.
         '''
         print("Gettign APK ", self.package_name)
-
         if not is_package_installed(self.transport_id, self.package_name):
             return False
 
@@ -341,29 +341,24 @@ class AppInfo:
         dl_dir = f"{root_path}/apks/{self.package_name}"
         create_dir_if_not_exists(dl_dir)
 
-        does_exist = file_exists(f"{root_path}/apks/{self.package_name}/base.apk")
-        if does_exist:
-            return True
-
         cmd = ('adb', '-t', self.transport_id, 'shell', 'pm', 'path', self.package_name )
-        print("File exists ", does_exist)
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
                                     capture_output=True).stdout.strip()
         apk_path = None
         for line in outstr.split("\n"):
-            if 'base.apk' in line and not "asset" in line:
+            # Remove package name from the line and check because asset exists
+            # in the package name: com.cassette.aquapark
+            rm_name_line = line.replace(self.package_name, "")
+            if 'base.apk' in rm_name_line and not "asset" in rm_name_line:
                 apk_path = line[len("package:"):]
-
         print(f"Found apk path: {apk_path}")
-
-
-
+        if apk_path is None:
+            p_alert(f"Failed to find APK path for {self.package_name}\n", outstr)
+            return False
         print("Pulling APK: ", self.package_name, dl_dir)
-
         cmd = ('adb', '-t', self.transport_id, 'pull', apk_path, dl_dir )
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
                                     capture_output=True).stdout.strip()
-
         return True
 
     def __download_manifest(self) -> str:
@@ -692,8 +687,10 @@ class ErrorDetector:
 
         '''
         cmd = ('adb', '-t', self.__transport_id, 'logcat', 'time', '-t', start_time)  #
-        self.__logs =  subprocess.run(cmd, check=False, encoding='utf-8',
-            capture_output=True).stdout.strip()
+
+        self.__logs =  subprocess.getoutput(" ".join(cmd))
+        # self.__logs =  subprocess.run(cmd, check=False, encoding='utf-16',
+        #     capture_output=True).stdout.strip()
 
     def __check_for_win_death(self):
         ''' Searches logs for WIN DEATH record.
@@ -802,27 +799,35 @@ class ErrorDetector:
                 A string representing the failing activity otherwise it returns an empty string.
 
         '''
-        self.__get_logs(self.__start_time)
+        try:
+            self.__get_logs(self.__start_time)
+            # p_alert(f"{self.__logs}")
+            self.reset_start_time()
 
-        failed_act, match = self.__check_fatal_exception()
-        if failed_act:
-            return (CrashTypes.FATAL_EXCEPTION, failed_act, match)
 
-        failed_act, match = self.__check_for_win_death()
-        if failed_act:
-            return (CrashTypes.WIN_DEATH, failed_act, match)
+            failed_act, match = self.__check_fatal_exception()
+            if failed_act:
+                return (CrashTypes.FATAL_EXCEPTION, failed_act, match)
 
-        failed_act, match = self.__check_force_remove_record()
-        if failed_act:
-            return (CrashTypes.WIN_DEATH, failed_act, match)
 
-        failed_act, match = self.__check_f_debug_crash()
-        if match:
-            return (CrashTypes.FDEBUG_CRASH, failed_act, match)
+            failed_act, match = self.__check_for_win_death()
+            if failed_act:
+                return (CrashTypes.WIN_DEATH, failed_act, match)
 
-        if self.__check_for_ANR():
-            return (CrashTypes.ANR, "unknown activity", "ANR detected.")
 
+            failed_act, match = self.__check_force_remove_record()
+            if failed_act:
+                return (CrashTypes.WIN_DEATH, failed_act, match)
+
+            failed_act, match = self.__check_f_debug_crash()
+            if match:
+                return (CrashTypes.FDEBUG_CRASH, failed_act, match)
+
+            if self.__check_for_ANR():
+                return (CrashTypes.ANR, "unknown activity", "ANR detected.")
+        except Exception as error:
+            p_alert(f"Error in ErrorDetector: {self.__transport_id=} {self.__package_name}", error)
+            self.reset_start_time()
         return (CrashTypes.SUCCESS, "", "")
 
     def __get_start_time(self, ):
@@ -852,6 +857,7 @@ class AppListTSV:
     def __init__(self):
         self.__app_list = list()
         self.__filename = "app_list.tsv" # This file should be place in the home dir on linux ~/
+        # self.__filename = "failed_apps_test_list.tsv" # This file should be place in the home dir on linux ~/
         self.__badfilename = "bad_app_list.tsv" # This will be created in the home dir ~/
         self.__all_bad_apps = dict()
         self.__home_dir = users_home_dir()
@@ -933,11 +939,12 @@ class AppListTSV:
         with open(f"{self.__home_dir}/{self.__filename}", 'w' ) as f:
             [f.write(f"{app[0]}\t{app[1]}\n") for app in self.__app_list]
 
-
-
-
 class AppLogger:
-    ''' Logs passed/ failed apps to tsv. '''
+    ''' Logs passed/ failed apps to tsv 'live' instead of at the end of the program like __AppEventLogger.
+
+        TODO() https://developers.google.com/sheets/api/quickstart/python
+
+    '''
     def __init__(self):
         self.packages_logged = dict()
 
@@ -984,10 +991,8 @@ class AppLogger:
                 self.logger_failed.info(message)
             self.packages_logged[args[1]] = True  # track logged package_device
 
-
-
-class __AppLogger:
-    ''' Logs major events and summary reporting for the latest run. '''
+class __AppEventLogger:
+    ''' Logs events and summary reporting (after completion) for the latest run into latest_report.txt '''
     def __init__(self):
         filename = f'{users_home_dir()}/latest_report.txt'
         logger = logging.getLogger('my_logger')
@@ -1018,7 +1023,7 @@ class __AppLogger:
         self.logger.info(message)
         print(message, end=kwargs['end'] if 'end' in kwargs else '\n')
 
-logger = __AppLogger()
+logger = __AppEventLogger()
 ##     Colored printing     ##
 Red = "\033[31m"
 Black = "\033[30m"
@@ -1115,7 +1120,7 @@ def create_dir_if_not_exists(directory):
 
 def create_file_if_not_exists(path):
     print("Create path if not exist", path)
-    if not file_exists(path):
+    if path and not file_exists(path):
         with open(path, 'w'):
             pass
 

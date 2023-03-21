@@ -81,6 +81,36 @@ Prep work for Chromebook:
 
 
 # TODOs
+    - In TSV headers we should have:
+        - Discovery successful
+        - App installed
+        - Logged in
+
+        - Failed to open because the package was not installed.)
+            - Break this into:
+             - Discovery successful
+             - App installed
+             - Failed on click...
+
+    - Google Sheets API
+        - Create a test account/ GCP project
+        - Need to upgrade to python 3.10
+        - Use:
+            - Fetch initial app_list.tsv AND bad_app_list.tsv
+            - Do normal procedure
+            - Update app_list.tsv AND bad_app_list.tsv after runs
+                - This will still be updated on file live
+                - Once run is over, update all TSVs
+
+            - Init Fetch - same files ea time
+                - app_list.tsv
+                - bad_app_list.tsv
+
+            - Generated ea run:
+                - passed_apps_live.tsv
+                - failed_apps_live.tsv
+
+
     - Strategy when we have two continue buttons and one is disabled but has the higher probability
         - we should try to click all of them unless something happens?
             - Make it try more continue buttons before takinga new screenshot...??
@@ -88,10 +118,6 @@ Prep work for Chromebook:
                 - Cancel Agree Continue buttons are conflicting.
 
     - Improve model
-        - recently labeled FBAuth in Dataset, in v5 from Roboflow, we will have NEW LABELS
-            - Will need to update coco128.yaml with new labels.
-                - FBAuth
-                - Two (Age Verification)
         -1. Explore Age verification
             - input age or slider
             - we are detecting "2" for num pads
@@ -127,12 +153,6 @@ Prep work for Chromebook:
     - Detect AMAC-e (determine if app is O4C) -> impossible feat so far unless building test image.
         - AMAC-E overlays will not actually interfere with our process.
         - When sending comands via ADB, it essentially ignores those windows/ overlays.
-
-
-
-Bugs:
-
-
 
 # NOTES
 

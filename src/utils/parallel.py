@@ -108,7 +108,9 @@ def validate_task(queue: Queue, app_list_queue: Queue, app_logger: AppLogger, pa
         app_list_queue,
         app_logger
     )
-    validator.uninstall_multiple()
+    if not CONFIG.skip_pre_multi_uninstall:
+        p_alert(f"Skipping pre uninstall {CONFIG.skip_pre_multi_uninstall=}")
+        validator.uninstall_multiple()
     validator.run()
 
 

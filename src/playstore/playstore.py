@@ -452,6 +452,7 @@ class AppValidator:
         self.detector = ObjDetector(self.test_img_fp, [self.weights])
         self.ID = f"{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}-{self.ip.split(':')[0]}"
         self.__name_span_text = ''
+        self.__misnamed_reason_text = "App name does not match the current name on the playstore."
         self.instance_num = instance_num if instance_num else 0
         self.dev_ss_count = 320
         print(f"Testing packages: ", len(package_names), package_names)
@@ -822,7 +823,7 @@ class AppValidator:
         self.uninstall_app(app_package_name)  # (save space)
         open_app(PLAYSTORE_PACKAGE_NAME, self.transport_id, self.arc_version)
         self.driver.orientation = 'PORTRAIT'
-
+        self.__name_span_text = ''  # reset misnamed app's new name
 
     ## Logging in.
     def sleep_while_in_progress(self, app_package_name: str):
@@ -844,7 +845,7 @@ class AppValidator:
         empty_retries = 2
         self.is_new_activity() ## Init current activty
         if not self.get_test_ss():
-            return False, login_entered, password_entered
+            return False, login_entered_init, password_entered_init
         results = self.detector.detect()
         login_entered, password_entered = login_entered_init, password_entered_init
         if results is None:
@@ -960,7 +961,7 @@ class AppValidator:
                                         is_game,
                                         app_package_name)
                 logged_in, login_entered, password_entered = res
-                print(f"\n\n After attempt login: ")
+                print(f"\n\n After attempt login: ", login_attemps)
                 print(f"{logged_in=}, {login_entered=}, {password_entered=} \n\n")
 
                 if logged_in and not fb_login_continue_after_login:
@@ -975,6 +976,7 @@ class AppValidator:
                 login_attemps += 1
 
             except ANRThrownException as error_obj:
+                p_alert(f"ANR thrown - {app_title} - {app_package_name}")
                 if error_obj['ANR_for_package'] == app_package_name:
                     self.update_report_history(app_package_name, "ANR thrown.")
                     self.report.update_status(app_package_name, ValidationReport.FAIL, CrashType.value)
@@ -1297,7 +1299,7 @@ class AppValidator:
                 return self.return_error(last_step, error)
 
 
-    def handle_failed_open_app(self, package_name: str, app_title: str, msg: str):
+    def handle_failed_open_app(self, package_name: str, app_title: str, msg: str) -> str:
         reason = ''
         NEW_APP_NAME = ''
         INVALID_APP = False
@@ -1306,18 +1308,19 @@ class AppValidator:
             INVALID_APP = True
             self.app_list_queue.put(('invalid', package_name, app_title))
         elif not app_title == self.check_playstore_name(package_name, app_title):
-            reason = f"[{app_title} !=  {self.__name_span_text}] App name does not match the current name on the playstore"
+            reason = f"[{app_title} !=  {self.__name_span_text}] {self.__misnamed_reason_text}"
             NEW_APP_NAME = self.__name_span_text
             self.app_list_queue.put(('misnamed', package_name, NEW_APP_NAME))
-            self.__name_span_text = ''
+
         elif not self.is_installed(package_name):
-            reason = "Failed to open because the package was not installed."
+            reason = f"Not installed - {msg}"
         else:
             reason = msg
 
 
         self.report.update_status(package_name, ValidationReport.FAIL, reason, NEW_APP_NAME, INVALID_APP)
         self.update_report_history(package_name, f"{reason}")
+        return reason
 
 
     def check_crash(self, package_name: str):
@@ -1329,6 +1332,58 @@ class AppValidator:
 
             return True
         return False
+
+
+    def __process_app(self, app_title: str, app_package_name: str):
+        self.current_package = app_package_name
+        self.report.add_app(app_package_name, app_title)
+        self.err_detector.reset_start_time()
+        self.err_detector.update_package_name(app_package_name)
+        try:
+            installed, error = self.discover_and_install(app_title, app_package_name)
+            self.dprint(f"Installed? {installed}   err: {error}")
+            if not installed and not error is None:
+                reason = self.handle_failed_open_app(app_package_name, app_title, f"[{app_title} {error}")
+                if self.__misnamed_reason_text in reason:
+                    # Retry app again
+                    p_alert(f"{self.ip} - ", "Retrying app with new name: ", self.__name_span_text)
+                    return self.__process_app(self.__name_span_text, app_package_name)
+                self.cleanup_run(app_package_name)
+                return
+
+
+            if not open_app(app_package_name, self.transport_id, self.arc_version):
+                reason = self.handle_failed_open_app(app_package_name, app_title, "Failed to open")
+                if self.__misnamed_reason_text in reason:
+                    # Retry app again
+                    p_alert(f"{self.ip} - ", "Retrying app with new name: ", self.__name_span_text)
+                    return self.__process_app(self.__name_span_text, app_package_name)
+
+                self.check_crash(app_package_name)
+                self.cleanup_run(app_package_name)
+                return
+
+            info = AppInfo(self.transport_id, app_package_name).info()
+            self.report.update_app_info(app_package_name, info)
+            self.cur_app_info = info
+            print(f"App {info=}")
+            sleep(5) # ANR Period
+            if self.check_crash(app_package_name):
+                self.cleanup_run(app_package_name)
+                return
+
+            self.update_report_history(app_package_name, "App launch successful.")
+            # self.dev_SS_loop()
+
+            if info and not info.is_pwa:
+                logged_in = self.attempt_login(app_title, app_package_name, info.is_game)
+                print(f"Attempt loging: {logged_in=}")
+
+        except Exception as error:
+            p_alert(f"{self.ip} - ", f"Error in main RUN: {app_title} - {app_package_name}", error)
+            if error == "PLAYSTORECRASH":
+                self.dprint("restart this attemp!")
+
 
     ##  Main Loop
     def run(self):
@@ -1342,50 +1397,8 @@ class AppValidator:
 
         self.driver.orientation = 'PORTRAIT'
         for app_title, app_package_name in self.package_names:
-            self.current_package = app_package_name
-            self.report.add_app(app_package_name, app_title)
-            self.err_detector.reset_start_time()
-            self.err_detector.update_package_name(app_package_name)
-
-
-            try:
-                installed, error = self.discover_and_install(app_title, app_package_name)
-                self.dprint(f"Installed? {installed}   err: {error}")
-
-                if not installed and not error is None:
-                    self.handle_failed_open_app(app_package_name, app_title, f"[{app_title} {error}")
-                    self.cleanup_run(app_package_name)
-                    continue
-
-                info = AppInfo(self.transport_id, app_package_name).info()
-                self.report.update_app_info(app_package_name, info)
-                self.cur_app_info = info
-                print(f"App {info=}")
-
-                if not open_app(app_package_name, self.transport_id, self.arc_version):
-                    self.handle_failed_open_app(app_package_name, app_title, "Failed to open")
-                    self.check_crash(app_package_name)
-                    self.cleanup_run(app_package_name)
-                    continue
-
-                sleep(5) # ANR Period
-
-                if self.check_crash(app_package_name):
-                    self.cleanup_run(app_package_name)
-                    continue
-
-
-                self.update_report_history(app_package_name, "App launch successful.")
-                # self.dev_SS_loop()
-
-                if info and not info.is_pwa:
-                    logged_in = self.attempt_login(app_title, app_package_name, info.is_game)
-                    print(f"Attempt loging: {logged_in=}")
-
-            except Exception as error:
-                p_alert("Error in main RUN: ", error)
-                if error == "PLAYSTORECRASH":
-                    self.dprint("restart this attemp!")
+            # Allows for recursive call to retest an app.
+            self.__process_app(app_title, app_package_name)
             self.cleanup_run(app_package_name)
 
 
