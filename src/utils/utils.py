@@ -1,5 +1,3 @@
-import collections
-from copy import deepcopy
 from dataclasses import dataclass
 import json
 import logging
@@ -15,7 +13,7 @@ from typing import AnyStr, Dict, List, Tuple, Union
 import cv2
 import numpy as np
 
-
+@dataclass(frozen=True)
 class _CONFIG:
     login_facebook =  False  # Discover, install and sign into Facebook before running AppValidator.
     multi_split_packages = False  # MultiprocessTaskRunner, splits apps across devices or not
@@ -156,57 +154,6 @@ class DEVICES(Enum):
         else:
             return DEVICES.UNKNOWN
 
-
-# @dataclass
-# class StatsData:
-#     device_name: str
-#     total_apps:int
-#     update_app_names = collections.defaultdict(str)
-#     invalid_apps = collections.defaultdict(str)
-#     failed_apps = collections.defaultdict(str)
-
-
-# @dataclass
-# class Stats:
-#     stats: List[StatsData] = list()
-#     total_apps: int
-#     total_update_app_names: int
-#     total_invalid_apps: int
-#     total_failed_apps: int
-#     all_updated_names = collections.defaultdict(str)
-#     all_invalid_apps = collections.defaultdict(str)
-#     all_failed_apps = list()
-
-
-#     def add(self, stats_data: StatsData):
-#         if stats_data:
-#             self.stats.append(stats_data)
-
-
-#     def calc_stats(self):
-#         ''' Calculates total stats for all StatsData in self.stats.
-
-#         '''
-#         # updated names should be condensed from all devices, single srouce of truth -> playstore web
-#         all_updated_names = collections.defaultdict(str)
-#         # invalid names should be condensed from all devices, single srouce of truth -> playstore web
-#         all_invalid_apps = collections.defaultdict(str)
-
-#         for data in self.stats:
-#             all_updated_names.update(data.update_app_names) # collect into single dict
-#             all_invalid_apps.update(data.invalid_apps)  # collect into single dict
-#             self.total_apps += data.total_apps
-#             self.total_failed_apps += len(data.failed_apps.items())
-#             self.all_failed_apps.append([])
-
-#         self.total_update_app_names = len(all_updated_names)
-#         self.total_invalid_apps = len(all_invalid_apps)
-#         self.all_updated_names = all_updated_names
-#         self.all_invalid_apps = all_invalid_apps
-
-#         return self
-
-
 # APK & Manifest stuff
 @dataclass(frozen=True)
 class AppData:
@@ -219,8 +166,6 @@ class AppData:
     platformBuildVersionName: str
     is_pwa: bool
     is_game: bool
-
-
 
 class AppInfo:
     '''
@@ -662,6 +607,11 @@ class ErrorDetector:
         self.__ArcVersion = ArcVersion
         self.__start_time = None  # Logcat logs starting at
         self.reset_start_time()
+        self.__logs = ""
+
+    @property
+    def logs(self):
+        return self.__logs
 
     def get_package_name(self):
         return self.__package_name
@@ -844,7 +794,6 @@ class ErrorDetector:
     def reset_start_time(self):
         self.__start_time = self.__get_start_time()
 
-
 class AppListTSV:
     ''' Tranformation layer between persisted storage of list to python list.
 
@@ -856,8 +805,8 @@ class AppListTSV:
 
     def __init__(self):
         self.__app_list = list()
+
         self.__filename = "app_list.tsv" # This file should be place in the home dir on linux ~/
-        # self.__filename = "failed_apps_test_list.tsv" # This file should be place in the home dir on linux ~/
         self.__badfilename = "bad_app_list.tsv" # This will be created in the home dir ~/
         self.__all_bad_apps = dict()
         self.__home_dir = users_home_dir()
@@ -946,21 +895,20 @@ class AppLogger:
 
     '''
     def __init__(self):
-        self.packages_logged = dict()
-
+        self.__packages_logged = dict()
         filename_failed = f'{users_home_dir()}/failed_apps_live.tsv'
         filename_passed = f'{users_home_dir()}/passed_apps_live.tsv'
         logger_failed = logging.getLogger('failed_apps_live')
         logger_passed = logging.getLogger('passed_apps_live')
         logger_failed.setLevel(logging.DEBUG)
         logger_passed.setLevel(logging.DEBUG)
-
+        header = f"Package\tName\tReport Title\tReason\tNew Name\tInvalid\tHistory\n"
         # Create a file handler for the logger
-        with open(filename_failed, 'w'):
-            # Write headers...
-            pass
-        with open(filename_passed, 'w'):
-            pass
+        with open(filename_failed, 'w') as f:
+            f.write(header)
+
+        with open(filename_passed, 'w') as f:
+            f.write(header)
 
         file_handler_failed = logging.FileHandler(filename_failed)
         file_handler_failed.setLevel(logging.DEBUG)
@@ -975,21 +923,69 @@ class AppLogger:
         # Add the file handler to the logger
         logger_failed.addHandler(file_handler_failed)
         logger_passed.addHandler(file_handler_passed)
-        self.logger_failed = logger_failed
-        self.logger_passed = logger_passed
+        self.__logger_failed = logger_failed
+        self.__logger_passed = logger_passed
 
+    @property
+    def logger_failed(self):
+        return self.__logger_failed
+
+    @property
+    def logger_passed(self):
+        return self.__logger_passed
 
     def log(self, *args, **kwargs):
         # args = status, package_device_key, message args
-        print(f"{args[:2]=}")
-        if not args[1] in self.packages_logged:
+        if not args[1] in self.__packages_logged:
             message = '\t'.join(map(str, args[1:])).strip()
 
             if args[0] == 0:
                 self.logger_passed.info(message)
             elif args[0] == 1:
                 self.logger_failed.info(message)
-            self.packages_logged[args[1]] = True  # track logged package_device
+            self.__packages_logged[args[1]] = True  # track logged package_device
+
+class StatsLogger:
+    ''' Logs stats as each app is completed.  '''
+
+    @staticmethod
+    def stat_order():
+        return  ['total_apps','total_misnamed','total_invalid','total_failed','total_passed']
+
+    def __init__(self):
+        self.filename = f'{users_home_dir()}/latest_stat_report.tsv'
+        logger = logging.getLogger('latest_stat_report')
+        logger.setLevel(logging.DEBUG)
+
+        sorder = '\t'.join([f'{key.replace("_", " ").title()}' for key in StatsLogger.stat_order()])
+
+        self.__header = f"Summary For\t{sorder}\n"
+        # Create a file handler for the logger
+        self.clear()
+        file_handler = logging.FileHandler(self.filename)
+        file_handler.setLevel(logging.DEBUG)
+
+        # Create a formatter for the file handler
+        formatter = logging.Formatter('%(message)s')
+        file_handler.setFormatter(formatter)
+
+        # Add the file handler to the logger
+        logger.addHandler(file_handler)
+        self.__logger = logger
+
+    @property
+    def logger(self):
+        return self.__logger
+
+    def clear(self):
+        with open(self.filename, 'w') as f:
+            f.write(self.__header)
+
+
+    def log(self, *args, **kwargs):
+        self.clear()
+        message = ' '.join(map(str, args))
+        self.__logger.info(message)
 
 class __AppEventLogger:
     ''' Logs events and summary reporting (after completion) for the latest run into latest_report.txt '''
@@ -1054,7 +1050,6 @@ def p_purple(*args, end='\n'):
 def p_cyan(*args, end='\n'):
     print(Cyan, *args, RESET, end=end)
     logger.log(*args, end=end)
-
 def p_alert(*args):
     art = r"""
           _ ._  _ , _ ._
@@ -1828,90 +1823,6 @@ PACKAGE_NAMES = [
     ['Google My Business', 'com.google.android.apps.vega'],
     ['Google Opinion Rewards', 'com.google.android.apps.paidtasks'],
 ]
-
-TOP_500_APPS = PACKAGE_NAMES[:500]
-
-''' 100- 150 failure report
-FreeCell Solitaire at.ner.SolitaireFreeCell search/install status: FAILED - [192.168.1.113:5555]
-                 Failed to open because the package was not installed.
-
-Adobe Lightroom com.adobe.lrmobile search/install status: FAILED - [192.168.1.113:5555]
-                 Failed: Click app icon
-
-CrossOver on Chrome OS Beta com.codeweavers.cxoffice search/install status: FAILED - [192.168.1.113:5555]
-                 App package is invalid, update/ remove from list.
-
-Miracle Nikki com.elex.nikkigp search/install status: FAILED - [192.168.1.113:5555]
-                 Failed: Click app icon
-
-Mergical com.fotoable.mergetown search/install status: FAILED - [192.168.1.113:5555]
-                 Failed: Click app icon
-
-com.madfut.madfut21 com.madfut.madfut21 search/install status: FAILED - [192.168.1.113:5555]
-                 Failed: Click app icon
-
-V - Real-time celeb broadcasting app com.naver.vapp search/install status: FAILED - [192.168.1.113:5555]
-                 App package is invalid, update/ remove from list.
-
-hayu com.upst.hayu search/install status: FAILED - [192.168.1.113:5555]
-                 Failed: Click app icon
-
-com.yoku.marumovie com.yoku.marumovie search/install status: FAILED - [192.168.1.113:5555]
-                 Failed: Click app icon
-
-GyaO jp.co.yahoo.gyao.android.app search/install status: FAILED - [192.168.1.113:5555]
-                 Failed: Click app icon
-
-Anime Center pro.anioload.animecenter search/install status: FAILED - [192.168.1.113:5555]
-                 Failed to open because the package was not installed.
-
-
-
-
-
-150-200
-
-Kitchen Frenzy - Chef Master com.biglime.cookingmadness search/install status: FAILED - [192.168.1.113:5555]
-                 Failed to open because the package was not installed.
-
-Spider Solitaire com.cardgame.spider.fishdom search/install status: FAILED - [192.168.1.113:5555]
-                 Failed: Click install button :: Program installed incorrect package,                    com.cardgame.spider.fishdom was not actually installed
-
-DraStic DS Emulator com.dsemu.drastic search/install status: FAILED - [192.168.1.113:5555]
-                 Failed: Click install button :: Needs purchase
-
-My Boy! - GBA Emulator com.fastemulator.gba search/install status: FAILED - [192.168.1.113:5555]
-                 Failed: Click install button :: Needs purchase
-
-Google Slides com.google.android.apps.docs.editors.slides search/install status: FAILED - [192.168.1.113:5555]
-                 Failed: Click install button :: Program installed incorrect package,                    com.google.android.apps.docs.editors.slides was not actually installed
-
-TV d'Orange com.orange.owtv search/install status: FAILED - [192.168.1.113:5555]
-                 Failed to open because the package was not installed.
-
-Heart of Vegas com.productmadness.hovmobile search/install status: FAILED - [192.168.1.113:5555]
-                 Failed: Click search icon
-
-Sketch - Draw & Paint com.sonymobile.sketch search/install status: FAILED - [192.168.1.113:5555]
-                 App package is invalid, update/ remove from list.
-
-U-NEXT jp.unext.mediaplayer search/install status: FAILED - [192.168.1.113:5555]
-                 Failed: Click app icon
-
-Google Earth com.google.earth search/install status: FAILED - [192.168.1.113:5555]
-                 Failed: Click install button :: Program installed incorrect package,                    com.google.earth was not actually installed
-
-Kingdom Rush com.ironhidegames.android.kingdomrush search/install status: FAILED - [192.168.1.113:5555]
-                 Failed: Click install button :: Needs purchase
-
-Grand Theft Auto: San Andreas com.rockstargames.gtasa search/install status: FAILED - [192.168.1.113:5555]
-                 Failed to open because the package was not installed.
-
-Viaplay com.viaplay.android search/install status: FAILED - [192.168.1.113:5555]
-                 Failed: Click app icon
-
-
-'''
 
 ADB_KEYCODE_UNKNOWN = "0"
 ADB_KEYCODE_MENU = "1"

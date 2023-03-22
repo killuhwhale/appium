@@ -81,16 +81,9 @@ Prep work for Chromebook:
 
 
 # TODOs
-    - In TSV headers we should have:
-        - Discovery successful
-        - App installed
-        - Logged in
 
-        - Failed to open because the package was not installed.)
-            - Break this into:
-             - Discovery successful
-             - App installed
-             - Failed on click...
+    - Store logs when a crash is detected.
+
 
     - Google Sheets API
         - Create a test account/ GCP project
