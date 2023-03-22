@@ -17,7 +17,7 @@ from appium import webdriver
 from objdetector.objdetector import ObjDetector
 from utils.utils import (ACCOUNTS, ADB_KEYCODE_ENTER, CONFIG,
                          CONTINUE,  FACEBOOK_APP_NAME,
-                         FACEBOOK_PACKAGE_NAME, GOOGLE_AUTH,
+                         FACEBOOK_PACKAGE_NAME, FB_ATUH, GOOGLE_AUTH,
                          LOGIN, PASSWORD,
                          PLAYSTORE_PACKAGE_NAME, WEIGHTS, AppData, AppInfo, AppLogger,
                          BuildChannels, CrashTypes, Device,
@@ -80,7 +80,8 @@ class ValidationReport:
             'package_name': "",
             'report_title': "",
             'history': [],
-            'app_info': {}
+            'app_info': {},
+            'logs': '',
         }
 
     def __init__(self, device: Device):
@@ -146,7 +147,7 @@ class ValidationReport:
     @staticmethod
     def anim_starting():
         ''' Report decoration.'''
-        print("\033[2J")  # clear the screen
+        # print("\033[2J")  # clear the screen
         print("\033[0;0H")  # move cursor to top-left corner
         ValidationReport.ascii_starting()
 
@@ -667,14 +668,9 @@ class AppValidator:
             status_obj['new_name'],
             status_obj['invalid'],
             status_obj['history'],
+            status_obj['logs'],
         )
 
-        '''
-            Currently, I am collecting a list of reports and collect them.
-            Instead, I should send the status object.
-            Then I can just update a dict of reports istead of a list.
-            The status obj has the report_title, and package_name
-        '''
         self.__send_stats_update(status_obj)
 
         self.__prev_act = None
@@ -743,37 +739,40 @@ class AppValidator:
                 # We have A google Auth button presents lets press it
                 results[GOOGLE_AUTH], tapped = self.__click_button(results[GOOGLE_AUTH])
                 del results[GOOGLE_AUTH]
-                return True, login_entered, password_entered
+                return True, True, True
+            elif FB_ATUH in results and not login_entered:
+                results[FB_ATUH], tapped = self.__click_button(results[FB_ATUH])
+                del results[FB_ATUH]
+                return True, True, True # Conisdered email and password entered
             elif LOGIN in results and not login_entered:
-                print("Click login        <-------")
+                self.__dprint(f"Click login        <------- {login_entered=}")
                 results[LOGIN], tapped = self.__click_button(results[LOGIN])
                 del results[LOGIN]
                 if app_package_name in ACCOUNTS:
                     login_val = ACCOUNTS[app_package_name][0]
                     self.__send_keys_ADB(login_val, False, False)
-                    print(f"Send Login - {login_val}        <-------")
+                    self.__dprint(f"Send Login - {login_val}        <-------")
                 else:
-                    print(f"Login info not created for {app_package_name}")
-
+                    self.__dprint(f"Login info not created for {app_package_name}")
                 login_entered = True
 
+
             elif PASSWORD in results and not password_entered:
-                print("Click Password        <-------")
+                self.__dprint("Click Password        <-------")
                 results[PASSWORD], tapped = self.__click_button(results[PASSWORD])
                 del results[PASSWORD]
                 if app_package_name in ACCOUNTS:
                     pass_val = ACCOUNTS[app_package_name][1]
                     self.__send_keys_ADB(pass_val, False, False)
-                    print(f"Send Password - {pass_val}       <-------")
+                    self.__dprint(f"Send Password - {pass_val}       <-------")
                     password_entered = True
                 else:
-                    print(f"Password info not created for {app_package_name}")
-                sleep(3)
+                    self.__dprint(f"Password info not created for {app_package_name}")
                 if self.__is_new_activity():
                     return True, login_entered, password_entered
             elif CONTINUE in results:
                 # TODO Remove the button once we click it, so we dont keep clicking the same element.
-                print("Click Continue        <-------")
+                self.__dprint("Click Continue        <-------")
                 results[CONTINUE], tapped = self.__click_button(results[CONTINUE])
                 del results[CONTINUE]
 
@@ -798,8 +797,8 @@ class AppValidator:
                 self.__dprint(f"Results: ", results)
             elif len(results.keys()) == 0 and empty_retries > 0:
                 empty_retries -= 1
-                print("Empty results, grabbing new SS and processing...")
-                sleep(2)
+                self.__dprint("Empty results, grabbing new SS and processing...")
+                # sleep(2)
                 # Get a new SS, ir error return
                 if not self.__get_test_ss():
                     return False, login_entered, password_entered
@@ -808,9 +807,9 @@ class AppValidator:
         return False, login_entered, password_entered
 
     def __attempt_login(self, app_title: str, app_package_name: str, is_game: bool):
+        # We need to press the submit buttton on the screen following the login
+        # in order to use Facebook as an auth app for other apps like games.
         fb_login_continue_after_login = app_package_name == FACEBOOK_PACKAGE_NAME
-        print(f"{fb_login_continue_after_login=}")
-
         login_attemps = 0
         logged_in = False
         login_entered = False
@@ -825,13 +824,13 @@ class AppValidator:
                                         is_game,
                                         app_package_name)
                 logged_in, login_entered, password_entered = res
-                print(f"\n\n After attempt login: ", login_attemps)
-                print(f"{logged_in=}, {login_entered=}, {password_entered=} \n\n")
+                self.__dprint(f"\n\n After attempt login: ", login_attemps)
+                self.__dprint(f"{logged_in=}, {login_entered=}, {password_entered=} \n\n")
 
                 if logged_in and not fb_login_continue_after_login:
                     break
                 elif logged_in and fb_login_continue_after_login:
-                    print("Logged in to FB! Reattempting for save info continue...")
+                    self.dprint("Logged in to FB! Reattempting for save info continue...")
                     res = self.__handle_login(login_entered,
                                         password_entered,
                                         is_game,
@@ -895,6 +894,7 @@ class AppValidator:
                 ready = True
             except Exception as e:
                 self.__dprint("App not ready to open, retrying...")
+                # TODO() rethink this part.
                 if t > max_wait * 0.25:
                     self.__check_playstore_crash()
                 sleep(0.5)

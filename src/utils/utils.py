@@ -23,7 +23,7 @@ class _CONFIG:
 
 CONFIG = _CONFIG()
 BASE_PORT = 4723
-
+# Hulu: Stream shows & movies	com.hulu.plus
 weights = 'notebooks/yolov5/runs/train/exp007/weights/best_309.pt'
 weights = 'notebooks/yolov5/runs/train/exp4/weights/best.pt'  # Lastest RoboFlow Model V1
 weights = 'notebooks/yolov5/runs/train/exp6/weights/best.pt'  # Lastest RoboFlow Model V2
@@ -55,7 +55,6 @@ TWO = 'Two'
 CODE = 'code'
 LOGIN = 'loginfield'
 PASSWORD = 'passwordfield'
-
 
 IMAGE_LABELS = [
     CLOSE,
@@ -611,7 +610,10 @@ class ErrorDetector:
 
     @property
     def logs(self):
-        return self.__logs
+        return self.__escape(self.__logs)
+
+    def __escape(self, logs):
+        return logs.replace("\n", "\\n")
 
     def get_package_name(self):
         return self.__package_name
@@ -625,7 +627,7 @@ class ErrorDetector:
     def update_arc_version(self, ArcVersion: ArcVersions):
         self.__ArcVersion = ArcVersion
 
-    def __get_logs(self, start_time: str):
+    def __get_logs(self):
         '''Grabs logs from ADB logcat starting at a specified time.
 
             Params:
@@ -636,11 +638,12 @@ class ErrorDetector:
             Returns
 
         '''
-        cmd = ('adb', '-t', self.__transport_id, 'logcat', 'time', '-t', start_time)  #
-
+        # Sometimes Logcat with return bytes that arent able to be encoded and throws an error
+        # So we use 'getoutput' to avoid this. Also, we need to make the start time arg wrapped in string
+        # So that it see it as a single argument.
+        cmd = ('adb', '-t', self.__transport_id, 'logcat', 'time', '-t', f"'{self.__start_time}'")
+        print("Get logs command: ", " ".join(cmd))
         self.__logs =  subprocess.getoutput(" ".join(cmd))
-        # self.__logs =  subprocess.run(cmd, check=False, encoding='utf-16',
-        #     capture_output=True).stdout.strip()
 
     def __check_for_win_death(self):
         ''' Searches logs for WIN DEATH record.
@@ -697,7 +700,7 @@ class ErrorDetector:
             Returns:
                 A string representing the failing activity otherwise it returns an empty string.
         '''
-        force_removed = rf"[a-zA-Z0-9\s\-\:.,]*F DEBUG[a-zA-Z0-9\s\-\:.,]*>>> {self.__package_name} <<<"
+        force_removed = rf".*>>> {self.__package_name} <<<.*"
         force_removed_pattern = re.compile(force_removed, re.MULTILINE)
         match = force_removed_pattern.search(self.__logs)
 
@@ -741,8 +744,7 @@ class ErrorDetector:
 
             Params:
                 package_name: The name of the package to check crash logs for.
-                start_time: The formatted string representing the time the app was
-                    launched/ started.
+
                 transport_id: The transport id of the connected android device.
 
             Return:
@@ -750,15 +752,12 @@ class ErrorDetector:
 
         '''
         try:
-            self.__get_logs(self.__start_time)
-            # p_alert(f"{self.__logs}")
+            self.__get_logs()
             self.reset_start_time()
-
 
             failed_act, match = self.__check_fatal_exception()
             if failed_act:
                 return (CrashTypes.FATAL_EXCEPTION, failed_act, match)
-
 
             failed_act, match = self.__check_for_win_death()
             if failed_act:
@@ -902,7 +901,7 @@ class AppLogger:
         logger_passed = logging.getLogger('passed_apps_live')
         logger_failed.setLevel(logging.DEBUG)
         logger_passed.setLevel(logging.DEBUG)
-        header = f"Package\tName\tReport Title\tReason\tNew Name\tInvalid\tHistory\n"
+        header = f"Package\tName\tReport Title\tReason\tNew Name\tInvalid\tHistory\tLogs\n"
         # Create a file handler for the logger
         with open(filename_failed, 'w') as f:
             f.write(header)
@@ -1019,6 +1018,7 @@ class __AppEventLogger:
         self.logger.info(message)
         print(message, end=kwargs['end'] if 'end' in kwargs else '\n')
 
+
 logger = __AppEventLogger()
 ##     Colored printing     ##
 Red = "\033[31m"
@@ -1030,7 +1030,6 @@ Purple = "\033[35m"
 Cyan = "\033[36m"
 White = "\033[37m"
 RESET = "\033[0m"
-
 
 def p_red(*args, end='\n'):
     print(Red, *args, RESET, end=end)
