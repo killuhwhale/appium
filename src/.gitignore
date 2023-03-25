@@ -1,8 +1,0 @@
-*__pycache__
-.vscode
-notebooks/yolov5/runs
-images/errors/*
-appium/
-apks/
-latest_report.txt
-accounts.json

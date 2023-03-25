@@ -5,3 +5,10 @@ pyvenv.cfg
 share/
 src/utils/__pycache__/
 *__pycache__/
+.vscode
+src/notebooks/yolov5/runs
+src/images/errors/*
+src/appium/
+src/apks/
+src/latest_report.txt
+src/accounts.json
