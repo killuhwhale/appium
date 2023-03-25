@@ -1,26 +1,9 @@
 
 """Main entry point to running search, install, launch, login, reporting.
                                     SILLR
-
-Uses file in home directory:
-1. app_list.tsv
-    - List of appnames, package names to test.
-
-Produces files in home directory:
-1. bad_app_list.tsv
-    - Invalid packages
-2. failed_apps_live.tsv
-    - Report of failed apps
-3. passed_apps_live.tsv
-    - Report of passed apps
-4. latest_stat_report.tsv
-    - Numerical summary of reports
-5. latest_report.txt
-    - Logs + Summary of run
-
 To run this script with the CLI:
 Syntax:
-python3 cpu.py [-d <time-in-seconds>] [-o <output-file>] package_id
+python3 main.py [-c --clean] -i --ip <ip-addresses>
 
 Arguments:
     ips: (Required) ip addresses of the DUT.
@@ -28,18 +11,32 @@ Arguments:
 Example:
     python3 main.py 192.168.1.125 192.168.1.113
 """
+import argparse
+from multiprocessing import Queue
 from appium import webdriver
-from appium.webdriver.appium_service import AppiumService
-from time import sleep
-import sys
 
-from playstore.playstore import AppValidator, FacebookApp, ValidationReport
-from utils.parallel import MultiprocessTaskRunner, ValidationReportStats
-from utils.utils import AppListTSV
+from playstore.app_validator import AppValidator
+from playstore.facebook_app import  FacebookApp
+from playstore.validation_report import ValidationReport
+from playstore.validation_report_stats import ValidationReportStats
+from serviceManager.appium_service_manager import AppiumServiceManager
+from utils.device_utils import Device
+from utils.logging_utils import AppListTSV, AppLogger
+from utils.parallel import MultiprocessTaskRunner
+from utils.utils import BASE_PORT, PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME, android_des_caps, dev_scrape_start_at_app
 
 
 if __name__ == "__main__":
-    ips = sys.argv[1:]
+    parser = argparse.ArgumentParser(description="App validation.")
+    parser.add_argument("-c", "--clean",
+                        help="Clean up appium server..",
+                        action='store_true')
+    parser.add_argument("-i", "--ips",
+                        help="Ip address of DUTs.",
+                        default=[], type=list)
+
+    args = parser.parse_args()
+    ips = args.ips
     # Multiprocessing Runs
     if len(ips) == 0:
         ips = [
@@ -47,8 +44,8 @@ if __name__ == "__main__":
             # 'emulator-5554',
             # '192.168.1.248:5555', # Morphius AMD ARC-P        Yellow,
             # '192.168.1.128:5555',  # Kevin ARM ARC-p          Blue,
-            '192.168.1.238:5555', # Helios x86 intel ARC-R   RED,
-            '192.168.1.113:5555', # CoachZ snapdragon ARC-P   Green,
+            # '192.168.1.238:5555', # Helios x86 intel ARC-R   RED,
+            # '192.168.1.113:5555', # CoachZ snapdragon ARC-P   Green,
             '192.168.1.125:5555',  # ARC-R Eve
         ]
     print("ips: ", ips)
@@ -57,28 +54,75 @@ if __name__ == "__main__":
     TESTING_APPS = tsv.get_apps()
 
     # Dev, choose startin package by name.
-    # starting_app = "com.picsart.studio"
-    # start_idx = dev_scrape_start_at_app(starting_app, TESTING_APPS)
-    # print(f"{start_idx=} ~ {starting_app=}")
-    # package_names = TESTING_APPS[start_idx: start_idx + 1]
+    starting_app = "com.picsart.studio"
+    start_idx = dev_scrape_start_at_app(starting_app, TESTING_APPS)
+    print(f"{start_idx=} ~ {starting_app=}")
+    package_names = TESTING_APPS[start_idx: start_idx + 1]
 
     # Dev, choose startin package by index.
-    package_names = TESTING_APPS[:1]
+    package_names = TESTING_APPS[8:9]
 
     runner = MultiprocessTaskRunner(ips, package_names)
+    if args.clean:
+        runner.cleanup_appium_server()
+    runner.start_appium_server()
     runner.run()
     runner.print_devices()
 
 
-
-    # tsv.update_list(report_stats.stats['all_misnamed'])
-    # tsv.export_bad_apps(report_stats.stats['all_invalid'])
     stats, device = ValidationReportStats.calc(runner.reports_dict)
-    ValidationReportStats.print_stats(stats, device)
+    ValidationReportStats.print_stats(stats, device)  # TODO() fix bug with end of reporting.
 
     ValidationReport.print_reports_by_app(runner.reports)
 
+    ####################################
+    ##   Single Run
+    ####################################
+
+    ip = "192.168.1.113:5555"
+    ip = "192.168.1.125:5555"
+
+    service_manager = AppiumServiceManager([ip])
+    if args.clean:
+        service_manager.cleanup_services()  # Will exit
+    service_manager.start_services()
+
+    device = Device(ip)
+    app_logger = AppLogger()
+    tsv = AppListTSV()  # Create Globally
+    TESTING_APPS = tsv.get_apps()
+    package_names = TESTING_APPS[8:9]
 
 
+    print("Creating driver...")
+    driver = webdriver.Remote(
+        f"http://localhost:{BASE_PORT}/wd/hub",
+        android_des_caps(
+            ip,
+            PLAYSTORE_PACKAGE_NAME,
+            PLAYSTORE_MAIN_ACT
+        )
+    )
 
+    driver.implicitly_wait(5)
+    driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
+
+    fb_handle = FacebookApp(driver, app_logger,  device, BASE_PORT, Queue(),)
+    fb_handle.install_and_login()
+
+    validator = AppValidator(
+        driver,
+        package_names,
+        device,
+        0,
+        Queue(),
+        app_logger,
+        Queue(),
+    )
+
+    validator.uninstall_multiple()
+    validator.run()
+
+    validator.report.merge(fb_handle.validator.report)
+    validator.report.print()
 

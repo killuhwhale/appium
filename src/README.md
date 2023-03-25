@@ -4,6 +4,15 @@ Example Output
 <video src="https://drive.google.com/open?id=1kztEqXsqcLiEa24NN3vr3_ddeH0D0re4&authuser=0&usp=drive_link" />
 
 
+Account:
+appval001/testminnie123
+ID
+436076947816-38i1q90b17vcfl8p5mfi6qaf5gohsa9v.apps.googleusercontent.com
+Key
+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
+
+
+
 Prep work for Chromebook:
 - DUT
     - Install Accounts for testing.
@@ -37,10 +46,13 @@ Prep work for Chromebook:
 5. Can Detect if an app is a game.
 5. Open app and detect crashing upon opening.
 6. Attempt login using Object Detection via YOLOv5
-7. Detect if app was logged in if we are able to send username/ password or click on Google/ Facebook sign in without subsequent crash.
-8. Log misnamed apps, invalid apps and failed apps to file.
-9. History report for each app w/ screenshots at ea step.
-10. Summary report of all apps from each device.
+7. Detect if app was logged in
+    - if we are able to send username/ password or click on Google/ Facebook sign in without subsequent crash.
+8. Log reports to file.
+    - misnamed apps, invalid apps and failed apps
+9. Update misnamed apps
+10. History report for each app w/ screenshots at ea step.
+11. Summary report of all apps from each device.
 
 # What we need to do but cant yet
 1. Detect if an app is O4C
@@ -82,10 +94,10 @@ Prep work for Chromebook:
 
 # TODOs
 
-    - Store logs when a crash is detected.
+    # Scrape a few more image on Eve
+        - Top 3 list of app_list.tsv
 
-
-    - Google Sheets API
+    - Google Sheets API? Probably not? If we create a dashboard we proabably wont use this.
         - Create a test account/ GCP project
         - Need to upgrade to python 3.10
         - Use:
