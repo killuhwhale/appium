@@ -11,12 +11,6 @@ class AppiumServiceItem:
     port: int
     service: AppiumService
 
-    def __del__(self):
-        try:
-            self.service.stop()
-        except:
-            print("Cant stop wont stop.")
-
 class AppiumServiceManager:
     '''
       Given list of ips, create a list of objects to group ip, port number and service.
@@ -29,13 +23,6 @@ class AppiumServiceManager:
         self.__ips = ips
         self.__base_port = BASE_PORT
         self.services: List[AppiumServiceItem] = []
-
-    def __del__(self):
-        try:
-            [s.service.stop() for s in self.services]
-        except:
-            pass
-
 
     def cleanup_services(self):
         ''' Starts and stops the service immediately.
@@ -56,7 +43,7 @@ class AppiumServiceManager:
                     print("Waiting for appium service to listen...")
                 service.stop()
             except Exception as error:
-                print("Error starting appium server", str(error))
+                print("Error cleaning up server", str(error))
             sys.exit(1)
 
     def start_services(self):
@@ -73,3 +60,6 @@ class AppiumServiceManager:
                 self.services.append(AppiumServiceItem(ip, port, service))
             except Exception as error:
                 print("Error starting appium server", str(error))
+                return False
+        return True
+

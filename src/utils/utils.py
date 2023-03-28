@@ -14,6 +14,19 @@ import cv2
 import numpy as np
 
 
+def users_home_dir():
+    return os.path.expanduser( '~' )
+
+def file_exists(directory):
+    return os.path.exists(directory)
+
+def create_file_if_not_exists(path):
+    print("Create path if not exist", path)
+    if path and not file_exists(path):
+        with open(path, 'w'):
+            pass
+
+
 @dataclass(frozen=True)
 class _CONFIG:
     login_facebook =  False  # Discover, install and sign into Facebook before running AppValidator.
@@ -70,6 +83,7 @@ ACCOUNTS = None
 with open(f"{os.path.expanduser( '~' )}/accounts.json", 'r') as f:
     ACCOUNTS = json.load(f)
 
+
 ##      Appium config & stuff  ##
 def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: AnyStr) -> Dict:
     '''
@@ -97,8 +111,8 @@ def dev_scrape_start_at_app(start_package_name: str, app_list: List[List[str]]) 
             return i
     raise Exception(f"{start_package_name} not in the list.")
 
-##        NOT CURRENTLY USED          Image utils      NOT CURRENTLY USED         ##
 
+##        NOT CURRENTLY USED          Image utils      NOT CURRENTLY USED         ##
 def transform_coord_from_resized(original_size: Tuple, resized_to: Tuple, resized_coords: Tuple) -> Tuple[int]:
     ''' Given original img size, resized image size and resized coords, this will calculate the original coords.
 
@@ -181,25 +195,6 @@ def find_template(large_img, small_img, method=cv2.TM_CCOEFF_NORMED):
     # cv2.imshow('Matched Image', gray_large_img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
-
-def check_amace(driver, package_name: str) -> bool:
-    # '''
-    # Apk Analyzer - AMAC-e
-    #  ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] id=window_session_id=8 flg=0x10200000 cmp=sk.styk.martin.apkanalyzer/.ui.main.MainActivity} from uid 1000
-    # '''
-    # Grab screenshot of device
-    # Look for AMAC-e image.
-    names = ['amace_phone', 'amace_tablet', 'amace_resize'] # names of .pngs for template matching.
-    root_path = get_root_path()
-    ss_path = f"{root_path}/apks/{package_name}/test.png"
-    does_exist = file_exists(ss_path)
-
-    print("Checking AMAC-e", ss_path[:100])
-    ss = driver.get_screenshot_as_file(ss_path)
-    for name in names:
-        amace_icon_path = f"{get_root_path()}/images/templates/{name}.png"
-        find_template(ss_path, amace_icon_path)
-    return False
 
 ADB_KEYCODE_UNKNOWN = "0"
 ADB_KEYCODE_MENU = "1"

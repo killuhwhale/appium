@@ -43,7 +43,7 @@ class FacebookApp:
         self.__validator.uninstall_app(self.__package_name, force_rm=True)
         self.__validator.run()
         sleep(3)
-        close_app(self.__package_name, self.__device.info().transport_id)
+        close_app(self.__package_name, self.__device.info.transport_id)
 
 if __name__ == "__main__":
     pass

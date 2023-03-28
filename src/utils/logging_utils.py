@@ -2,7 +2,7 @@
 
 import logging
 from typing import Dict
-from utils.app_utils import create_file_if_not_exists, users_home_dir
+from utils.utils import create_file_if_not_exists, users_home_dir
 
 
 class AppListTSV:
@@ -16,9 +16,7 @@ class AppListTSV:
 
     def __init__(self):
         self.__app_list = list()
-
-        self.__filename = "app_list_login.tsv" # This file should be place in the home dir on linux ~/
-        # self.__filename = "app_list.tsv" # This file should be place in the home dir on linux ~/
+        self.__filename = "app_list.tsv" # This file should be place in the home dir on linux ~/
         self.__badfilename = "bad_app_list.tsv" # This will be created in the home dir ~/
         self.__all_bad_apps = dict()
         self.__home_dir = users_home_dir()
@@ -233,7 +231,24 @@ class __AppEventLogger:
 
 
 logger = __AppEventLogger()
+
 ##     Colored printing     ##
+def get_color_printer(n):
+    if(n % 6 == 0):
+        return p_red
+    elif(n % 6 == 1):
+        return p_green
+    elif(n % 6 == 2):
+        return p_yellow
+    elif(n % 6 == 3):
+        return p_blue
+    elif(n % 6 == 4):
+        return p_purple
+    elif(n % 6 == 5):
+        return p_cyan
+
+
+
 Red = "\033[31m"
 Black = "\033[30m"
 Green = "\033[32m"

@@ -1,17 +1,14 @@
 from dataclasses import dataclass
-import logging
 import os
 import re
 import subprocess
 from typing import Dict, Union
 import __main__
-from time import time
+from time import sleep, time
 from utils.device_utils import ArcVersions
+from utils.logging_utils import get_color_printer
+from utils.utils import FACEBOOK_PACKAGE_NAME, file_exists
 
-from utils.utils import FACEBOOK_PACKAGE_NAME
-
-def users_home_dir():
-    return os.path.expanduser( '~' )
 
 def get_root_path():
     ''' Returns root path /home/user/pathto/appium/src '''
@@ -27,16 +24,62 @@ def create_dir_if_not_exists(directory):
 
 
 
-def create_file_if_not_exists(path):
-    print("Create path if not exist", path)
-    if path and not file_exists(path):
-        with open(path, 'w'):
-            pass
+def is_installed(package_name: str, transport_id: str) -> bool:
+    """Returns whether package_name is installed.
+    Args:
+        package_name: A string representing the name of the application to
+            be targeted.
+    Returns:
+        A boolean representing if package is installed.
+    """
+    cmd = ('adb', '-t', transport_id, 'shell', 'pm', 'list', 'packages')
+    outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+        capture_output=True).stdout.strip()
+    full_pkg_regexp = fr'^package:({re.escape(package_name)})$'
+    regexp = full_pkg_regexp
 
-def file_exists(directory):
-    return os.path.exists(directory)
+    # IGNORECASE is needed because some package names use uppercase letters.
+    matches = re.findall(regexp, outstr, re.MULTILINE | re.IGNORECASE)
+    if len(matches) == 0:
+        print(f'No installed package matches "{package_name}"')
+        return False
+    if len(matches) > 1:
+        print(f'More than one package matches "{package_name}":')
+        for p in matches:
+            print(f' - {p}')
+        return False
 
+    return True
 
+def uninstall_app(package_name: str, transport_id: str, force_rm: bool= False):
+    '''
+        Uninstalls app and waits 40 seconds or so while checking if app is still installed.
+        Returns True once app is fianlly unisntalled.
+        Returns False if it takes too long to unisntall or some other unexpected error.
+    '''
+    if  package_name in ['com.android.vending'] and not force_rm:
+        print(f"Not uninstalling {package_name}")
+        return False
+
+    uninstalled = False
+    try:
+        print("Uninstalling ", package_name)
+        cmd = ( 'adb', '-t', transport_id, 'uninstall', package_name)
+        outstr = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+        sleep(1)
+        uninstalled = True
+    except Exception as e:
+        print("Error uninstalling: ", package_name, e)
+
+    if uninstalled:
+        try:
+            sleep_cycle = 0
+            while is_installed(package_name) and sleep_cycle <= 20:
+                sleep(2)
+                sleep_cycle += 1
+        except Exception as e:
+            return False
+    return True
 
 def is_ANR(dumpsys_act_text: str, package_name: str) -> bool:
     # TODO confirm this works by finding an APP that throws ANR consistently. OR create an app that crashes.
@@ -248,9 +291,10 @@ class AppInfo:
         package: name='com.plexapp.android' versionCode='855199985' versionName='9.15.0.38159' compileSdkVersion='33' compileSdkVersionCodename='13'
         package: name='com.tumblr' versionCode='1280200110' versionName='28.2.0.110' compileSdkVersion='33' compileSdkVersionCodename='13'
     '''
-    def __init__(self, transport_id: str, package_name: str):
+    def __init__(self, transport_id: str, package_name: str, instance_num=0):
         self.transport_id = transport_id
         self.package_name = package_name
+        self.__dprint = get_color_printer(instance_num)
         self.__info = {
                 'name': '',
                 'versionCode': '',
@@ -262,6 +306,7 @@ class AppInfo:
                 'is_game': False
             }
         self.__process_app()
+
 
     def __get_aapt_version(self) -> str:
         ''' Get the latest version of aapt on host device.
@@ -299,13 +344,14 @@ class AppInfo:
             Returns:
                 - True if there is a matching surface name.
         '''
-        pattern_with_surface = rf"""^SurfaceView\s*-\s*(?P<package>{self.package_name})/[\w.#]*$"""                    # Surface window
+        pattern_with_surface = f"""^SurfaceView\s*-\s*(?P<package>{self.package_name})/[\w.#]*$"""
         re_surface = re.compile(pattern_with_surface, re.MULTILINE | re.IGNORECASE | re.VERBOSE)
         cmd = ('adb', '-t', self.transport_id, 'shell', 'dumpsys', 'SurfaceFlinger', '--list')
         surfaces_list = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
         last = None
+        self.__dprint(f"Checking surface for {self.package_name=} against list:")
         for match in re_surface.finditer(surfaces_list):
-            print(f"Found match: ", match)
+            print(f"Found surface match: ", match)
             last = match
         if last:
             if self.package_name != last.group('package'):
@@ -369,7 +415,7 @@ class AppInfo:
                 apk_path = line[len("package:"):]
         print(f"Found apk path: {apk_path}")
         if apk_path is None:
-            p_alert(f"Failed to find APK path for {self.package_name}\n", outstr)
+            self.__dprint(f"Failed to find APK path for {self.package_name}!!!!!!s\n", outstr)
             return False
         print("Pulling APK: ", self.package_name, dl_dir)
         cmd = ('adb', '-t', self.transport_id, 'pull', apk_path, dl_dir )
@@ -455,7 +501,7 @@ class AppInfo:
         if self.__get_apk():
             manifest = self.__download_manifest()
             if not manifest:
-                p_alert("No manifest found.")
+                self.__dprint("No manifest found!!!!")
                 return None
             self.__populate_app_info(manifest)
 

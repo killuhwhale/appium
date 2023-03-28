@@ -1,8 +1,9 @@
 import collections
+from appium.webdriver import Remote
 from copy import deepcopy
 from typing import Dict, List
 import __main__
-from utils.app_utils import AppData
+from utils.app_utils import AppData, create_dir_if_not_exists, get_root_path
 from utils.device_utils import Device
 from utils.logging_utils import ( p_blue, p_cyan, p_green,
                          p_purple, p_red, p_yellow, logger)
@@ -63,7 +64,7 @@ class ValidationReport:
 
     def __init__(self, device: Device):
         # Device and Session information for the report.
-        self.__device = device.info()
+        self.__device = device.info
         self.__report_title = f'{self.__device.device_name}_{self.__device.ip}'
         self.__report = {self.__report_title: collections.defaultdict(ValidationReport.default_dict)}
 
@@ -92,8 +93,20 @@ class ValidationReport:
         self.__report[self.__report_title][package_name]['new_name'] = new_name
         self.__report[self.__report_title][package_name]['invalid'] = invalid
 
-    def add_history(self,package_name: str, history_msg: str, img_path: str=""):
-        self.__report[self.__report_title][package_name]['history'].append({'msg':history_msg, 'img': img_path })
+    def add_history(self, package_name: str, history_msg: str, driver: Remote):
+        full_path = ''
+        try:
+            num = len(self.report[self.report_title][package_name]['history'])
+            path = f"{get_root_path()}/images/history/{self.__device.ip}/{package_name}"
+            create_dir_if_not_exists(path)
+            full_path = f"{path}/{num}.png"
+            driver.get_screenshot_as_file(full_path)
+        except Exception as error:
+            print("Error grabbing screenshot to update history.")
+            pass
+
+        self.__report[self.__report_title][package_name]['history'].append({'msg': history_msg, 'img': full_path })
+
 
     def add_logs(self, package_name: str, logs: str):
         self.__report[self.__report_title][package_name]['logs'] = logs
@@ -105,6 +118,10 @@ class ValidationReport:
         ''' Merges on report title, used to merge pre-process Facebook login report. '''
         title_to_merge_on = self.__report_title
         self.__report[title_to_merge_on].update(deepcopy(oreport.report[title_to_merge_on]))
+
+      ##  Reporting
+
+
 
     @staticmethod
     def ascii_starting(color=None):

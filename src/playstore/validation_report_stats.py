@@ -1,5 +1,3 @@
-
-
 from collections import defaultdict
 from multiprocessing import Process, Queue
 from typing import Any, Dict
@@ -7,19 +5,14 @@ from playstore.validation_report import ValidationReport
 from utils.logging_utils import StatsLogger, p_alert, p_blue, p_cyan, p_purple
 
 
-
-
 class ValidationReportStats:
     ''' Given a list of reports, calculate stats section.
     '''
-
-
     def __init__(self, queue: Queue):
         self.__queue = queue
         self.process = None
         self.nested_dict = lambda: defaultdict(self.nested_dict)
         self.reports = self.nested_dict()
-
 
     @staticmethod
     def default_item():
@@ -30,7 +23,6 @@ class ValidationReportStats:
             'total_failed': 0,
             'total_passed': 0,
         }
-
 
     def task(self, queue: Queue):
         nested_dict = lambda: defaultdict(nested_dict)
@@ -48,7 +40,6 @@ class ValidationReportStats:
                 stats, stats_by_device = ValidationReportStats.calc(reports)
                 current_stats = ValidationReportStats.get_stats(stats, stats_by_device)
                 logger.log(current_stats)
-
 
     def start(self):
         self.process = Process(target=self.task, args=(self.__queue, ))
@@ -78,7 +69,7 @@ class ValidationReportStats:
                 total_apps += 1
                 devices[report_title]['total_apps'] += 1
 
-                if status_obj['new_name']:
+                if len(status_obj['new_name']):
                     all_misnamed[package_name] = status_obj['new_name']
                     devices[report_title]['total_misnamed'] += 1
 
@@ -107,8 +98,6 @@ class ValidationReportStats:
 
         return stats, devices
 
-    # TODO() This is broken, it seems to incorrectly report when the same apps are run on multiple deviecs.,
-    # Only broken when running report at the end. It correctly updates report in file.
     @staticmethod
     def get_stats(stats: Dict, stats_by_device: defaultdict(Any)):
         '''
@@ -139,21 +128,12 @@ class ValidationReportStats:
 
         '''
         S = []
-        HEADER = """
-          _  _     _  _     _  _     _____ _        _           _  _     _  _     _  _
-        _| || |_ _| || |_ _| || |_  /  ___| |      | |        _| || |_ _| || |_ _| || |_
-       |_  __  _|_  __  _|_  __  _| \ `--.| |_ __ _| |_ ___  |_  __  _|_  __  _|_  __  _|
-        _| || |_ _| || |_ _| || |_   `--. \ __/ _` | __/ __|  _| || |_ _| || |_ _| || |_
-       |_  __  _|_  __  _|_  __  _| /\__/ / || (_| | |_\__ \ |_  __  _|_  __  _|_  __  _|
-         |_||_|   |_||_|   |_||_|   \____/ \__\__,_|\__|___/   |_||_|   |_||_|   |_||_|  """
-
-        # S.append(f"{HEADER}\n\n")
         sorder = StatsLogger.stat_order()
         S.append("All devices")
         for key in sorder:
             val = stats[key]
             if isinstance(val, int):
-                name = key.replace("_", " ").title()
+                # name = key.replace("_", " ").title()
                 # Absoulte, if app failed due to these reasons, it failed on all devices
                 # Reporting the count this way shows how many apps are misnamed, and the total count of apps misnamed of those tested.
                 if key in ['total_misnamed', 'total_invalid']:
@@ -168,7 +148,7 @@ class ValidationReportStats:
             S.append(f"{device_name}")
             for key in sorder:
                 val = stats[key]
-                name = key.replace("_", " ").title()
+                # name = key.replace("_", " ").title()
                 S.append(f"\t{val}")
             S.append(f"\n")
         return ''.join(S)
@@ -219,8 +199,6 @@ class ValidationReportStats:
                     p_cyan(f"\t{name}: {val * len(stats_by_device.items())} ({val})")
                 else:
                     p_cyan(f"\t{name}: {val}")
-        p_cyan(f"\tTotal passed: {stats['total_apps'] - stats['total_failed']}")
-
 
         p_blue("\n\n\tStats by device\n")
         for device_name, stats in stats_by_device.items():
@@ -228,8 +206,6 @@ class ValidationReportStats:
             for key, val in stats.items():
                 name = key.replace("_", " ").title()
                 p_cyan(f"\t\t{name}: {val}")
-            p_cyan(f"\t\tTotal passed: {stats['total_apps'] - stats['total_failed']}")
-
 
 if __name__ == "__main__":
     pass

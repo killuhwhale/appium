@@ -96,8 +96,7 @@ class MultiprocessTaskRunner:
         self.__app_list_queue = Queue()
         self.__app_list_process = None
         self.__app_logger = AppLogger()
-        self.__drivers: List[webdriver.Remote] = []
-        # self.valdiators: List[AppValidator] = []
+
         self.__ips = ips
         self.__packages = packages
         self.__devices: List[Device] = []
@@ -112,7 +111,7 @@ class MultiprocessTaskRunner:
         signal.signal(signal.SIGINT, self.handle_sigint)
 
     def start_appium_server(self):
-        self.__appium_service_manager.start_services()
+        return self.__appium_service_manager.start_services()
 
     def cleanup_appium_server(self):
         '''Will exit after running.'''
@@ -135,7 +134,13 @@ class MultiprocessTaskRunner:
 
     @property
     def reports_dict(self):
-        return {report.report_title: report.report for report  in self.__reports}
+        nested_dict = lambda: defaultdict(nested_dict)
+        reports = nested_dict()
+
+        for report  in self.__reports:
+            for package_name, status_obj in report.report[report.report_title].items():
+                reports[status_obj['report_title']][status_obj['package_name']] = status_obj
+        return reports
 
     def __start_app_list_renaming_task(self):
         self.__app_list_process = Process(target=update_app_list, args=(self.__app_list_queue,))
@@ -161,6 +166,7 @@ class MultiprocessTaskRunner:
             # Check if there is a message in the queue
             if not self.__queue.empty():
                 validator: AppValidatorPickle = self.__queue.get()
+                print(f"Recv'd validator: ", validator, validator.report)
                 if hasattr(validator, 'report'):
                     self.__reports.append(validator.report)
 

@@ -88,7 +88,7 @@ class Device:
     def __init__(self, ip: str):
         self.__is_connected = self.__adb_connect(ip)
         self.__transport_id = self.__find_transport_id(ip)
-        self.__device_info = {
+        self.__device_info = DeviceData(**{
             'ip': ip,
             'transport_id': self.__transport_id,
             'is_emu': self.__is_emulator(),
@@ -98,10 +98,10 @@ class Device:
             'wxh': self.__get_display_size(),
             'arc_build': self.__get_arc_build(),
             'product_name': self.__get_product_name(),
-        }
+        })
 
     def __str__(self):
-        return f"{self.__device_info['device_name']}({self.__device_info['arc_version']}): {self.__device_info['channel']} - {self.__device_info['arc_build']} - {self.__device_info['product_name']}"
+        return f"{self.__device_info.device_name}({self.__device_info.arc_version}): {self.__device_info.channel} - {self.__device_info.arc_build} - {self.__device_info.product_name}"
 
     def is_connected(self):
         return self.__is_connected
@@ -267,6 +267,6 @@ class Device:
             print("Cannot find __get_product_name", err)
         return None
 
-
+    @property
     def info(self) -> DeviceData:
-        return DeviceData(**self.__device_info)
+        return self.__device_info
