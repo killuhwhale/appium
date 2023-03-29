@@ -204,6 +204,7 @@ class AppLogin:
         tapped = False
         detect_attempt = 0
         while not (CONTINUE_SUBMITTED and login_entered and password_entered) and detect_attempt < 3:
+            print(f"{results=}")
             if CONTINUE_SUBMITTED and login_entered and password_entered:
                 return True, True, True
 

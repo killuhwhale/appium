@@ -55,13 +55,13 @@ if __name__ == "__main__":
     TESTING_APPS = tsv.get_apps()
 
     # Dev, choose startin package by name.
-    # starting_app = "com.picsart.studio"
-    # start_idx = dev_scrape_start_at_app(starting_app, TESTING_APPS)
-    # print(f"{start_idx=} ~ {starting_app=}")
-    # package_names = TESTING_APPS[start_idx: start_idx + 1]
+    starting_app = "com.mojang.minecraftpe"
+    start_idx = dev_scrape_start_at_app(starting_app, TESTING_APPS)
+    print(f"{start_idx=} ~ {starting_app=}")
+    package_names = TESTING_APPS[start_idx: ]
 
     # Dev, choose startin package by index.
-    package_names = TESTING_APPS
+    # package_names = TESTING_APPS
 
     runner = MultiprocessTaskRunner(ips, package_names)
     if args.clean:

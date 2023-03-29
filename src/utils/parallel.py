@@ -49,7 +49,7 @@ def validate_task(queue: Queue, app_list_queue: Queue, app_logger: AppLogger, st
         queue.put({})
         return
 
-    print(f"Creating driver for isntance {port}.....")
+    print(f"Creating driver for instance/port {port}.....")
     try:
         driver = webdriver.Remote(
             f"http://localhost:{port}/wd/hub",
@@ -170,8 +170,8 @@ class MultiprocessTaskRunner:
             # Check if there is a message in the queue
             if not self.__queue.empty():
                 validator: AppValidatorPickle = self.__queue.get()
-                print(f"Recv'd validator: ", validator, validator.report)
                 if hasattr(validator, 'report'):
+                    print(f"Recv'd validator: ", validator, validator.report)
                     self.__reports.append(validator.report)
 
                 validators += 1

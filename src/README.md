@@ -93,13 +93,11 @@ Prep work for Chromebook:
 
 
 # TODOs
+    - Collect price of apps that need purchase.
 
     - Record which log in method was used, GAuth, FBAuth, email/pass
 
-    - Collect price of apps that need purchase.
 
-    - Ensure error detecotr is not checking for the wrong app.
-        - It looks like if app A and B are tested, A has fatal exception, B will pick it up....
 
     # Scrape a few more image on Eve
         - Top 3 list of app_list.tsv

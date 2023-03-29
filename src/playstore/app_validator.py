@@ -128,6 +128,7 @@ class AppValidator:
         if self.__check_crash(app_package_name):
             return
 
+        return
         # Now app is installed and launched...
         info = AppInfo(self.__transport_id, app_package_name, self.__instance_num).info()
         self.__report.update_app_info(app_package_name, info)

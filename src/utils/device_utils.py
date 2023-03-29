@@ -242,7 +242,6 @@ class Device:
         width, height = 0, 0
         try:
             res = subprocess.run(cmd, check=False, encoding='utf-8', capture_output=True).stdout.strip()
-            print(f"Dispaly size: {res=}")
             size_str = res.split(": ")[1]  # Extract the string after the colon
             width, height = map(int, size_str.split("x"))  # Split the string into width and height, and convert them to integers
         except Exception as err:
