@@ -33,7 +33,6 @@ class AppLauncher:
             instance_num
 
         ):
-        self.__report = ValidationReport(device)
         self.__app_list_queue = app_list_queue
 
         self.__device = device.info
@@ -44,10 +43,6 @@ class AppLauncher:
         self.__misnamed_reason_text = "App name does not match the current name on the playstore."
         self.dev_ss_count = 8
         self.__dprint = get_color_printer(instance_num)
-
-    @property
-    def report(self):
-        return self.__report
 
     def __check_playstore_invalid(self, package_name) -> bool:
         ''' Checks if an app's package_name is invalid via Google playstore URL
@@ -116,6 +111,7 @@ class AppLauncher:
         if not open_app(package_name, self.__transport_id, self.__arc_version):
             new_app_name, invalid_app, reason = self.__handle_failed_open_app(package_name, app_title, "Failed to open")
             return [False, new_app_name, invalid_app, reason]
+        sleep(5)
         return [True, "", False, "" ]
 
 

@@ -47,7 +47,7 @@ if __name__ == "__main__":
             # '192.168.1.128:5555',  # Kevin ARM ARC-p          Blue,
             # '192.168.1.238:5555', # Helios x86 intel ARC-R   RED,
             '192.168.1.113:5555', # CoachZ snapdragon ARC-P   Green,
-            '192.168.1.125:5555',  # ARC-R Eve
+            # '192.168.1.125:5555',  # ARC-R Eve
         ]
     print("ips: ", ips)
 
@@ -55,13 +55,13 @@ if __name__ == "__main__":
     TESTING_APPS = tsv.get_apps()
 
     # Dev, choose startin package by name.
-    starting_app = "com.picsart.studio"
-    start_idx = dev_scrape_start_at_app(starting_app, TESTING_APPS)
-    print(f"{start_idx=} ~ {starting_app=}")
-    package_names = TESTING_APPS[start_idx: start_idx + 1]
+    # starting_app = "com.picsart.studio"
+    # start_idx = dev_scrape_start_at_app(starting_app, TESTING_APPS)
+    # print(f"{start_idx=} ~ {starting_app=}")
+    # package_names = TESTING_APPS[start_idx: start_idx + 1]
 
     # Dev, choose startin package by index.
-    package_names = TESTING_APPS[0:3]
+    package_names = TESTING_APPS
 
     runner = MultiprocessTaskRunner(ips, package_names)
     if args.clean:
@@ -83,8 +83,8 @@ if __name__ == "__main__":
     ##   Single Run
     ####################################
 
-    # ip = "192.168.1.113:5555"
     # ip = "192.168.1.125:5555"
+    # ip = "192.168.1.113:5555"
 
     # service_manager = AppiumServiceManager([ip])
     # if args.clean:
@@ -95,7 +95,7 @@ if __name__ == "__main__":
     # app_logger = AppLogger()
     # tsv = AppListTSV()  # Create Globally
     # TESTING_APPS = tsv.get_apps()
-    # package_names = TESTING_APPS[8:9]
+    # package_names = TESTING_APPS[0:1]
 
 
     # print("Creating driver...")
@@ -121,7 +121,8 @@ if __name__ == "__main__":
     #     0,
     #     Queue(),
     #     app_logger,
-    #     Queue(),
+    #     Queue(),  # Stats
+    #     Queue(),  # Prices
     # )
 
     # validator.uninstall_multiple()

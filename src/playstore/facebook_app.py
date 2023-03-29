@@ -27,7 +27,7 @@ class FacebookApp:
             Queue(),
             app_logger,
             stats_queue,
-
+            Queue()  # Price queue not need when checking facebook.
         )
 
     @property

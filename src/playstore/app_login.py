@@ -313,6 +313,14 @@ class AppLogin:
 
     ## PlayStore install discovery
     def login(self, app_title: str, app_package_name: str, app_info: AppInfo):
+        ''' Attempts to log in to an app.
+            TODO() implement behavior below.
+            Args:
+                - login_method: The method to use to login with.
+
+            Returns:
+                - dict containing the status of logged in and method used to log in.
+        '''
         self.__current_package = app_package_name
         self.__err_detector.reset_start_time()
         self.__err_detector.update_package_name(app_package_name)

@@ -8,6 +8,7 @@ from playstore.app_validator import AppValidator
 from playstore.facebook_app import FacebookApp
 from playstore.validation_report import ValidationReport
 from playstore.validation_report_stats import ValidationReportStats
+from prices.prices import Prices
 from serviceManager.appium_service_manager import AppiumServiceManager
 from utils.device_utils import Device
 from utils.logging_utils import AppListTSV, AppLogger, p_alert, logger
@@ -40,7 +41,7 @@ def update_app_list(queue: Queue ):
                 p_alert("Breaking from")
                 break
 
-def validate_task(queue: Queue, app_list_queue: Queue, app_logger: AppLogger, stats_queue: Queue, packages: List[List[str]], ip: str, device: Device, port: int):
+def validate_task(queue: Queue, app_list_queue: Queue, app_logger: AppLogger, stats_queue: Queue, price_queue: Queue, packages: List[List[str]], ip: str, device: Device, port: int):
     '''
         A single task to validate apps on a given device.
     '''
@@ -77,6 +78,7 @@ def validate_task(queue: Queue, app_list_queue: Queue, app_logger: AppLogger, st
         app_list_queue,
         app_logger,
         stats_queue,
+        price_queue,
     )
     if not CONFIG.skip_pre_multi_uninstall:
         validator.uninstall_multiple()
@@ -106,6 +108,8 @@ class MultiprocessTaskRunner:
         self.__stats_queue = Queue()
         self.__validation_report_stats = ValidationReportStats(self.__stats_queue)
         self.__packages_recvd = defaultdict(list)
+        self.__price_queue = Queue()
+        self.__prices = Prices(self.__price_queue)
 
         self.__appium_service_manager = AppiumServiceManager(ips)
         signal.signal(signal.SIGINT, self.handle_sigint)
@@ -153,12 +157,12 @@ class MultiprocessTaskRunner:
         ValidationReport.anim_starting()
         self.__start_app_list_renaming_task()
         self.__validation_report_stats.start()
+        self.__prices.start()
 
         if CONFIG.multi_split_packages:
             self.__start_runs_split()
         else:
             self.__start_runs()
-
         print("started running, waiting for drivers and validators")
 
         validators = 0
@@ -175,6 +179,7 @@ class MultiprocessTaskRunner:
             sleep(1.2)
         self.__app_list_process.terminate()
         self.__validation_report_stats.stop()
+        self.__prices.stop()
         print('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n')
 
     def __clear_processes(self):
@@ -203,7 +208,7 @@ class MultiprocessTaskRunner:
 
         device = Device(ip)
         self.__devices.append(device)
-        process = Process(target=validate_task, args=(self.__queue, self.__app_list_queue, self.__app_logger, self.__stats_queue, apps, ip, device, port_number))
+        process = Process(target=validate_task, args=(self.__queue, self.__app_list_queue, self.__app_logger, self.__stats_queue, self.__price_queue, apps, ip, device, port_number))
         process.start()
         self.__processes.append(process)
 

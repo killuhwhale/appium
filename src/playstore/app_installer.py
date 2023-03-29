@@ -1,15 +1,48 @@
+from dataclasses import dataclass
 import re
 import subprocess
 from time import sleep, time
-from typing import List
+from typing import List, Tuple
 import __main__
 from appium.webdriver.common.appiumby import AppiumBy
 from appium import webdriver
-from utils.app_utils import is_installed, uninstall_app
+from utils.app_utils import get_cur_activty, is_installed, uninstall_app
 from utils.device_utils import Device
 from utils.error_utils import CrashTypes, ErrorDetector
 from utils.logging_utils import get_color_printer, p_alert
 from utils.utils import (ADB_KEYCODE_ENTER, PLAYSTORE_PACKAGE_NAME)
+
+
+class NeedsPurchaseException(Exception):
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self):
+        return self.message
+
+class NeedsUpdateException(Exception):
+    pass
+
+class NotInstalledException(Exception):
+    pass
+
+class FoundWrongPackageException(Exception):
+    pass
+
+class FailedClickIconException(Exception):
+    pass
+
+class PlaystoreCrashException(Exception):
+    pass
+
+@dataclass
+class AppInstallerResult:
+    installed: bool
+    message: str
+    price: float = 0.0
+
+
 
 class AppInstaller:
     ''' Main class to validate a broken app. Discovers, installs, opens and
@@ -54,21 +87,27 @@ class AppInstaller:
             return False
         return True
 
+
+
     def __return_error(self, last_step: int, error: str):
         if last_step == 0:
             self.__driver.back()
-            return [False, f"Failed: {self.__steps[0]}"]
+            # return [False, f"Failed: {self.__steps[0]}"]
+            return AppInstallerResult(False, f"Failed: {self.__steps[0]}")
         elif last_step == 1:
             self.__driver.back()
-            return [False, f"Failed: {self.__steps[1]}"]
+            # return [False, f"Failed: {self.__steps[1]}"]
+            return AppInstallerResult(False, f"Failed: {self.__steps[1]}")
         elif last_step == 2:
             self.__driver.back()
-            return [False, f"Failed: {self.__steps[2]}"]
+            # return [False, f"Failed: {self.__steps[2]}"]
+            return AppInstallerResult(False, f"Failed: {self.__steps[2]}")
         elif last_step == 3:
             self.__driver.back()
             self.__driver.back()
             self.__dprint(f"Failed: {self.__steps[3]} :: {error}")
-            return [False, f"Failed: {self.__steps[3]} :: {error}"]
+            # return [False, f"Failed: {self.__steps[3]} :: {error}"]
+            return AppInstallerResult(False, f"Failed: {self.__steps[3]} :: {error}")
 
     ## PlayStore install discovery
     def __is_installed_UI(self):
@@ -110,25 +149,27 @@ class AppInstaller:
             self.__driver.orientation = 'PORTRAIT'
         return ready
 
-    def __needs_purchase(self) -> bool:
-        # Pixel 2
-        # Chromebook (I think this works with Pixel2 also)
+    def __needs_purchase(self) -> float:
         try:
             content_desc = f'''
                 new UiSelector().className("android.widget.Button").textMatches(\"\$\d+\.\d+\")
             '''
             self.__dprint("Searching for Button with Price...", content_desc)
-            self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
-            return True
+            btn = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+            price = btn.text
+            print(f"A {price=}")
+            return float(price.replace("$", ''))
         except Exception as e:
-            pass
+            print("failed ", e)
         try:
             content_desc = f'''new UiSelector().descriptionMatches(\"\$\d+\.\d+\");'''
             self.__dprint("Searching for Button with Price...", content_desc)
-            self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
-            return True
+            btn = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+            price = btn.get_attribute('content-desc')
+            return float(price.replace("$", ''))
         except Exception as e:
-            return False
+            print("failed ", e)
+        return 0.0
 
     def __needs_update(self) -> bool:
         '''
@@ -167,7 +208,7 @@ class AppInstaller:
         if(not CrashType == CrashTypes.SUCCESS):
             # TODO() Determine what to do when this scenario happens.
             self.__dprint("PlayStore crashed ", CrashTypes.value)
-            raise Exception("PLAYSTORECRASH")
+            raise PlaystoreCrashException()
 
     def __search_playstore(self, title: str, submit=True):
         content_desc = f'''
@@ -180,7 +221,17 @@ class AppInstaller:
             subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
         sleep(2)  # Wait for search results
 
-    def __click_app_icon(self, title: str):
+    def __find_coords(self, bounds: List[int]) -> Tuple[str]:
+        '''
+            bounds='[276,297][1883,475]'
+        '''
+        print(f"{bounds=}")
+        x = ((bounds[2] - bounds[0]) // 2) + bounds[0]
+        y = ((bounds[3] - bounds[1]) // 2) + bounds[1]
+        return (str(x), str(y),)
+
+
+    def __click_app_icon(self, title: str, package_name: str):
         '''
             # Sometime the app has a different view on the same device.
             contentdesc = App: My Boy! - GBA Emulator Fast Emulator Arcade Star rating: 4.6 1,000,000+ downloads $4.99
@@ -199,17 +250,18 @@ class AppInstaller:
             try:
                 app_icon = self.__driver.find_elements(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
                 for icon in app_icon:
-                    self.__dprint("Icons:", icon.location, icon.id, icon.get_attribute("content-desc"))
-                    if "Image" in icon.get_attribute('content-desc') or \
-                        title_first in icon.get_attribute("content-desc"):
-                        self.__dprint("Clicked: ", icon.id, icon.get_attribute("content-desc"))
+                    cont_desc = icon.get_attribute('content-desc')
+                    self.__dprint("Icons:", icon.location, icon.id, cont_desc)
+                    if "Image" in cont_desc or title_first in cont_desc:
+                        self.__dprint("Clicked: ", icon.id, cont_desc)
+                        bounds = icon.get_attribute("bounds")
                         icon.click()  # TODO() bug on Eve, it wont click the app icon to get into the detail view.
+                        self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds))) # This second click will not affect anything when the first click is successful.
+                        sleep(1)
                         return
-
             except Exception as e:
                 self.__dprint("Icon failed click ", e)
-
-        raise Exception("Icon not found!")
+        raise FailedClickIconException()
 
     def __extract_bounds(self, bounds: str):
         '''
@@ -283,13 +335,15 @@ class AppInstaller:
         # Error finding/Clicking Install button  amd app is not installed still...
         if err and not already_installed:
             self.__dprint("Verifying UI for Needs to Purchase...")
-            if self.__needs_purchase():
+            price = self.__needs_purchase()
+            print(f"{price=}")
+            if price:
                 self.__dprint("raising needs purchase")
-                raise Exception("Needs purchase")
+                raise NeedsPurchaseException(str(price))
 
             if self.__needs_update():
                 self.__dprint("raising needs update")
-                raise Exception("Needs update")
+                raise NeedsUpdateException()
 
             # Now, Install and Price, Update are not present,
             # To get here, we must be looking for a package
@@ -300,64 +354,67 @@ class AppInstaller:
             # Therefore, at this point we have an installed app, that doesnt match our targeted package name.
             # TODO() :NOTE: On the first run, it will install this package and report as correct....
             self.__dprint(f"Program may have installed an incorrect package, {install_package_name} was not actually installed")
-            raise Exception(f"{install_package_name} was not installed.")
+            #  Exception(f"{install_package_name} was not installed.")
+            raise NotInstalledException()
+
         # We have successfully clicked an install buttin
         # We wait for it to download. We will catch if its the correct package or not after installation.
         if not self.__is_installed_UI():  # Waits up to 7mins to find install button.
-            raise Exception("Failed to install app!!")
+            # raise Exception("Failed to install app!!")
+            raise FoundWrongPackageException()
 
     def __discover_and_install(self, title: str, install_package_name: str):
         '''
          A method to search Google Playstore for an app and install via the Playstore UI.
         '''
         try:
-            error = None
             last_step = 0  # track last sucessful step to, atleast, report in console.
-
-
-            # input("Press search icon # 1")
             self.__click_playstore_search()
-            # input("Press search icon # 1")
             self.__check_playstore_crash()
 
             last_step = 1
             self.__search_playstore(title)
             self.__check_playstore_crash()
 
-            # input("Press app icon # 2")
             last_step = 2
-            self.__click_app_icon(title)
+            self.__click_app_icon(title, install_package_name)
             self.__check_playstore_crash()
-            # input("Press app icon # 2")
 
             last_step = 3
-
-            # input("Step 3, press install")
             self.__install_app_UI(install_package_name)
             self.__check_playstore_crash()
-            # input("Step 3, press install")
             self.__driver.back()  # back to seach results
             self.__driver.back()  # back to home page
-        except Exception as e:
-            error = e
-        finally:
-            if error is None:
-                return [True, None]
-            elif error == "PLAYSTORECRASH":
-                raise Exception(error)
-            else:
-                return self.__return_error(last_step, error)
+        except PlaystoreCrashException as e:
+            raise PlaystoreCrashException()
+        except NeedsPurchaseException as price:
+            error = self.__return_error(last_step, "Needs purchase.")
+            error.price = float(price.message)
+            return error
+        except NeedsUpdateException:
+            return self.__return_error(last_step, "Needs update.")
+        except NotInstalledException:
+            return self.__return_error(last_step, "Not installed.")
+        except FoundWrongPackageException:
+            return self.__return_error(last_step, "Wrong package found in playstore.")
+        except FailedClickIconException:
+            return self.__return_error(last_step, 'Failed to click app icon.')
+        except Exception as error:
+            print("Eroorr ", error)
+            return self.__return_error(last_step, error)
+        return AppInstallerResult(True, "")
 
     def discover_and_install(self, app_title: str, app_package_name: str) -> List:
         try:
             return self.__discover_and_install(app_title, app_package_name)
-
+        except PlaystoreCrashException:
+            self.__dprint("Playstore crashed!")  # Havent encountered this in a long time.
+            # return [False, f"Failed: Playstore crashed"]
+            return AppInstallerResult(False, f"Failed: Playstore crashed")
         except Exception as error:
             p_alert(f"{self.__ip} - ", f"Error in main RUN: {app_title} - {app_package_name}", error)
-            if error == "PLAYSTORECRASH":
-                self.__dprint("Playstore crashed!")  # Havent encountered this in a long time.
-            return [False, f"Failed: {error=}"]
-
+            # return [False, f"Failed: {error=}"]
+            return AppInstallerResult(False, f"Failed: {error=}")
 
 if __name__ == "__main__":
     pass

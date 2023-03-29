@@ -3,7 +3,7 @@ from time import sleep
 from typing import List
 import __main__
 from appium.webdriver import Remote
-from playstore.app_installer import AppInstaller
+from playstore.app_installer import AppInstaller, AppInstallerResult
 from playstore.app_login import AppLogin
 from playstore.app_launcher import AppLauncher
 from playstore.validation_report import ValidationReport
@@ -26,6 +26,7 @@ class AppValidator:
             app_list_queue: Queue,
             app_logger: AppLogger,
             stats_queue: Queue,
+            price_queue: Queue,
         ):
         self.__driver = driver
         self.__device = device
@@ -34,6 +35,7 @@ class AppValidator:
         self.__err_detector = ErrorDetector(self.__transport_id, self.__device.info.arc_version)
         self.__app_list_queue = app_list_queue
         self.__stats_queue = stats_queue
+        self.__price_queue = price_queue
         self.__app_logger = app_logger
         self.__package_names = package_names  # List of packages to test as [app_title, app_package_name]
         self.__instance_num = instance_num
@@ -100,12 +102,15 @@ class AppValidator:
 
     def __process_app(self, app_title:str, app_package_name: str):
         self.__report.add_app(app_package_name, app_title)
+        self.__err_detector.update_package_name(app_package_name)
 
         # Install
         installer = AppInstaller(self.__driver, self.__device, self.__instance_num)
-        app_status, msg = installer.discover_and_install(app_title, app_package_name)
-        print("App installation: ", app_status, msg)
-        self.__report.add_history(app_package_name, msg or "App install successfull.", self.__driver)
+        install_result: AppInstallerResult = installer.discover_and_install(app_title, app_package_name)
+        self.__report.add_history(app_package_name, install_result.message or "App install successfull.", self.__driver)
+        if install_result.price:
+            self.__price_queue.put((app_title, app_package_name, install_result.price,))
+            return self.__report.update_status(app_package_name, ValidationReport.FAIL, f"{install_result.message} - {install_result.price}")
 
         if self.__check_crash(app_package_name):
             return
@@ -120,7 +125,6 @@ class AppValidator:
             self.__report.add_history(app_package_name, reason, self.__driver)
             return self.__report.update_status(app_package_name, ValidationReport.FAIL, reason)
 
-        sleep(5)
         if self.__check_crash(app_package_name):
             return
 

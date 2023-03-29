@@ -120,6 +120,7 @@ class Device:
             cmd = ('adb', 'connect', ip)
             outstr = subprocess.run(cmd, check=True, encoding='utf-8',
                                     capture_output=True).stdout.strip()
+
             if outstr.startswith("failed to connect to"):
                 raise Exception(outstr)
             print(outstr)

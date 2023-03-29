@@ -349,12 +349,13 @@ class AppInfo:
         cmd = ('adb', '-t', self.transport_id, 'shell', 'dumpsys', 'SurfaceFlinger', '--list')
         surfaces_list = subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
         last = None
-        self.__dprint(f"Checking surface for {self.package_name=} against list:")
+
         for match in re_surface.finditer(surfaces_list):
             print(f"Found surface match: ", match)
             last = match
         if last:
             if self.package_name != last.group('package'):
+                self.__dprint(f"Found match for wrong package.")
                 return False
             # UE4 games have at least two SurfaceView surfaces. The one
             # that seems to in the foreground is the last one.
