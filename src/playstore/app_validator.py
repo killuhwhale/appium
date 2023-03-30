@@ -154,19 +154,19 @@ class AppValidator:
             return
 
         # Now app is installed and launched...
-        # info = AppInfo(self.__transport_id, app_package_name, self.__instance_num).info()
-        # self.__report.update_app_info(app_package_name, info)
+        info = AppInfo(self.__transport_id, app_package_name, self.__instance_num).info()
+        self.__report.update_app_info(app_package_name, info)
 
-        self.__dev_SS_loop()
+        # self.__dev_SS_loop()
 
-        # login_module = AppLogin(self.__driver, self.__device, self.__instance_num)
-        # logged_in = login_module.login(app_title, app_package_name, info)
+        login_module = AppLogin(self.__driver, self.__device, self.__instance_num)
+        logged_in = login_module.login(app_title, app_package_name, info)
 
-        # if self.__check_crash(app_package_name):
-        #     return
+        if self.__check_crash(app_package_name):
+            return
 
-        # self.__report.add_history(app_package_name,
-        #     "Logged in." if logged_in else "Not logged in.", self.__driver)
+        self.__report.add_history(app_package_name,
+            "Logged in." if logged_in else "Not logged in.", self.__driver)
         self.__report.update_status(app_package_name, ValidationReport.PASS, f"{logged_in=}")
 
     ##  Main Loop
