@@ -5,11 +5,12 @@ import __main__
 from selenium.common.exceptions import (ScreenshotException,)
 from appium import webdriver
 from objdetector.objdetector import ObjDetector
+from utils.accounts import Accounts
 from utils.app_utils import AppInfo, get_cur_activty, get_root_path, is_download_in_progress
 from utils.device_utils import Device
 from utils.error_utils import ErrorDetector
 from utils.logging_utils import get_color_printer, p_alert
-from utils.utils import (ACCOUNTS, ADB_KEYCODE_ENTER, CONTINUE,
+from utils.utils import (ADB_KEYCODE_ENTER, CONTINUE,
                          FACEBOOK_PACKAGE_NAME, FB_ATUH, GOOGLE_AUTH, LOGIN,
                          PASSWORD, WEIGHTS)
 
@@ -30,6 +31,7 @@ class AppLogin:
         self.__driver = driver
         self.__current_package = None
         self.__device = device
+        self.__accounts = Accounts().accounts
         self.__err_detector = ErrorDetector(self.__device.info.transport_id, self.__device.info.arc_version)
         self.__prev_act = None
         self.__cur_act = None
@@ -38,6 +40,7 @@ class AppLogin:
         self.__weights = WEIGHTS
         self.__detector = ObjDetector(self.__test_img_fp, [self.__weights])
         self.__dprint = get_color_printer(instance_num)
+
 
     def __is_new_activity(self) -> bool:
         ''' Calls adb shell dumpsys activity | grep mFocusedWindow/
@@ -222,8 +225,8 @@ class AppLogin:
                 self.__dprint(f"Click login        <------- {login_entered=}")
                 results[LOGIN], tapped = self.__click_button(results[LOGIN])
                 del results[LOGIN]
-                if app_package_name in ACCOUNTS:
-                    login_val = ACCOUNTS[app_package_name][0]
+                if app_package_name in self.__accounts:
+                    login_val = self.__accounts[app_package_name][0]
                     self.__send_keys_ADB(login_val, False, False)
                     self.__dprint(f"Send Login - {login_val}        <-------")
                 else:
@@ -235,8 +238,8 @@ class AppLogin:
                 self.__dprint("Click Password        <-------")
                 results[PASSWORD], tapped = self.__click_button(results[PASSWORD])
                 del results[PASSWORD]
-                if app_package_name in ACCOUNTS:
-                    pass_val = ACCOUNTS[app_package_name][1]
+                if app_package_name in self.__accounts:
+                    pass_val = self.__accounts[app_package_name][1]
                     self.__send_keys_ADB(pass_val, False, False)
                     self.__dprint(f"Send Password - {pass_val}       <-------")
                     password_entered = True
@@ -330,9 +333,7 @@ class AppLogin:
             return self.__attempt_login(app_title, app_package_name, app_info.is_game)
 
         except Exception as error:
-            p_alert(f"{self.__device.info.ip} - ", f"Error in main RUN: {app_title} - {app_package_name}", error)
-            if error == "PLAYSTORECRASH":
-                self.__dprint("Playstore crashed!")  # Havent encountered this in a long time.
+            p_alert(f"{self.__device.info.ip} - ", f"Error in login: {app_title} - {app_package_name}", error)
             return False
 
 

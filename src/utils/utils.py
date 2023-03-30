@@ -79,10 +79,6 @@ IMAGE_LABELS = [
     PASSWORD,
 ]
 
-ACCOUNTS = None
-with open(f"{os.path.expanduser( '~' )}/accounts.json", 'r') as f:
-    ACCOUNTS = json.load(f)
-
 
 ##      Appium config & stuff  ##
 def android_des_caps(device_name: AnyStr, app_package: AnyStr, main_activity: AnyStr) -> Dict:

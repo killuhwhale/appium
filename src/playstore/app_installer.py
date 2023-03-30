@@ -6,7 +6,7 @@ from typing import List, Tuple
 import __main__
 from appium.webdriver.common.appiumby import AppiumBy
 from appium import webdriver
-from utils.app_utils import get_cur_activty, is_installed, uninstall_app
+from utils.app_utils import is_installed, uninstall_app
 from utils.device_utils import Device
 from utils.error_utils import CrashTypes, ErrorDetector
 from utils.logging_utils import get_color_printer, p_alert
@@ -409,11 +409,9 @@ class AppInstaller:
             return self.__discover_and_install(app_title, app_package_name)
         except PlaystoreCrashException:
             self.__dprint("Playstore crashed!")  # Havent encountered this in a long time.
-            # return [False, f"Failed: Playstore crashed"]
             return AppInstallerResult(False, f"Failed: Playstore crashed")
         except Exception as error:
             p_alert(f"{self.__ip} - ", f"Error in main RUN: {app_title} - {app_package_name}", error)
-            # return [False, f"Failed: {error=}"]
             return AppInstallerResult(False, f"Failed: {error=}")
 
 if __name__ == "__main__":

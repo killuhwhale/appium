@@ -1,5 +1,4 @@
 from multiprocessing import Queue
-from time import sleep
 from typing import List
 import __main__
 from appium.webdriver import Remote
@@ -100,6 +99,32 @@ class AppValidator:
             return True
         return False
 
+    def __scrape_dev_test_image(self):
+        try:
+            self.__driver.get_screenshot_as_file(
+            f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/scraped_images/{self.dev_ss_count}.png"
+            )
+            self.dev_ss_count += 1
+        except Exception as error:
+            self.__dprint("Error w/ dev ss: ", error)
+
+
+    def __dev_SS_loop(self):
+        ''' Loop that pauses on input allowing to take multiple screenshots
+                after manually changing app state.
+        '''
+        ans = ''
+        while not (ans == 'q'):
+            ans = input("Take your screen shots bro...")
+            self.__dprint(f"{ans=}, {(not ans == 'q')}")
+            if not (ans == 'q'):
+                self.__dprint("Taking SS")
+                self.__scrape_dev_test_image()
+            else:
+                self.__dprint("Quit from SS")
+
+
+
     def __process_app(self, app_title:str, app_package_name: str):
         self.__report.add_app(app_package_name, app_title)
         self.__err_detector.update_package_name(app_package_name)
@@ -128,20 +153,20 @@ class AppValidator:
         if self.__check_crash(app_package_name):
             return
 
-        return
         # Now app is installed and launched...
-        info = AppInfo(self.__transport_id, app_package_name, self.__instance_num).info()
-        self.__report.update_app_info(app_package_name, info)
+        # info = AppInfo(self.__transport_id, app_package_name, self.__instance_num).info()
+        # self.__report.update_app_info(app_package_name, info)
 
+        self.__dev_SS_loop()
 
-        login_module = AppLogin(self.__driver, self.__device, self.__instance_num)
-        logged_in = login_module.login(app_title, app_package_name, info)
+        # login_module = AppLogin(self.__driver, self.__device, self.__instance_num)
+        # logged_in = login_module.login(app_title, app_package_name, info)
 
-        if self.__check_crash(app_package_name):
-            return
+        # if self.__check_crash(app_package_name):
+        #     return
 
-        self.__report.add_history(app_package_name,
-            "Logged in." if logged_in else "Not logged in.", self.__driver)
+        # self.__report.add_history(app_package_name,
+        #     "Logged in." if logged_in else "Not logged in.", self.__driver)
         self.__report.update_status(app_package_name, ValidationReport.PASS, f"{logged_in=}")
 
     ##  Main Loop

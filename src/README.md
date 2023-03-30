@@ -4,13 +4,6 @@ Example Output
 <video src="https://drive.google.com/open?id=1kztEqXsqcLiEa24NN3vr3_ddeH0D0re4&authuser=0&usp=drive_link" />
 
 
-Account:
-appval001/testminnie123
-ID
-436076947816-38i1q90b17vcfl8p5mfi6qaf5gohsa9v.apps.googleusercontent.com
-Key
-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
-
 
 
 Prep work for Chromebook:
@@ -93,33 +86,15 @@ Prep work for Chromebook:
 
 
 # TODOs
-    - Collect price of apps that need purchase.
 
-    - Record which log in method was used, GAuth, FBAuth, email/pass
-
-
-
-    # Scrape a few more image on Eve
-        - Top 3 list of app_list.tsv
-
-    - Google Sheets API? Probably not? If we create a dashboard we proabably wont use this.
-        - Create a test account/ GCP project
-        - Need to upgrade to python 3.10
-        - Use:
-            - Fetch initial app_list.tsv AND bad_app_list.tsv
-            - Do normal procedure
-            - Update app_list.tsv AND bad_app_list.tsv after runs
-                - This will still be updated on file live
-                - Once run is over, update all TSVs
-
-            - Init Fetch - same files ea time
-                - app_list.tsv
-                - bad_app_list.tsv
-
-            - Generated ea run:
-                - passed_apps_live.tsv
-                - failed_apps_live.tsv
-
+    - Record which log in method was used or to use, GAuth, FBAuth, email/pass
+        - Figure out how to attempt multiple logins on each app.
+            - After Installed, perform a cycle check until we find login field or GAuth or FBAuth
+                - Depending on what we find, we will attempt those methods.
+                - So we start with a general search with only Continue buttons until we find a SS w/ a login method.
+                    - If multiple methods, cycle through ea method
+                    - If one method just try that one.
+                - Then we can report which methods were tried and their status
 
     - Strategy when we have two continue buttons and one is disabled but has the higher probability
         - we should try to click all of them unless something happens?
@@ -134,6 +109,7 @@ Prep work for Chromebook:
             - WE WILL NEED TO detect slider age bars.
                 - click in center of view
             - Empty form fields to type age will probably be the trickiest...
+
 
         NOTE:
         *** Update to YOLOv7? slight increase in accuracy ~3% (from what I've read)

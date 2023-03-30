@@ -37,97 +37,100 @@ if __name__ == "__main__":
                         default=[], type=list)
 
     args = parser.parse_args()
-    ips = args.ips
-    # Multiprocessing Runs
-    if len(ips) == 0:
-        ips = [
-            # '710KPMZ0409387',  # Device connected via USB (Pixel 2)
-            # 'emulator-5554',
-            # '192.168.1.248:5555', # Morphius AMD ARC-P        Yellow,
-            # '192.168.1.128:5555',  # Kevin ARM ARC-p          Blue,
-            # '192.168.1.238:5555', # Helios x86 intel ARC-R   RED,
-            '192.168.1.113:5555', # CoachZ snapdragon ARC-P   Green,
-            # '192.168.1.125:5555',  # ARC-R Eve
-        ]
-    print("ips: ", ips)
+    # ips = args.ips
+    # # Multiprocessing Runs
+    # if len(ips) == 0:
+    #     ips = [
+    #         # '710KPMZ0409387',  # Device connected via USB (Pixel 2)
+    #         # 'emulator-5554',
+    #         # '192.168.1.248:5555', # Morphius AMD ARC-P        Yellow,
+    #         # '192.168.1.128:5555',  # Kevin ARM ARC-p          Blue,
+    #         # '192.168.1.238:5555', # Helios x86 intel ARC-R   RED,
+    #         '192.168.1.113:5555', # CoachZ snapdragon ARC-P   Green,
+    #         # '192.168.1.125:5555',  # ARC-R Eve
+    #     ]
+    # print("ips: ", ips)
 
-    tsv = AppListTSV()  # Create Globally
-    TESTING_APPS = tsv.get_apps()
+    # tsv = AppListTSV()  # Create Globally
+    # TESTING_APPS = tsv.get_apps()
 
-    # Dev, choose startin package by name.
-    starting_app = "com.mojang.minecraftpe"
-    start_idx = dev_scrape_start_at_app(starting_app, TESTING_APPS)
-    print(f"{start_idx=} ~ {starting_app=}")
-    package_names = TESTING_APPS[start_idx: ]
+    # # Dev, choose startin package by name.
+    # starting_app = "com.mojang.minecraftpe"
+    # start_idx = dev_scrape_start_at_app(starting_app, TESTING_APPS)
+    # print(f"{start_idx=} ~ {starting_app=}")
+    # package_names = TESTING_APPS[start_idx: ]
 
-    # Dev, choose startin package by index.
-    # package_names = TESTING_APPS
+    # # Dev, choose startin package by index.
+    # # package_names = TESTING_APPS
 
-    runner = MultiprocessTaskRunner(ips, package_names)
-    if args.clean:
-        runner.cleanup_appium_server()
-    if not runner.start_appium_server():
-        print("Error starting server...")
-        sys.exit(1)
+    # runner = MultiprocessTaskRunner(ips, package_names)
+    # if args.clean:
+    #     runner.cleanup_appium_server()
+    # if not runner.start_appium_server():
+    #     print("Error starting server...")
+    #     sys.exit(1)
 
-    runner.run()
-    runner.print_devices()
+    # runner.run()
+    # runner.print_devices()
 
-    stats, device = ValidationReportStats.calc(runner.reports_dict)
+    # stats, device = ValidationReportStats.calc(runner.reports_dict)
 
-    ValidationReportStats.print_stats(stats, device)
+    # ValidationReportStats.print_stats(stats, device)
 
-    ValidationReport.print_reports_by_app(runner.reports)
+    # ValidationReport.print_reports_by_app(runner.reports)
 
     ####################################
     ##   Single Run
     ####################################
 
-    # ip = "192.168.1.125:5555"
-    # ip = "192.168.1.113:5555"
-
-    # service_manager = AppiumServiceManager([ip])
-    # if args.clean:
-    #     service_manager.cleanup_services()  # Will exit
-    # service_manager.start_services()
-
-    # device = Device(ip)
-    # app_logger = AppLogger()
-    # tsv = AppListTSV()  # Create Globally
-    # TESTING_APPS = tsv.get_apps()
-    # package_names = TESTING_APPS[0:1]
 
 
-    # print("Creating driver...")
-    # driver = webdriver.Remote(
-    #     f"http://localhost:{BASE_PORT}/wd/hub",
-    #     android_des_caps(
-    #         ip,
-    #         PLAYSTORE_PACKAGE_NAME,
-    #         PLAYSTORE_MAIN_ACT
-    #     )
-    # )
 
-    # driver.implicitly_wait(5)
-    # driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
+    ip = "192.168.1.125:5555"
+    ip = "192.168.1.113:5555"
 
-    # fb_handle = FacebookApp(driver, app_logger,  device, BASE_PORT, Queue(),)
-    # fb_handle.install_and_login()
+    service_manager = AppiumServiceManager([ip])
+    if args.clean:
+        service_manager.cleanup_services()  # Will exit
+    service_manager.start_services()
 
-    # validator = AppValidator(
-    #     driver,
-    #     package_names,
-    #     device,
-    #     0,
-    #     Queue(),
-    #     app_logger,
-    #     Queue(),  # Stats
-    #     Queue(),  # Prices
-    # )
+    device = Device(ip)
+    app_logger = AppLogger()
+    tsv = AppListTSV()  # Create Globally
+    TESTING_APPS = tsv.get_apps()
+    package_names = TESTING_APPS[0:1]
 
-    # validator.uninstall_multiple()
-    # validator.run()
 
-    # validator.report.merge(fb_handle.validator.report)
-    # validator.report.print()
+    print("Creating driver...")
+    driver = webdriver.Remote(
+        f"http://localhost:{BASE_PORT}/wd/hub",
+        android_des_caps(
+            ip,
+            PLAYSTORE_PACKAGE_NAME,
+            PLAYSTORE_MAIN_ACT
+        )
+    )
+
+    driver.implicitly_wait(5)
+    driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
+
+    fb_handle = FacebookApp(driver, app_logger,  device, BASE_PORT, Queue(),)
+    fb_handle.install_and_login()
+
+    validator = AppValidator(
+        driver,
+        package_names,
+        device,
+        0,
+        Queue(),
+        app_logger,
+        Queue(),  # Stats
+        Queue(),  # Prices
+    )
+
+    validator.uninstall_multiple()
+    validator.run()
+
+    validator.report.merge(fb_handle.validator.report)
+    validator.report.print()
 

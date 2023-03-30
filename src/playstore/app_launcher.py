@@ -1,26 +1,12 @@
 from multiprocessing import Queue
-import re
-import subprocess
-from time import sleep, time
-from typing import Dict, List
+from time import sleep
 import __main__
 import requests
-from appium.webdriver.common.appiumby import AppiumBy
 from bs4 import BeautifulSoup
-from selenium.common.exceptions import (ScreenshotException,)
-from appium import webdriver
-from objdetector.objdetector import ObjDetector
-from playstore.app_installer import AppInstaller
-from playstore.app_login import AppLogin
-from playstore.validation_report import ValidationReport
-from utils.app_utils import AppInfo, close_app, create_dir_if_not_exists, get_cur_activty, get_root_path, is_download_in_progress, is_installed, open_app
+from utils.app_utils import is_installed, open_app
 from utils.device_utils import Device
-from utils.error_utils import CrashTypes, ErrorDetector
-from utils.logging_utils import AppLogger, get_color_printer, p_alert, p_blue, p_cyan, p_green, p_purple, p_red, p_yellow
-from utils.utils import (ACCOUNTS, ADB_KEYCODE_ENTER, CONFIG,
-                         CONTINUE,  FACEBOOK_APP_NAME,
-                         FACEBOOK_PACKAGE_NAME, FB_ATUH, GOOGLE_AUTH,
-                         LOGIN, PASSWORD, PLAYSTORE_PACKAGE_NAME, WEIGHTS)
+from utils.logging_utils import get_color_printer
+
 
 class AppLauncher:
     ''' Main class to validate a broken app. Discovers, installs, opens and
