@@ -5,7 +5,7 @@ import __main__
 from selenium.common.exceptions import (ScreenshotException,)
 from appium import webdriver
 from objdetector.objdetector import ObjDetector
-from utils.accounts import Accounts
+from utils.accounts import ACCOUNTS
 from utils.app_utils import AppInfo, get_cur_activty, get_root_path, is_download_in_progress
 from utils.device_utils import Device
 from utils.error_utils import ErrorDetector
@@ -31,7 +31,6 @@ class AppLogin:
         self.__driver = driver
         self.__current_package = None
         self.__device = device
-        self.__accounts = Accounts().accounts
         self.__err_detector = ErrorDetector(self.__device.info.transport_id, self.__device.info.arc_version)
         self.__prev_act = None
         self.__cur_act = None
@@ -225,8 +224,8 @@ class AppLogin:
                 self.__dprint(f"Click login        <------- {login_entered=}")
                 results[LOGIN], tapped = self.__click_button(results[LOGIN])
                 del results[LOGIN]
-                if app_package_name in self.__accounts:
-                    login_val = self.__accounts[app_package_name][0]
+                if app_package_name in ACCOUNTS:
+                    login_val = ACCOUNTS[app_package_name][0]
                     self.__send_keys_ADB(login_val, False, False)
                     self.__dprint(f"Send Login - {login_val}        <-------")
                 else:
@@ -238,8 +237,8 @@ class AppLogin:
                 self.__dprint("Click Password        <-------")
                 results[PASSWORD], tapped = self.__click_button(results[PASSWORD])
                 del results[PASSWORD]
-                if app_package_name in self.__accounts:
-                    pass_val = self.__accounts[app_package_name][1]
+                if app_package_name in ACCOUNTS:
+                    pass_val = ACCOUNTS[app_package_name][1]
                     self.__send_keys_ADB(pass_val, False, False)
                     self.__dprint(f"Send Password - {pass_val}       <-------")
                     password_entered = True

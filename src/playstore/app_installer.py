@@ -256,7 +256,7 @@ class AppInstaller:
                         self.__dprint("Clicked: ", icon.id, cont_desc)
                         bounds = icon.get_attribute("bounds")
                         icon.click()  # TODO() bug on Eve, it wont click the app icon to get into the detail view.
-                        self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds))) # This second click will not affect anything when the first click is successful.
+                        # self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds))) # This second click will not affect anything when the first click is successful.
                         sleep(1)
                         return
             except Exception as e:

@@ -1,11 +1,13 @@
 import json
+import sys
 import requests
+from utils.logging_utils import p_alert
 
 from utils.utils import users_home_dir
 
 
 
-class Accounts:
+class __AccountsAPI:
     def __init__(self):
         self.__filename = "apikey.txt"
         self.__api_key = self.__get_key()
@@ -29,3 +31,9 @@ class Accounts:
         if res.status_code == 200:
             self.__accounts = dict(json.loads(res.text)['record'])
             print(f"{self.__accounts=}")
+        else:
+            p_alert("Failed to load account information from jsonbin.io")
+            sys.exit(1)
+
+
+ACCOUNTS = __AccountsAPI().accounts

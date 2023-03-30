@@ -11,8 +11,13 @@ class ValidationReportStats:
     def __init__(self, queue: Queue):
         self.__queue = queue
         self.process = None
-        self.nested_dict = lambda: defaultdict(self.nested_dict)
+        self.nested_dict = ValidationReportStats.dd
+        # self.nested_dict = lambda: defaultdict(self.nested_dict)
         self.reports = self.nested_dict()
+
+    @staticmethod
+    def dd():
+        return defaultdict(ValidationReportStats.dd)
 
     @staticmethod
     def default_item():
