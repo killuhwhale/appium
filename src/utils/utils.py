@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass
 import json
 import logging
@@ -107,6 +108,9 @@ def dev_scrape_start_at_app(start_package_name: str, app_list: List[List[str]]) 
             return i
     raise Exception(f"{start_package_name} not in the list.")
 
+
+def nested_default_dict():
+        return defaultdict(nested_default_dict)
 
 ##        NOT CURRENTLY USED          Image utils      NOT CURRENTLY USED         ##
 def transform_coord_from_resized(original_size: Tuple, resized_to: Tuple, resized_coords: Tuple) -> Tuple[int]:

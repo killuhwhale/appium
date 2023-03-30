@@ -3,6 +3,7 @@ from multiprocessing import Process, Queue
 from typing import Any, Dict
 from playstore.validation_report import ValidationReport
 from utils.logging_utils import StatsLogger, p_alert, p_blue, p_cyan, p_purple
+from utils.utils import nested_default_dict
 
 
 class ValidationReportStats:
@@ -11,13 +12,11 @@ class ValidationReportStats:
     def __init__(self, queue: Queue):
         self.__queue = queue
         self.process = None
-        self.nested_dict = ValidationReportStats.dd
+        # self.nested_dict = nested_default_dict
         # self.nested_dict = lambda: defaultdict(self.nested_dict)
-        self.reports = self.nested_dict()
+        self.reports = nested_default_dict()
 
-    @staticmethod
-    def dd():
-        return defaultdict(ValidationReportStats.dd)
+
 
     @staticmethod
     def default_item():
@@ -30,8 +29,8 @@ class ValidationReportStats:
         }
 
     def task(self, queue: Queue):
-        nested_dict = lambda: defaultdict(nested_dict)
-        reports = nested_dict()
+
+        reports = nested_default_dict()
         stats_by_device: Dict[Any] = defaultdict(dict)
         stats: Dict = dict()
         logger = StatsLogger()
@@ -58,7 +57,7 @@ class ValidationReportStats:
         '''
 
             Args:
-             - all_reports: Is a nested default dictionary, nested_dict = lambda: defaultdict(nested_dict).
+             - all_reports: Is a nested default dictionary
         '''
         total_apps = 0
         all_misnamed = defaultdict(str)

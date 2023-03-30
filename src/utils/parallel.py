@@ -16,7 +16,7 @@ from utils.pickles import AppValidatorPickle
 
 from utils.utils import (
     BASE_PORT, CONFIG, PLAYSTORE_PACKAGE_NAME, PLAYSTORE_MAIN_ACT,
-    android_des_caps)
+    android_des_caps, nested_default_dict)
 
 import signal
 import sys
@@ -138,8 +138,7 @@ class MultiprocessTaskRunner:
 
     @property
     def reports_dict(self):
-        nested_dict = lambda: defaultdict(nested_dict)
-        reports = nested_dict()
+        reports = nested_default_dict()
 
         for report  in self.__reports:
             for package_name, status_obj in report.report[report.report_title].items():
