@@ -1,4 +1,5 @@
 from multiprocessing import Queue
+from time import sleep
 from typing import List
 import __main__
 from appium.webdriver import Remote
@@ -10,7 +11,7 @@ from utils.app_utils import AppInfo, close_app, open_app, uninstall_app
 from utils.device_utils import Device
 from utils.error_utils import CrashTypes, ErrorDetector
 from utils.logging_utils import AppLogger, get_color_printer
-from utils.utils import PLAYSTORE_PACKAGE_NAME
+from utils.utils import CONFIG, PLAYSTORE_PACKAGE_NAME
 
 class AppValidator:
     ''' Main class to validate a broken app. Discovers, installs, opens and
@@ -78,7 +79,8 @@ class AppValidator:
 
         self.__stats_queue.put(status_obj)
         close_app(app_package_name, self.__transport_id)
-        uninstall_app(app_package_name, self.__transport_id)  # (save space)
+        if not CONFIG.skip_post_uninstall:
+            uninstall_app(app_package_name, self.__transport_id)  # (save space)
         open_app(PLAYSTORE_PACKAGE_NAME, self.__transport_id, self.__device.info.arc_version)
         self.__driver.orientation = 'PORTRAIT'
 
@@ -91,11 +93,18 @@ class AppValidator:
             Returns:
                 - True if a crash was detected.
         '''
-        CrashType, crashed_act, msg = self.__err_detector.check_crash()
-        if(not CrashType == CrashTypes.SUCCESS):
-            self.__report.add_logs(package_name, self.__err_detector.logs)
-            self.__report.add_history(package_name, f"{CrashType.value}: {crashed_act} - {msg}", self.__driver)
-            self.__report.update_status(package_name, ValidationReport.FAIL, CrashType.value)
+        print("checkinbg for crash in app_val")
+        errors = self.__err_detector.check_crash()
+        # CrashType, crashed_act, msg = self.__err_detector.check_crash()
+        if(not CrashTypes.SUCCESS in errors):
+            self.__report.add_logs(package_name, self.__err_detector.logs.replace('\t', '').replace('\n', ''))
+            all_errors_msg = []
+            for key, val in errors.items():
+                crash_type, crashed_act, msg = val
+                all_errors_msg.append(crash_type.value)
+                self.__report.add_history(package_name, f"{crash_type.value}: {crashed_act} - {msg}", self.__driver)
+            self.__report.update_status(package_name, ValidationReport.FAIL, ' '.join(all_errors_msg))
+            print("\n\n Found error returning True")
             return True
         return False
 
@@ -130,44 +139,48 @@ class AppValidator:
         self.__err_detector.update_package_name(app_package_name)
 
         # Install
-        installer = AppInstaller(self.__driver, self.__device, self.__instance_num)
-        install_result: AppInstallerResult = installer.discover_and_install(app_title, app_package_name)
-        self.__report.add_history(app_package_name, install_result.message or "App install successfull.", self.__driver)
-        if install_result.price:
-            self.__price_queue.put((app_title, app_package_name, install_result.price,))
-            return self.__report.update_status(app_package_name, ValidationReport.FAIL, f"{install_result.message} - {install_result.price}")
+        if not CONFIG.skip_install:
+            installer = AppInstaller(self.__driver, self.__device, self.__instance_num)
+            install_result: AppInstallerResult = installer.discover_and_install(app_title, app_package_name)
+            self.__report.add_history(app_package_name, install_result.message or "App install successfull.", self.__driver)
+            if install_result.price:
+                self.__price_queue.put((app_title, app_package_name, install_result.price,))
+                return self.__report.update_status(app_package_name, ValidationReport.FAIL, f"{install_result.message} - {install_result.price}")
 
-        if self.__check_crash(app_package_name):
-            return
+            if self.__check_crash(app_package_name):
+                return
 
         # Lauch App
-        launcher = AppLauncher(self.__device, self.__app_list_queue, self.__instance_num)
-        app_did_open, new_app_name, invalid_app, reason  = launcher.check_open_app(app_title, app_package_name)
-        if new_app_name:
-            self.__report.add_history(app_package_name, reason, self.__driver)
-            return self.__process_app(new_app_name, app_package_name)
-        elif invalid_app or not app_did_open:
-            self.__report.add_history(app_package_name, reason, self.__driver)
-            return self.__report.update_status(app_package_name, ValidationReport.FAIL, reason)
-
-        if self.__check_crash(app_package_name):
-            return
-
-        # Now app is installed and launched...
-        info = AppInfo(self.__transport_id, app_package_name, self.__instance_num).info()
-        self.__report.update_app_info(app_package_name, info)
+        if not CONFIG.skip_launch:
+            launcher = AppLauncher(self.__device, self.__app_list_queue, self.__instance_num)
+            app_did_open, new_app_name, invalid_app, reason  = launcher.check_open_app(app_title, app_package_name)
+            if new_app_name:
+                self.__report.add_history(app_package_name, reason, self.__driver)
+                return self.__process_app(new_app_name, app_package_name)
+            elif invalid_app or not app_did_open:
+                self.__report.add_history(app_package_name, reason, self.__driver)
+                return self.__report.update_status(app_package_name, ValidationReport.FAIL, reason)
+            sleep(5)
+            if self.__check_crash(app_package_name):
+                return
 
         # self.__dev_SS_loop()
 
-        login_module = AppLogin(self.__driver, self.__device, self.__instance_num)
-        logged_in = login_module.login(app_title, app_package_name, info)
+        # Now app is installed and launched...
+        if not CONFIG.skip_login:
+            info = AppInfo(self.__transport_id, app_package_name, self.__instance_num).info()
+            self.__report.update_app_info(app_package_name, info)
 
-        if self.__check_crash(app_package_name):
-            return
 
-        self.__report.add_history(app_package_name,
-            "Logged in." if logged_in else "Not logged in.", self.__driver)
-        self.__report.update_status(app_package_name, ValidationReport.PASS, f"{logged_in=}")
+            login_module = AppLogin(self.__driver, self.__device, self.__instance_num)
+            logged_in = login_module.login(app_title, app_package_name, info)
+
+            if self.__check_crash(app_package_name):
+                return
+
+            self.__report.add_history(app_package_name,
+                "Logged in." if logged_in else "Not logged in.", self.__driver)
+            self.__report.update_status(app_package_name, ValidationReport.PASS, f"{logged_in=}")
 
     ##  Main Loop
     def run(self):

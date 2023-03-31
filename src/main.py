@@ -24,7 +24,7 @@ from serviceManager.appium_service_manager import AppiumServiceManager
 from utils.device_utils import Device
 from utils.logging_utils import AppListTSV, AppLogger
 from utils.parallel import MultiprocessTaskRunner
-from utils.utils import BASE_PORT, PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME, android_des_caps, dev_scrape_start_at_app
+from utils.utils import BASE_PORT, CONFIG, PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME, android_des_caps, dev_scrape_start_at_app
 
 
 if __name__ == "__main__":
@@ -43,11 +43,13 @@ if __name__ == "__main__":
         ips = [
             # '710KPMZ0409387',  # Device connected via USB (Pixel 2)
             # 'emulator-5554',
-            # '192.168.1.248:5555', # Morphius AMD ARC-P        Yellow,
-            # '192.168.1.128:5555',  # Kevin ARM ARC-p          Blue,
-            # '192.168.1.238:5555', # Helios x86 intel ARC-R   RED,
-            '192.168.1.113:5555', # CoachZ snapdragon ARC-P   Green,
+            # '192.168.1.128:5555', # Kevin ARM ARC-P          Blue,
             # '192.168.1.125:5555',  # ARC-R Eve
+            '192.168.1.248:5555', # Morphius AMD        ARC-R x86   Yellow,
+            '192.168.1.238:5555', # Helios   intel      ARC-R x86   RED,
+            '192.168.1.113:5555', # CoachZ   snapdragon ARC-P ARM   Green,
+            '192.168.1.149:5555', # Caroline intel      ARC-P x86   Green,
+            # '192.168.1.149:5555', # Careena  AMD        ARC-P x86   Green,
         ]
     print("ips: ", ips)
 
@@ -88,6 +90,7 @@ if __name__ == "__main__":
 
     # ip = "192.168.1.125:5555"
     # ip = "192.168.1.113:5555"
+    # ip = '192.168.1.149:5555'
 
     # service_manager = AppiumServiceManager([ip])
     # if args.clean:
@@ -127,8 +130,8 @@ if __name__ == "__main__":
     #     Queue(),  # Stats
     #     Queue(),  # Prices
     # )
-
-    # validator.uninstall_multiple()
+    # if not CONFIG.skip_pre_multi_uninstall:
+    #     validator.uninstall_multiple()
     # validator.run()
 
     # validator.report.merge(fb_handle.validator.report)

@@ -31,7 +31,6 @@ class AppLogin:
         self.__driver = driver
         self.__current_package = None
         self.__device = device
-        self.__err_detector = ErrorDetector(self.__device.info.transport_id, self.__device.info.arc_version)
         self.__prev_act = None
         self.__cur_act = None
         # Path for SS location for detector.
@@ -291,9 +290,6 @@ class AppLogin:
         login_entered = False
         password_entered = False
         while not logged_in and login_attemps < 4:
-            # if self.__check_crash(app_package_name):
-            #     break
-
             res = self.__handle_login(login_entered,
                                     password_entered,
                                     is_game,
@@ -325,8 +321,6 @@ class AppLogin:
                 - dict containing the status of logged in and method used to log in.
         '''
         self.__current_package = app_package_name
-        self.__err_detector.reset_start_time()
-        self.__err_detector.update_package_name(app_package_name)
         try:
             sleep(3)
             return self.__attempt_login(app_title, app_package_name, app_info.is_game)

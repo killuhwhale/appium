@@ -63,3 +63,9 @@ class AppiumServiceManager:
                 return False
         return True
 
+    # def __del__(self):
+    #     for service in self.services:
+    #         try:
+    #             service.service.stop()
+    #         except Exception as e:
+    #             print("AppiumServiceManager ", e)

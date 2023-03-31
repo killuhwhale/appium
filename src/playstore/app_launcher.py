@@ -20,11 +20,9 @@ class AppLauncher:
 
         ):
         self.__app_list_queue = app_list_queue
-
         self.__device = device.info
         self.__transport_id = self.__device.transport_id
         self.__arc_version = self.__device.arc_version
-
         self.__name_span_text = ''
         self.__misnamed_reason_text = "App name does not match the current name on the playstore."
         self.dev_ss_count = 8

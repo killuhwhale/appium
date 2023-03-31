@@ -33,7 +33,11 @@ class _CONFIG:
     login_facebook =  False  # Discover, install and sign into Facebook before running AppValidator.
     multi_split_packages = False  # MultiprocessTaskRunner, splits apps across devices or not
     debug_print = True # Playstore.py, debug color printing by device.
-    skip_pre_multi_uninstall = False  #Skips pre process uninstalltion of all apps to be tested.
+    skip_pre_multi_uninstall = True  #Skips pre process uninstalltion of all apps to be tested.
+    skip_install = True # App_validator allow to skip this step
+    skip_launch = False # App_validator allow to skip this step
+    skip_login = True # App_validator allow to skip this step
+    skip_post_uninstall = True  #Skips pre process uninstalltion of all apps to be tested.
 
 CONFIG = _CONFIG()
 BASE_PORT = 4723

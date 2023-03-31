@@ -201,14 +201,22 @@ class AppInstaller:
 
     def __check_playstore_crash(self):
         # 01-05 22:08:57.546   129   820 I WindowManager: WIN DEATH: Window{afca274 u0 com.android.vending/com.google.android.finsky.activities.MainActivity}
-        cur_package = self.__err_detector.get_package_name()
-        self.__err_detector.update_package_name(PLAYSTORE_PACKAGE_NAME)
-        CrashType, crashed_act, msg = self.__err_detector.check_crash()
-        self.__err_detector.update_package_name(cur_package)  # switch back to package
-        if(not CrashType == CrashTypes.SUCCESS):
-            # TODO() Determine what to do when this scenario happens.
-            self.__dprint("PlayStore crashed ", CrashTypes.value)
+        # cur_package = self.__err_detector.get_package_name()
+        # self.__err_detector.update_package_name(PLAYSTORE_PACKAGE_NAME)
+        # self.__err_detector.update_package_name(cur_package)  # switch back to package
+
+        errors = self.__err_detector.check_crash()
+        print(f"{errors=}")
+        if(not CrashTypes.SUCCESS in errors):
+            all_errors_msg = []
+            for key, val in errors.items():
+                crash_type, crashed_act, msg = val
+                all_errors_msg.append(crash_type.value)
+                # TODO() Determine what to do when this scenario happens.
+            self.__dprint("PlayStore crashed ", ' '.join(all_errors_msg))
             raise PlaystoreCrashException()
+        return False
+
 
     def __search_playstore(self, title: str, submit=True):
         content_desc = f'''
@@ -229,7 +237,6 @@ class AppInstaller:
         x = ((bounds[2] - bounds[0]) // 2) + bounds[0]
         y = ((bounds[3] - bounds[1]) // 2) + bounds[1]
         return (str(x), str(y),)
-
 
     def __click_app_icon(self, title: str, package_name: str):
         '''
@@ -255,8 +262,9 @@ class AppInstaller:
                     if "Image" in cont_desc or title_first in cont_desc:
                         self.__dprint("Clicked: ", icon.id, cont_desc)
                         bounds = icon.get_attribute("bounds")
-                        icon.click()  # TODO() bug on Eve, it wont click the app icon to get into the detail view.
-                        # self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds))) # This second click will not affect anything when the first click is successful.
+                        # icon.click()  # TODO() bug on Eve, Caroline it wont click the app icon to get into the detail view.
+                        self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds))) # This second click will not affect anything when the first click is successful.
+                        self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds))) # This second click will not affect anything when the first click is successful.
                         sleep(1)
                         return
             except Exception as e:
@@ -400,7 +408,6 @@ class AppInstaller:
         except FailedClickIconException:
             return self.__return_error(last_step, 'Failed to click app icon.')
         except Exception as error:
-            print("Eroorr ", error)
             return self.__return_error(last_step, error)
         return AppInstallerResult(True, "")
 

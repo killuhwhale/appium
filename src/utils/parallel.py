@@ -204,7 +204,6 @@ class MultiprocessTaskRunner:
             logger.print_log(f'\t{d}\n')
 
     def __start_process(self, ip, port_number, apps: List[List[str]]):
-
         device = Device(ip)
         self.__devices.append(device)
         process = Process(target=validate_task, args=(self.__queue, self.__app_list_queue, self.__app_logger, self.__stats_queue, self.__price_queue, apps, ip, device, port_number))
@@ -215,16 +214,8 @@ class MultiprocessTaskRunner:
         '''
             Starts ea process w/ all pacakages in list.
         '''
-
-
-        # for i, ip in enumerate(self.__ips):
         for i, service_item in enumerate(self.__appium_service_manager.services):
             self.__start_process(service_item.ip, service_item.port, self.__packages)
-            # device = Device(ip)
-            # self.__devices.append(device)
-            # process = Process(target=validate_task, args=(self.__queue, self.__packages, ip, device, i))
-            # process.start()
-            # self.__processes.append(process)
 
     def __start_runs_split(self) -> List[webdriver.Remote]:
         '''
@@ -235,7 +226,6 @@ class MultiprocessTaskRunner:
         num_packages_ea = total_packages // len(self.__ips)
         rem_packages = total_packages % len(self.__ips)
         start = 0
-        # for i, ip in enumerate(self.__ips):
         for i, service_item in enumerate(self.__appium_service_manager.services):
             end = start + num_packages_ea
             if rem_packages > 0:

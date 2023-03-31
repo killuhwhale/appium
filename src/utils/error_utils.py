@@ -4,7 +4,7 @@ from enum import Enum
 import re
 import subprocess
 from time import time
-from typing import Tuple
+from typing import Dict, Tuple
 from utils.app_utils import dumpysys_activity, is_ANR
 from utils.device_utils import ArcVersions
 from utils.logging_utils import p_alert
@@ -35,13 +35,15 @@ class ErrorDetector:
         self.__transport_id = transport_id
         self.__package_name = ""
         self.__ArcVersion = ArcVersion
-        self.__start_time = None  # Logcat logs starting at
+        self.__start_time = None  # Logcat logs starting at time
         self.reset_start_time()
-        self.__logs = ""
+        self.__logs = ""  # Store logs from ADB logcat output to search through
+        self.__clean_logs = []  # Collects chunks of logs surrounding the errors that are found.
 
     @property
     def logs(self):
-        return self.__escape(self.__logs)
+        ''' Returns all logs found.'''
+        return self.__escape("".join(self.__clean_logs))
 
     def __escape(self, logs):
         return logs.replace("\n", "\\n")
@@ -75,6 +77,18 @@ class ErrorDetector:
         cmd = ('adb', '-t', self.__transport_id, 'logcat', 'time', '-t', f"'{self.__start_time}'")
         self.__logs =  subprocess.getoutput(" ".join(cmd))
 
+    def __add_clean_logs(self, match: re.Match):
+        ''' Given a match, store the previous/subsequent 10 lines of the match.
+            The goal is to avoid storing all logs. Sometimes this would be 50,000+ chars and
+            doesnt work well with Google sheets. Its also unneccessary.
+
+            We ideally need only the 10 lines surrounding the error.
+        '''
+        line_len = 160 * 10  # Chars per line * num_lines
+        start = match.start() - line_len if match.start() - line_len >= 0 else match.start()
+        end = match.end() + line_len if match.end() + line_len < len(self.__logs) else match.end()
+        self.__clean_logs.append(self.__logs[start: end])
+
     def __check_for_win_death(self):
         ''' Searches logs for WIN DEATH record.
 
@@ -91,7 +105,7 @@ class ErrorDetector:
         if match:
             print(f"{match.group(0)=}")
             failed_activity = match.group(0).split("/")[-1][:-1]
-            # print("failed act: ", failed_activity)
+            self.__add_clean_logs(match)
             return failed_activity, match.group(0)
         return "", ""
 
@@ -108,11 +122,9 @@ class ErrorDetector:
         force_removed_pattern = re.compile(force_removed, re.MULTILINE)
         match = force_removed_pattern.search(self.__logs)
 
-
         if match:
-            print(f"{match.group(0)=}")
+            self.__add_clean_logs(match)
             failed_activity = match.group(0).split("/")[-1][:-1].split(" ")[0]
-            print("failed act: ", failed_activity)
             return failed_activity, match.group(0)
         return "", ""
 
@@ -135,6 +147,7 @@ class ErrorDetector:
         match = force_removed_pattern.search(self.__logs)
 
         if match:
+            self.__add_clean_logs(match)
             return '', match.group(0)
         return "", ""
 
@@ -160,16 +173,15 @@ class ErrorDetector:
         force_removed_pattern = re.compile(force_removed, re.MULTILINE)
         match = force_removed_pattern.search(self.__logs)
 
-
         if match:
+            self.__add_clean_logs(match)
             no_timestamp_string = re.sub(ts_pattern, "", match.group(0), flags=re.MULTILINE)
             failed_activity = 'Failed to open due to crash'
             failed_msg =  '\t'.join(no_timestamp_string.split("E AndroidRuntime: ")).replace("\n", "").replace("\t\t", "\t").strip()
-            print(f"{failed_msg}")
             return failed_activity, failed_msg
         return "", ""
 
-    def check_crash(self)-> Tuple[CrashTypes, str, str]:
+    def check_crash(self)-> Dict[CrashTypes, Tuple[CrashTypes, str, str]]:
         ''' Grabs logcat logs starting at a specified time and check for crash logs.
 
             Params:
@@ -184,30 +196,41 @@ class ErrorDetector:
         try:
             self.__get_logs()
             self.reset_start_time()
-
+            '''
+                Need to check ea error and not break early.
+                Win death can come befre a F debug crash but we would be more interested in F debug
+            '''
+            errors = dict()
             failed_act, match = self.__check_fatal_exception()
             if failed_act:
-                return (CrashTypes.FATAL_EXCEPTION, failed_act, match)
+                self.__add_clean_logs(match)
+                errors[CrashTypes.FATAL_EXCEPTION] = (CrashTypes.FATAL_EXCEPTION, failed_act, match, )
+                # return (CrashTypes.FATAL_EXCEPTION, failed_act, match)
 
             failed_act, match = self.__check_for_win_death()
             if failed_act:
-                return (CrashTypes.WIN_DEATH, failed_act, match)
-
+                errors[CrashTypes.WIN_DEATH] = (CrashTypes.WIN_DEATH, failed_act, match, )
+                # return (CrashTypes.WIN_DEATH, failed_act, match)
 
             failed_act, match = self.__check_force_remove_record()
             if failed_act:
-                return (CrashTypes.WIN_DEATH, failed_act, match)
+                errors[CrashTypes.WIN_DEATH] = (CrashTypes.WIN_DEATH, failed_act, match, )
+                # return (CrashTypes.WIN_DEATH, failed_act, match)
 
             failed_act, match = self.__check_f_debug_crash()
             if match:
-                return (CrashTypes.FDEBUG_CRASH, failed_act, match)
+                errors[CrashTypes.FDEBUG_CRASH] = (CrashTypes.FDEBUG_CRASH, failed_act, match, )
+                # return (CrashTypes.FDEBUG_CRASH, failed_act, match)
 
             if self.__check_for_ANR():
-                return (CrashTypes.ANR, "unknown activity", "ANR detected.")
+                errors[CrashTypes.ANR] = (CrashTypes.ANR, "unknown activity", "ANR detected.", )
+                # return (CrashTypes.ANR, "unknown activity", "ANR detected.")
+            if len(errors.keys()):
+                return errors
         except Exception as error:
             p_alert(f"Error in ErrorDetector: {self.__transport_id=} {self.__package_name}", error)
             self.reset_start_time()
-        return (CrashTypes.SUCCESS, "", "")
+        return {CrashTypes.SUCCESS: (CrashTypes.SUCCESS, "", "",)}
 
     def __get_start_time(self, ):
         '''
