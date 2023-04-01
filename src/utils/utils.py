@@ -30,24 +30,26 @@ def create_file_if_not_exists(path):
 
 @dataclass(frozen=True)
 class _CONFIG:
+    save_yolov8_predicts = True
     login_facebook =  False  # Discover, install and sign into Facebook before running AppValidator.
     multi_split_packages = False  # MultiprocessTaskRunner, splits apps across devices or not
     debug_print = True # Playstore.py, debug color printing by device.
-    skip_pre_multi_uninstall = True  #Skips pre process uninstalltion of all apps to be tested.
-    skip_install = True # App_validator allow to skip this step
+    skip_pre_multi_uninstall = False  # Skips pre process uninstalltion of all apps to be tested.
+    skip_install = False # App_validator allow to skip this step
     skip_launch = False # App_validator allow to skip this step
-    skip_login = True # App_validator allow to skip this step
-    skip_post_uninstall = True  #Skips pre process uninstalltion of all apps to be tested.
+    skip_login = False # App_validator allow to skip this step
+    skip_post_uninstall = False  #Skips post process uninstalltion of the app just tested.
 
 CONFIG = _CONFIG()
 BASE_PORT = 4723
-# Hulu: Stream shows & movies	com.hulu.plus
+
 weights = 'notebooks/yolov5/runs/train/exp007/weights/best_309.pt'
 weights = 'notebooks/yolov5/runs/train/exp4/weights/best.pt'  # Lastest RoboFlow Model V1
 weights = 'notebooks/yolov5/runs/train/exp6/weights/best.pt'  # Lastest RoboFlow Model V2
 weights = 'notebooks/yolov5/runs/train/exp7/weights/best.pt'  # Lastest RoboFlow Model V3
 WEIGHTS = 'notebooks/yolov5/runs/train/exp8/weights/best.pt'  # Lastest RoboFlow Model V4
 WEIGHTS = 'notebooks/yolov5/runs/train/exp10/weights/best.pt'  # Lastest RoboFlow Model V5
+WEIGHTS = 'objdetector/weights/best_v5.pt'  # Lastest RoboFlow Model V5
 
 PLAYSTORE_PACKAGE_NAME = "com.android.vending"
 PLAYSTORE_MAIN_ACT = "com.google.android.finsky.activities.MainActivity"

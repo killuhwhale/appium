@@ -15,6 +15,7 @@ import argparse
 from multiprocessing import Queue
 import sys
 from appium import webdriver
+from objdetector.yolov8 import YoloV8
 
 from playstore.app_validator import AppValidator
 from playstore.facebook_app import  FacebookApp
@@ -24,7 +25,7 @@ from serviceManager.appium_service_manager import AppiumServiceManager
 from utils.device_utils import Device
 from utils.logging_utils import AppListTSV, AppLogger
 from utils.parallel import MultiprocessTaskRunner
-from utils.utils import BASE_PORT, CONFIG, PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME, android_des_caps, dev_scrape_start_at_app
+from utils.utils import BASE_PORT, CONFIG, PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME, WEIGHTS, android_des_caps, dev_scrape_start_at_app
 
 
 if __name__ == "__main__":
@@ -38,48 +39,59 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     ips = args.ips
+
+    yolo = YoloV8(WEIGHTS)
+    yolo.detect()
+
+
+
+
+
+
+
+
     # Multiprocessing Runs
-    if len(ips) == 0:
-        ips = [
-            # '710KPMZ0409387',  # Device connected via USB (Pixel 2)
-            # 'emulator-5554',
-            # '192.168.1.128:5555', # Kevin ARM ARC-P          Blue,
-            # '192.168.1.125:5555',  # ARC-R Eve
-            '192.168.1.248:5555', # Morphius AMD        ARC-R x86   Yellow,
-            '192.168.1.238:5555', # Helios   intel      ARC-R x86   RED,
-            '192.168.1.113:5555', # CoachZ   snapdragon ARC-P ARM   Green,
-            '192.168.1.149:5555', # Caroline intel      ARC-P x86   Green,
-            # '192.168.1.149:5555', # Careena  AMD        ARC-P x86   Green,
-        ]
-    print("ips: ", ips)
+    # if len(ips) == 0:
+    #     ips = [
+    #         # '710KPMZ0409387',  # Device connected via USB (Pixel 2)
+    #         # 'emulator-5554',
+    #         # '192.168.1.128:5555', # Kevin ARM ARC-P          Blue,
+    #         # '192.168.1.125:5555',  # ARC-R Eve
+    #         '192.168.1.248:5555', # Morphius AMD        ARC-R x86   Yellow,
+    #         '192.168.1.238:5555', # Helios   intel      ARC-R x86   RED,
+    #         '192.168.1.113:5555', # CoachZ   snapdragon ARC-P ARM   Green,
+    #         '192.168.1.149:5555', # Caroline intel      ARC-P x86   Green,
+    #         # '192.168.1.149:5555', # Careena  AMD        ARC-P x86   Green,
+    #     ]
+    # print("ips: ", ips)
 
-    tsv = AppListTSV()  # Create Globally
-    TESTING_APPS = tsv.get_apps()
+    # tsv = AppListTSV()  # Create Globally
+    # TESTING_APPS = tsv.get_apps()
 
-    # Dev, choose startin package by name.
-    # starting_app = "com.mojang.minecraftpe"
-    # start_idx = dev_scrape_start_at_app(starting_app, TESTING_APPS)
-    # print(f"{start_idx=} ~ {starting_app=}")
-    # package_names = TESTING_APPS[start_idx: ]
+    # # Dev, choose startin package by name.
+    # # starting_app = "com.mojang.minecraftpe"
+    # # start_idx = dev_scrape_start_at_app(starting_app, TESTING_APPS)
+    # # print(f"{start_idx=} ~ {starting_app=}")
+    # # package_names = TESTING_APPS[start_idx: ]
 
-    # Dev, choose startin package by index.
-    package_names = TESTING_APPS[:1]
+    # # Dev, choose startin package by index.
+    # package_names = TESTING_APPS[:1]
 
-    runner = MultiprocessTaskRunner(ips, package_names)
-    if args.clean:
-        runner.cleanup_appium_server()
-    if not runner.start_appium_server():
-        print("Error starting server...")
-        sys.exit(1)
+    # runner = MultiprocessTaskRunner(ips, package_names)
+    # if args.clean:
+    #     runner.cleanup_appium_server()
+    # if not runner.start_appium_server():
+    #     print("Error starting server...")
+    #     sys.exit(1)
 
-    runner.run()
-    runner.print_devices()
+    # runner.run()
+    # runner.print_devices()
 
-    stats, device = ValidationReportStats.calc(runner.reports_dict)
+    # stats, device = ValidationReportStats.calc(runner.reports_dict)
 
-    ValidationReportStats.print_stats(stats, device)
+    # ValidationReportStats.print_stats(stats, device)
 
-    ValidationReport.print_reports_by_app(runner.reports)
+    # ValidationReport.print_reports_by_app(runner.reports)
 
     ####################################
     ##   Single Run

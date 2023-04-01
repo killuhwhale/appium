@@ -3,8 +3,9 @@ Example Output
 <img src="https://raw.githubusercontent.com/killuhwhale/appium/main/src/images/readme/demo_output.png?sanitize=true&raw=true" />
 <video src="https://drive.google.com/open?id=1kztEqXsqcLiEa24NN3vr3_ddeH0D0re4&authuser=0&usp=drive_link" />
 
+LINE TO CHANGE IN yolov8 engine/model.py
 
-
+overrides['save'] = kwargs.get('save', False)  # not save files by default
 
 Prep work for Chromebook:
 - DUT
@@ -86,6 +87,10 @@ Prep work for Chromebook:
 
 
 # TODOs
+
+- Rework Yolov8 to collect v5 detect run()
+    - ret_results = collections.defaultdict(list)
+        collect results by key(label) and (p1p,p2,conf)
 
     - Record which log in method was used or to use, GAuth, FBAuth, email/pass
         - Figure out how to attempt multiple logins on each app.
