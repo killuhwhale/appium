@@ -1,18 +1,19 @@
+import __main__
 import subprocess
+import traceback
 from time import sleep, time
 from typing import Dict, List
-import __main__
 from selenium.common.exceptions import (ScreenshotException,)
 from appium import webdriver
 from objdetector.objdetector import ObjDetector
+from objdetector.yolov8 import YoloV8
 from utils.accounts import ACCOUNTS
 from utils.app_utils import AppInfo, get_cur_activty, get_root_path, is_download_in_progress
 from utils.device_utils import Device
-from utils.error_utils import ErrorDetector
 from utils.logging_utils import get_color_printer, p_alert
 from utils.utils import (ADB_KEYCODE_ENTER, CONTINUE,
                          FACEBOOK_PACKAGE_NAME, FB_ATUH, GOOGLE_AUTH, LOGIN,
-                         PASSWORD, WEIGHTS)
+                         PASSWORD, V8_WEIGHTS, WEIGHTS)
 
 
 class ANRThrownException(Exception):
@@ -33,10 +34,16 @@ class AppLogin:
         self.__device = device
         self.__prev_act = None
         self.__cur_act = None
-        # Path for SS location for detector.
-        self.__test_img_fp = f"{self.__device.info.ip}_test.png"
-        self.__weights = WEIGHTS
-        self.__detector = ObjDetector(self.__test_img_fp, [self.__weights])
+
+        # Detection
+        self.__using_v8 = True
+        img_name = f"{self.__device.info.ip}_test.png"
+        self.__test_img_fp = f"{get_root_path()}/notebooks/yolo_images/{img_name}"
+        # self.__detector = ObjDetector(self.__test_img_fp, [WEIGHTS])  # v5
+        self.__test_img_fp_v8 = f"{get_root_path()}/objdetector/yolo_images/inf_images/{img_name}"
+        self.__detector = YoloV8(weights=V8_WEIGHTS, src=self.__test_img_fp_v8)
+
+        # Debug printing
         self.__dprint = get_color_printer(instance_num)
 
 
@@ -61,6 +68,7 @@ class AppLogin:
     ##  Buttons
     def __sorted_conf(self, p: List):
         ''' Returns confidence value from the list.'''
+        print("sorting by conf: list => ", p)
         return int(p[2])
 
     def __tap_screen(self, x:str, y:str):
@@ -100,9 +108,13 @@ class AppLogin:
             Given a button list [Result from ObjDetector], remove the button and click it.
 
             Returns the remaining buttons.
+
+            results=defaultdict(<class 'list'>, {'Continue': [ (1015, 694), (1161, 743), 0.3802167475223541] })
+            results=defaultdict(<class 'list'>, {'Continue': [ ((1018, 790), (1163, 840), tensor(0.52810, device='cuda:0') ), ((812, 779), (1364, 850), tensor(0.87382, device='cuda:0'))]
         '''
-        btns = sorted(btns, key=self.__sorted_conf)  # Sorted by confidence
         self.__dprint("Btns: ",btns )
+        btns = sorted(btns, key=self.__sorted_conf)  # Sorted by confidence
+        self.__dprint("Sorted Btns: ",btns )
         tapped = False
         if(len(btns) >= 1):
             btn = btns.pop()
@@ -120,7 +132,11 @@ class AppLogin:
         '''
         root_path = get_root_path()
         try:
-            self.__driver.get_screenshot_as_file(f"{root_path}/notebooks/yolo_images/{self.__test_img_fp}")
+            if self.__using_v8:
+                print("Taking screenshot for v8!!!!")
+                self.__driver.get_screenshot_as_file(self.__test_img_fp_v8)
+            else:
+                self.__driver.get_screenshot_as_file(self.__test_img_fp)
             # png_bytes = self.__driver.get_screenshot_as_png()
             # save_resized_image(png_bytes, (1200,800), f"/{root_path}/notebooks/yolo_images/{self.__test_img_fp}")
             return True
@@ -205,7 +221,7 @@ class AppLogin:
         tapped = False
         detect_attempt = 0
         while not (CONTINUE_SUBMITTED and login_entered and password_entered) and detect_attempt < 3:
-            print(f"{results=}")
+            self.__dprint(f"Current {results=}")
             if CONTINUE_SUBMITTED and login_entered and password_entered:
                 return True, True, True
 
@@ -327,6 +343,7 @@ class AppLogin:
 
         except Exception as error:
             p_alert(f"{self.__device.info.ip} - ", f"Error in login: {app_title} - {app_package_name}", error)
+            traceback.print_exc()
             return False
 
 

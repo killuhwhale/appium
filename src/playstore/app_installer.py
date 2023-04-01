@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import re
 import subprocess
 from time import sleep, time
+import traceback
 from typing import List, Tuple
 import __main__
 from appium.webdriver.common.appiumby import AppiumBy
@@ -418,7 +419,8 @@ class AppInstaller:
             self.__dprint("Playstore crashed!")  # Havent encountered this in a long time.
             return AppInstallerResult(False, f"Failed: Playstore crashed")
         except Exception as error:
-            p_alert(f"{self.__ip} - ", f"Error in main RUN: {app_title} - {app_package_name}", error)
+            p_alert(f"{self.__ip} - ", f"Error in isntaller RUN: {app_title} - {app_package_name}", error)
+            traceback.print_exc()
             return AppInstallerResult(False, f"Failed: {error=}")
 
 if __name__ == "__main__":

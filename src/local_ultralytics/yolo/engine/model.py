@@ -98,7 +98,6 @@ class YOLO:
             self._load(model, task)
 
     def __call__(self, source=None, stream=False, **kwargs):
-        print(f"calling predict w/ {source=} {stream=} {kwargs=}")
         return self.predict(source, stream, **kwargs)
 
     def __getattr__(self, attr):
@@ -221,7 +220,7 @@ class YOLO:
         overrides.update(kwargs)  # prefer kwargs
         overrides['mode'] = kwargs.get('mode', 'predict')
         assert overrides['mode'] in ['track', 'predict']
-        # overrides['save'] = kwargs.get('save', False)  # not save files by default
+        overrides['save'] = kwargs.get('save', False)  # not save files by default
         if not self.predictor:
             self.task = overrides.get('task') or self.task
             self.predictor = TASK_MAP[self.task][3](overrides=overrides)

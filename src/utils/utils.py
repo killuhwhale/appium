@@ -34,11 +34,11 @@ class _CONFIG:
     login_facebook =  False  # Discover, install and sign into Facebook before running AppValidator.
     multi_split_packages = False  # MultiprocessTaskRunner, splits apps across devices or not
     debug_print = True # Playstore.py, debug color printing by device.
-    skip_pre_multi_uninstall = False  # Skips pre process uninstalltion of all apps to be tested.
-    skip_install = False # App_validator allow to skip this step
+    skip_pre_multi_uninstall = True  # Skips pre process uninstalltion of all apps to be tested.
+    skip_install = True # App_validator allow to skip this step
     skip_launch = False # App_validator allow to skip this step
     skip_login = False # App_validator allow to skip this step
-    skip_post_uninstall = False  #Skips post process uninstalltion of the app just tested.
+    skip_post_uninstall = True  #Skips post process uninstalltion of the app just tested.
 
 CONFIG = _CONFIG()
 BASE_PORT = 4723
@@ -49,7 +49,9 @@ weights = 'notebooks/yolov5/runs/train/exp6/weights/best.pt'  # Lastest RoboFlow
 weights = 'notebooks/yolov5/runs/train/exp7/weights/best.pt'  # Lastest RoboFlow Model V3
 WEIGHTS = 'notebooks/yolov5/runs/train/exp8/weights/best.pt'  # Lastest RoboFlow Model V4
 WEIGHTS = 'notebooks/yolov5/runs/train/exp10/weights/best.pt'  # Lastest RoboFlow Model V5
-WEIGHTS = 'objdetector/weights/best_v5.pt'  # Lastest RoboFlow Model V5
+V8_WEIGHTS = 'objdetector/weights/best_v5.pt'  # Lastest RoboFlow Model V5 dataset, yolov8 trained.
+# https://docs.ultralytics.com/tasks/detect/?h=model
+V8_WEIGHTS = 'objdetector/weights/best_v5_m.pt'  # Lastest RoboFlow Model V5 dataset, yolov8 trained on medium 	640	50.2	234.7	1.83	25.9	78.9.
 
 PLAYSTORE_PACKAGE_NAME = "com.android.vending"
 PLAYSTORE_MAIN_ACT = "com.google.android.finsky.activities.MainActivity"
