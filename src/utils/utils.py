@@ -31,14 +31,14 @@ def create_file_if_not_exists(path):
 @dataclass(frozen=True)
 class _CONFIG:
     save_yolov8_predicts = True
-    login_facebook =  False  # Discover, install and sign into Facebook before running AppValidator.
-    multi_split_packages = False  # MultiprocessTaskRunner, splits apps across devices or not
     debug_print = True # Playstore.py, debug color printing by device.
-    skip_pre_multi_uninstall = True  # Skips pre process uninstalltion of all apps to be tested.
-    skip_install = True # App_validator allow to skip this step
+    multi_split_packages = False  # MultiprocessTaskRunner, splits apps across devices or not
+    login_facebook =  False  # Discover, install and sign into Facebook before running AppValidator.
+    skip_pre_multi_uninstall = False  # Skips pre process uninstalltion of all apps to be tested.
+    skip_install = False # App_validator allow to skip this step
     skip_launch = False # App_validator allow to skip this step
     skip_login = False # App_validator allow to skip this step
-    skip_post_uninstall = True  #Skips post process uninstalltion of the app just tested.
+    skip_post_uninstall = False  #Skips post process uninstalltion of the app just tested.
 
 CONFIG = _CONFIG()
 BASE_PORT = 4723

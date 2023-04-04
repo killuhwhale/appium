@@ -7,7 +7,7 @@ from playstore.app_installer import AppInstaller, AppInstallerResult
 from playstore.app_login import AppLogin
 from playstore.app_launcher import AppLauncher
 from playstore.validation_report import ValidationReport
-from utils.app_utils import AppInfo, close_app, open_app, uninstall_app
+from utils.app_utils import AppInfo, close_app, get_cur_activty, get_views, open_app, uninstall_app
 from utils.device_utils import Device
 from utils.error_utils import CrashTypes, ErrorDetector
 from utils.logging_utils import AppLogger, get_color_printer
@@ -40,7 +40,10 @@ class AppValidator:
         self.__package_names = package_names  # List of packages to test as [app_title, app_package_name]
         self.__instance_num = instance_num
         self.dev_ss_count = 8
-        self.__dprint = get_color_printer(instance_num)
+        self.__dprinter = self.__dprint
+
+    def __dprint(self, *args):
+        get_color_printer(self.__instance_num)(self.__report.report_title, *args)
 
     @property
     def report(self):
@@ -108,17 +111,17 @@ class AppValidator:
             return True
         return False
 
-    def __scrape_dev_test_image(self):
+    def __scrape_dev_test_image(self, package_name: str):
         try:
             self.__driver.get_screenshot_as_file(
-            f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/scraped_images/{self.dev_ss_count}.png"
+                f"/home/killuh/ws_p38/appium/src/notebooks/yolo_images/scraped_images/{package_name}_{self.dev_ss_count}.png"
             )
             self.dev_ss_count += 1
         except Exception as error:
             self.__dprint("Error w/ dev ss: ", error)
 
 
-    def __dev_SS_loop(self):
+    def __dev_SS_loop(self, package_name: str):
         ''' Loop that pauses on input allowing to take multiple screenshots
                 after manually changing app state.
         '''
@@ -128,7 +131,7 @@ class AppValidator:
             self.__dprint(f"{ans=}, {(not ans == 'q')}")
             if not (ans == 'q'):
                 self.__dprint("Taking SS")
-                self.__scrape_dev_test_image()
+                self.__scrape_dev_test_image(package_name)
             else:
                 self.__dprint("Quit from SS")
 
@@ -140,7 +143,7 @@ class AppValidator:
 
         # Install
         if not CONFIG.skip_install:
-            installer = AppInstaller(self.__driver, self.__device, self.__instance_num)
+            installer = AppInstaller(self.__driver, self.__device, self.__dprinter)
             install_result: AppInstallerResult = installer.discover_and_install(app_title, app_package_name)
             self.__report.add_history(app_package_name, install_result.message or "App install successfull.", self.__driver)
             if install_result.price:
@@ -152,7 +155,7 @@ class AppValidator:
 
         # Lauch App
         if not CONFIG.skip_launch:
-            launcher = AppLauncher(self.__device, self.__app_list_queue, self.__instance_num)
+            launcher = AppLauncher(self.__device, self.__app_list_queue, self.__dprinter)
             app_did_open, new_app_name, invalid_app, reason  = launcher.check_open_app(app_title, app_package_name)
             if new_app_name:
                 self.__report.add_history(app_package_name, reason, self.__driver)
@@ -164,15 +167,15 @@ class AppValidator:
             if self.__check_crash(app_package_name):
                 return
 
-        # self.__dev_SS_loop()
+        # self.__dev_SS_loop(app_package_name)
 
         # Now app is installed and launched...
         if not CONFIG.skip_login:
-            info = AppInfo(self.__transport_id, app_package_name, self.__instance_num).info()
+            info = AppInfo(self.__transport_id, app_package_name, self.__dprinter).info()
             self.__report.update_app_info(app_package_name, info)
 
 
-            login_module = AppLogin(self.__driver, self.__device, self.__instance_num)
+            login_module = AppLogin(self.__driver, self.__device, self.__dprinter)
             logged_in = login_module.login(app_title, app_package_name, info)
 
             if self.__check_crash(app_package_name):
@@ -194,6 +197,11 @@ class AppValidator:
 
         self.__driver.orientation = 'PORTRAIT'
         for app_title, app_package_name in self.__package_names:
+            # q = ''
+            # while q != 'q':
+            #     q = input("Get act")
+            #     print(get_views(self.__transport_id))
+            #     get_cur_activty(self.__transport_id, self.__device.info.arc_version, app_package_name)
             # Allows for recursive call to retest an app.
             self.__process_app(app_title, app_package_name)
             self.__cleanup_run(app_package_name)

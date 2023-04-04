@@ -53,7 +53,7 @@ class AppInstaller:
             self,
             driver: webdriver.Remote,
             device: Device,
-            instance_num= 0
+            dprinter
         ):
         self.__driver = driver
         self.__device = device.info
@@ -69,7 +69,7 @@ class AppInstaller:
             'Click app icon',
             'Click install button',
         ]
-        self.__dprint = get_color_printer(instance_num)
+        self.__dprint = dprinter
 
     def uninstall_multiple(self):
         for app_info in self.__package_names:

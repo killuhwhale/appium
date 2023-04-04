@@ -16,7 +16,7 @@ class AppLauncher:
             self,
             device: Device,
             app_list_queue: Queue,
-            instance_num
+            dprinter
 
         ):
         self.__app_list_queue = app_list_queue
@@ -26,7 +26,7 @@ class AppLauncher:
         self.__name_span_text = ''
         self.__misnamed_reason_text = "App name does not match the current name on the playstore."
         self.dev_ss_count = 8
-        self.__dprint = get_color_printer(instance_num)
+        self.__dprint = dprinter
 
     def __check_playstore_invalid(self, package_name) -> bool:
         ''' Checks if an app's package_name is invalid via Google playstore URL

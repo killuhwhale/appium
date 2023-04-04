@@ -1,7 +1,10 @@
 import __main__
+from collections import defaultdict
+from io import BytesIO
+from PIL import Image
 import subprocess
 import traceback
-from time import sleep, time
+from time import perf_counter, sleep, time
 from typing import Dict, List
 from selenium.common.exceptions import (ScreenshotException,)
 from appium import webdriver
@@ -27,10 +30,9 @@ class AppLogin:
             self,
             driver: webdriver.Remote,
             device: Device,
-            instance_num: int
+            dprinter
         ):
         self.__driver = driver
-        self.__current_package = None
         self.__device = device
         self.__prev_act = None
         self.__cur_act = None
@@ -38,24 +40,22 @@ class AppLogin:
         # Detection
         self.__using_v8 = True
         img_name = f"{self.__device.info.ip}_test.png"
-        self.__test_img_fp = f"{get_root_path()}/notebooks/yolo_images/{img_name}"
-        # self.__detector = ObjDetector(self.__test_img_fp, [WEIGHTS])  # v5
-        self.__test_img_fp_v8 = f"{get_root_path()}/objdetector/yolo_images/inf_images/{img_name}"
-        self.__detector = YoloV8(weights=V8_WEIGHTS, src=self.__test_img_fp_v8)
-
+        self.__test_img_fp = f"{get_root_path()}/notebooks/yolo_images/{img_name}"  # req for v5 input
+        self.__detector_v5 = ObjDetector(self.__test_img_fp, [WEIGHTS])  # v5
+        self.__detector_v8 = YoloV8(weights=V8_WEIGHTS)
         # Debug printing
-        self.__dprint = get_color_printer(instance_num)
+        self.__dprint = dprinter
 
 
-    def __is_new_activity(self) -> bool:
+
+    def __is_new_activity(self, app_package_name: str) -> bool:
         ''' Calls adb shell dumpsys activity | grep mFocusedWindow/
 
             Raises ANRThrownException
         '''
-        results: Dict = get_cur_activty(self.__device.info.transport_id,  self.__device.info.arc_version, self.__current_package)
+        results: Dict = get_cur_activty(self.__device.info.transport_id,  self.__device.info.arc_version, app_package_name)
         if results['is_ANR_thrown']:
             raise ANRThrownException(results)
-
 
         act_name = f"{results['package_name']}/{results['act_name']}"
         self.__prev_act = self.__cur_act  # Update
@@ -123,8 +123,8 @@ class AppLogin:
         return btns, tapped
 
     ##  Images/ Reporting
-    def __get_test_ss(self) -> bool:
-        '''
+    def __detect_v5(self) -> defaultdict(list):
+        ''' Yolov5
             Attempts to get SS of device and saves to a location where the
                 object detector is configured to look.
             This image will be used as the source to detect our buttons and
@@ -132,21 +132,42 @@ class AppLogin:
         '''
         root_path = get_root_path()
         try:
-            if self.__using_v8:
-                print("Taking screenshot for v8!!!!")
-                self.__driver.get_screenshot_as_file(self.__test_img_fp_v8)
-            else:
-                self.__driver.get_screenshot_as_file(self.__test_img_fp)
+            self.__driver.get_screenshot_as_file(self.__test_img_fp)
             # png_bytes = self.__driver.get_screenshot_as_png()
             # save_resized_image(png_bytes, (1200,800), f"/{root_path}/notebooks/yolo_images/{self.__test_img_fp}")
-            return True
+            return self.__detector_v5.detect()
         except ScreenshotException as e:
             self.__dprint("App is scured!")
         except Exception as e:
             self.__dprint("Error taking SS: ", e)
 
         self.__dprint("Error taking SS: ", root_path)
-        return False
+        return defaultdict(list)
+
+    def __detect_v8(self) -> bool:
+        '''
+            Attempts to get SS of device as Pil Image and returns results for detection.
+        '''
+        try:
+            png_bytes = self.__driver.get_screenshot_as_png()
+            src = Image.open(BytesIO(png_bytes))
+            return self.__detector_v8.detect(src)
+        except ScreenshotException as e:
+            self.__dprint("App is scured!")
+        except Exception as e:
+            self.__dprint("Error taking SS: ", e)
+        return defaultdict(list)
+
+    def __detect(self) -> defaultdict(list):
+        start = perf_counter()
+        res = defaultdict(list)
+        if self.__using_v8:
+            res = self.__detect_v8()
+        else:
+            res = self.__detect_v5()
+        end = perf_counter()
+        self.__dprint(f"Detection took ({self.__using_v8=}): {(end - start):.6f}")
+        return res
 
     ##  Typing
     def __escape_chars(self, title: str):
@@ -198,16 +219,13 @@ class AppLogin:
         '''
         # Do
         empty_retries = 2
-        self.__is_new_activity() ## Init current activty
-        if not self.__get_test_ss():
+        self.__is_new_activity(app_package_name) ## Init current activty
+        results: defaultdict = self.__detect()
+        if not len(results.keys()):
             return False, login_entered_init, password_entered_init
-        results = self.__detector.detect()
         login_entered, password_entered = login_entered_init, password_entered_init
-        if results is None:
-            return False, login_entered, password_entered
 
         # While
-
         # here we have a dict of results from detection
         # Consists of 4 labels
         # We want to prioritize
@@ -224,7 +242,6 @@ class AppLogin:
             self.__dprint(f"Current {results=}")
             if CONTINUE_SUBMITTED and login_entered and password_entered:
                 return True, True, True
-
 
             if GOOGLE_AUTH in results:
                 # We have A google Auth button presents lets press it
@@ -246,8 +263,6 @@ class AppLogin:
                 else:
                     self.__dprint(f"Login info not created for {app_package_name}")
                 login_entered = True
-
-
             elif PASSWORD in results and not password_entered:
                 self.__dprint("Click Password        <-------")
                 results[PASSWORD], tapped = self.__click_button(results[PASSWORD])
@@ -259,7 +274,7 @@ class AppLogin:
                     password_entered = True
                 else:
                     self.__dprint(f"Password info not created for {app_package_name}")
-                if self.__is_new_activity():
+                if self.__is_new_activity(app_package_name):
                     return True, login_entered, password_entered
             elif CONTINUE in results:
                 # TODO Remove the button once we click it, so we dont keep clicking the same element.
@@ -277,13 +292,13 @@ class AppLogin:
                     sleep(5)  # Wait for a possible login to happen
                     return True, login_entered, password_entered
 
-            if self.__is_new_activity():
-                if not self.__get_test_ss():
-                    return False, login_entered, password_entered
+            if self.__is_new_activity(app_package_name):
                 self.__dprint("\n\n New Activity \n", self.__prev_act, "\n", self.__cur_act, '\n\n' )
-                results = self.__detector.detect()
-                if results is None:
+
+                results = self.__detect()
+                if not len(results.keys()):
                     return False, login_entered, password_entered
+
                 tapped = False
                 self.__dprint(f"Results: ", results)
             elif len(results.keys()) == 0 and empty_retries > 0:
@@ -291,9 +306,14 @@ class AppLogin:
                 self.__dprint("Empty results, grabbing new SS and processing...")
                 sleep(3)
                 # Get a new SS, ir error return
+                results = self.__detect()
+                if not len(results.keys()):
+                    return False, login_entered, password_entered
+
                 if not self.__get_test_ss():
                     return False, login_entered, password_entered
-                results = self.__detector.detect()
+                results = self.__detect()
+
             detect_attempt += 1
         return False, login_entered, password_entered
 
@@ -336,7 +356,6 @@ class AppLogin:
             Returns:
                 - dict containing the status of logged in and method used to log in.
         '''
-        self.__current_package = app_package_name
         try:
             sleep(3)
             return self.__attempt_login(app_title, app_package_name, app_info.is_game)

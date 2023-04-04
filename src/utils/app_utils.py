@@ -155,7 +155,7 @@ def get_cur_activty(transport_id: str, ArcVersion: ArcVersions, package_name: st
                 "ANR_for_package": 'packge_name here'
             }
 
-        # print(f"get_cur_activty: {result.group('package_name')=} {result.group('act_name')=}")
+        print(f"get_cur_activty: {result.group('package_name')=} {result.group('act_name')=}")
         return  {
             "package_name": result.group("package_name"),
             "act_name": result.group("act_name"),
@@ -291,10 +291,10 @@ class AppInfo:
         package: name='com.plexapp.android' versionCode='855199985' versionName='9.15.0.38159' compileSdkVersion='33' compileSdkVersionCodename='13'
         package: name='com.tumblr' versionCode='1280200110' versionName='28.2.0.110' compileSdkVersion='33' compileSdkVersionCodename='13'
     '''
-    def __init__(self, transport_id: str, package_name: str, instance_num=0):
+    def __init__(self, transport_id: str, package_name: str, dprinter):
         self.transport_id = transport_id
         self.package_name = package_name
-        self.__dprint = get_color_printer(instance_num)
+        self.__dprint = dprinter
         self.__info = {
                 'name': '',
                 'versionCode': '',

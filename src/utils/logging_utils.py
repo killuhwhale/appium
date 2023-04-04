@@ -12,11 +12,13 @@ class AppListTSV:
 
         This also cleans/ filters the list. It will update misnamed apps and remove invalid package names.
         We can replace this with another class to interact with another data storage.
+
+        **App list file must not contain duplicate package names.
     '''
 
     def __init__(self):
         self.__app_list = list()
-        self.__filename = "app_list.tsv" # This file should be place in the home dir on linux ~/
+        self.__filename = "app_list_demo.tsv" # This file should be place in the home dir on linux ~/
         self.__badfilename = "bad_app_list.tsv" # This will be created in the home dir ~/
         self.__all_bad_apps = dict()
         self.__home_dir = users_home_dir()
