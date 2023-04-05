@@ -3,9 +3,6 @@ Example Output
 <img src="https://raw.githubusercontent.com/killuhwhale/appium/main/src/images/readme/demo_output.png?sanitize=true&raw=true" />
 <video src="https://drive.google.com/open?id=1kztEqXsqcLiEa24NN3vr3_ddeH0D0re4&authuser=0&usp=drive_link" />
 
-LINE TO CHANGE IN yolov8 engine/model.py
-
-overrides['save'] = kwargs.get('save', False)  # not save files by default
 
 Prep work for Chromebook:
 - DUT
@@ -87,24 +84,11 @@ Prep work for Chromebook:
 
 
 # TODOs
-
-    Bug:
-     - Bad_apps_list.tsv reports False in column for invalid even when it reports teh reason as invalid.
-
-
     - Write utility class to install an apk
         - We should be able to skip the installation step and install apk directly and continue like normal
         - Create/ Curate apks that will fails to demo/ test our process is working correctly for the errors we are trying to catch.
 
-    - App demo list issues...
-        - Messenger
-            - Smart lock appear first... doest pick an account..
-                - Helios
-        - Wish
-            - Failed, continue with accounts appear early..  Helios
-
-
-    - Record which log in method was used or to use, GAuth, FBAuth, email/pass
+    - @Ecox() Record which log in method was used or to use, GAuth, FBAuth, email/pass
         - Figure out how to attempt multiple logins on each app.
             - After Installed, perform a cycle check until we find login field or GAuth or FBAuth
                 - Depending on what we find, we will attempt those methods.
@@ -113,12 +97,6 @@ Prep work for Chromebook:
                     - If one method just try that one.
                 - Then we can report which methods were tried and their status
 
-    - Strategy when we have two continue buttons and one is disabled but has the higher probability
-        - we should try to click all of them unless something happens?
-            - Make it try more continue buttons before takinga new screenshot...??
-            - Gacha life
-                - Cancel Agree Continue buttons are conflicting.
-
     - Improve model
         -1. Explore Age verification
             - input age or slider
@@ -126,11 +104,6 @@ Prep work for Chromebook:
             - WE WILL NEED TO detect slider age bars.
                 - click in center of view
             - Empty form fields to type age will probably be the trickiest...
-
-
-        NOTE:
-        *** Update to YOLOv7? slight increase in accuracy ~3% (from what I've read)
-        *** Most likely will need to scrape same image set from multiple devices w/ varying screen sizes.
 
 
 

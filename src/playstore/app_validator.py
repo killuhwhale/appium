@@ -162,7 +162,7 @@ class AppValidator:
                 return self.__process_app(new_app_name, app_package_name)
             elif invalid_app or not app_did_open:
                 self.__report.add_history(app_package_name, reason, self.__driver)
-                return self.__report.update_status(app_package_name, ValidationReport.FAIL, reason)
+                return self.__report.update_status(app_package_name, ValidationReport.FAIL, reason, '', invalid_app)
             sleep(5)
             if self.__check_crash(app_package_name):
                 return

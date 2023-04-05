@@ -125,7 +125,7 @@ class AppLogin:
         self.__dprint("Sorted Btns: ",btns )
         tapped = False
         if(len(btns) >= 1):
-            btn = btns.pop()
+            btn = btns[0]
             self.__tap_screen(*self.__get_coords(btn))
             tapped = True
         return btns, tapped
@@ -230,6 +230,22 @@ class AppLogin:
             self.__dprint(f"DLinProgress...")
             sleep(1.5)
 
+    def __clean_result(self, key: str, results: defaultdict):
+        '''
+            Removes detection from the list under a given key, removes entry when list is empty.
+        '''
+        num_detections = len(results[key])
+        # print(f"Cleaning {key=} w/ {num_detections=}")
+        # print(f"{results=}")
+        if num_detections == 0:
+            return
+        elif num_detections > 1:
+            del results[key][0]
+        else:
+            del results[key]
+        # print(f"After {results=}")
+
+
     def __handle_login(self, login_entered_init: bool, password_entered_init:bool, is_game: bool, app_package_name: str) -> bool:
         '''
             On a given page we will look at it and perform an action, if there is one .
@@ -299,10 +315,9 @@ class AppLogin:
                 if self.__is_new_activity(app_package_name):
                     return True, login_entered, password_entered
             elif CONTINUE in results:
-                # TODO Remove the button once we click it, so we dont keep clicking the same element.
                 self.__dprint("Click Continue        <-------")
                 results[CONTINUE], tapped = self.__click_button(results[CONTINUE])
-                del results[CONTINUE]
+                self.__clean_result(CONTINUE, results)
 
                 self.__dprint(f"Cont w/ login and password entered {login_entered=} {password_entered=}")
                 if login_entered and password_entered:
