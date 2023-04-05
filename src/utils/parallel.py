@@ -114,6 +114,8 @@ class MultiprocessTaskRunner:
         self.__appium_service_manager = AppiumServiceManager(ips)
         signal.signal(signal.SIGINT, self.handle_sigint)
 
+
+
     def start_appium_server(self):
         return self.__appium_service_manager.start_services()
 
@@ -179,6 +181,7 @@ class MultiprocessTaskRunner:
         self.__app_list_process.terminate()
         self.__validation_report_stats.stop()
         self.__prices.stop()
+        self.__appium_service_manager.stop()
         print('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n')
 
     def __clear_processes(self):

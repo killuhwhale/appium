@@ -84,9 +84,9 @@ class BasePredictor:
             overrides (dict, optional): Configuration overrides. Defaults to None.
         """
         self.args = get_cfg(cfg, overrides)
-        project = self.args.project or Path(SETTINGS['runs_dir']) / self.args.task
-        name = self.args.name or f'{self.args.mode}'
-        self.save_dir = increment_path(Path(project) / name, exist_ok=self.args.exist_ok)
+        self.project = self.args.project or Path(SETTINGS['runs_dir']) / self.args.task
+        self.name = self.args.name or f'{self.args.mode}'
+        self.save_dir = increment_path(Path(self.project) / self.name, exist_ok=self.args.exist_ok)
         if self.args.conf is None:
             self.args.conf = 0.25  # default conf=0.25
         self.done_warmup = False
@@ -121,6 +121,7 @@ class BasePredictor:
 
     def __call__(self, source=None, model=None, stream=False):
         self.stream = stream
+        self.save_dir = increment_path(Path(self.project) / self.name, exist_ok=self.args.exist_ok)
         if stream:
             return self.stream_inference(source, model)
         else:
@@ -177,6 +178,7 @@ class BasePredictor:
             self.batch = batch
             path, im, im0s, vid_cap, s = batch
             visualize = increment_path(self.save_dir / Path(path).stem, mkdir=True) if self.args.visualize else False
+
 
             # preprocess
             with self.dt[0]:
@@ -263,7 +265,7 @@ class BasePredictor:
         im0 = self.annotator.result()
         # save imgs
         if self.dataset.mode == 'image':
-            cv2.imwrite(save_path, im0)
+            cv2.imwrite(f"{self.save_dir}/img.png", im0)
         else:  # 'video' or 'stream'
             if self.vid_path[idx] != save_path:  # new video
                 self.vid_path[idx] = save_path

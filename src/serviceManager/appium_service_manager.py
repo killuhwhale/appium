@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from subprocess import Popen
 import sys
 from typing import List
 from appium.webdriver.appium_service import AppiumService
@@ -9,15 +10,18 @@ from utils.utils import BASE_PORT
 class AppiumServiceItem:
     ip: str
     port: int
-    service: AppiumService
+    service: Popen
+
+    # def __del__(self):
+    #     self.service.stop()
 
 class AppiumServiceManager:
     '''
       Given list of ips, create a list of objects to group ip, port number and service.
 
-      Server(we/hub/4723) -> driver(4723) -> ip/device1
-      Server(we/hub/4724) -> driver(4724) -> ip/device2
-      Server(we/hub/4725) -> driver(4725) -> ip/device3
+      Server(wd/hub/4723) -> driver(4723) -> ip/device1
+      Server(wd/hub/4724) -> driver(4724) -> ip/device2
+      Server(wd/hub/4725) -> driver(4725) -> ip/device3
     '''
     def __init__(self, ips: List[str]):
         self.__ips = ips
@@ -53,19 +57,20 @@ class AppiumServiceManager:
                 port = self.__base_port + i
                 print(f"Starting service: {port=} for device at {ip=}")
                 service = AppiumService()
-                service.start(args=['--address', '0.0.0.0', '-p', str(port), '--base-path', '/wd/hub'])
+                process = service.start(args=['--address', '0.0.0.0', '-p', str(port), '--base-path', '/wd/hub'])
                 while not service.is_listening or not service.is_running:
                     print("Waiting for appium service to listen...")
 
-                self.services.append(AppiumServiceItem(ip, port, service))
+                self.services.append(AppiumServiceItem(ip, port, process))
             except Exception as error:
                 print("Error starting appium server", str(error))
                 return False
         return True
 
-    # def __del__(self):
-    #     for service in self.services:
-    #         try:
-    #             service.service.stop()
-    #         except Exception as e:
-    #             print("AppiumServiceManager ", e)
+    def stop(self):
+        for service in self.services:
+            try:
+                print("deleting server: ", service.service)
+                service.service.terminate()
+            except Exception as e:
+                print("AppiumServiceManager ", e)

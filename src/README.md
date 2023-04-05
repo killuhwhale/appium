@@ -88,6 +88,10 @@ Prep work for Chromebook:
 
 # TODOs
 
+    Bug:
+     - Bad_apps_list.tsv reports False in column for invalid even when it reports teh reason as invalid.
+
+
     - Write utility class to install an apk
         - We should be able to skip the installation step and install apk directly and continue like normal
         - Create/ Curate apks that will fails to demo/ test our process is working correctly for the errors we are trying to catch.
@@ -96,28 +100,9 @@ Prep work for Chromebook:
         - Messenger
             - Smart lock appear first... doest pick an account..
                 - Helios
-        - Duolingo
-            - Fails clicked on password? Coachz
-
-        - Messenger Kids
-            - Confirm button isnt detected....
-
-        - Free Fire and see if is_download in progress...
-            - Took too long to load
-
-        - Roblox
-            - Took too long Eve
-            - Didnt find Login field CoachZ
-
         - Wish
             - Failed, continue with accounts appear early..  Helios
 
-
-    - Detection: Instead of saving as file and reading as file
-        - It already gets the file as b64 in memory, lets just use that and pass that into the detector instead of by file.
-            - Should be ,much quicker
-            - Need to find out what types of sources we can use....
-                - ss as b64 -> png -> to file, read file -> .png -> detector
 
     - Record which log in method was used or to use, GAuth, FBAuth, email/pass
         - Figure out how to attempt multiple logins on each app.

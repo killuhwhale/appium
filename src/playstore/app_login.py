@@ -16,7 +16,7 @@ from utils.device_utils import Device
 from utils.logging_utils import get_color_printer, p_alert
 from utils.utils import (ADB_KEYCODE_ENTER, CONTINUE,
                          FACEBOOK_PACKAGE_NAME, FB_ATUH, GOOGLE_AUTH, LOGIN,
-                         PASSWORD, V8_WEIGHTS, WEIGHTS)
+                         PASSWORD, V8_WEIGHTS, WEIGHTS, save_resized_image)
 
 
 class ANRThrownException(Exception):
@@ -25,6 +25,14 @@ class ANRThrownException(Exception):
 class AppLogin:
     ''' Main class to validate a broken app. Discovers, installs, opens and
           logs in to apps.
+
+          After a few sample runs comparing v5 and v8, as well as getting SS as file vs in-mem PNG/ PIL Image, it seems
+          Yolo Version:
+            - v8 detections are better so far
+            - cant find any exmples yet as to whether or not resizing an image improves accuracy.
+          File types:
+            - the speed isnt much different
+
     '''
     def __init__(
             self,
@@ -130,11 +138,14 @@ class AppLogin:
             This image will be used as the source to detect our buttons and
                 fields.
         '''
+        start = perf_counter()
         root_path = get_root_path()
         try:
             self.__driver.get_screenshot_as_file(self.__test_img_fp)
             # png_bytes = self.__driver.get_screenshot_as_png()
             # save_resized_image(png_bytes, (1200,800), f"/{root_path}/notebooks/yolo_images/{self.__test_img_fp}")
+            end = perf_counter()
+            print(f"\n\n Getting image and resizing took (v5): {(end - start):.6f} \n\n")
             return self.__detector_v5.detect()
         except ScreenshotException as e:
             self.__dprint("App is scured!")
@@ -149,8 +160,14 @@ class AppLogin:
             Attempts to get SS of device as Pil Image and returns results for detection.
         '''
         try:
+            start = perf_counter()
             png_bytes = self.__driver.get_screenshot_as_png()
             src = Image.open(BytesIO(png_bytes))
+            # src.resize((640,640), resample=Image.NEAREST)
+            # src.resize((640,640))  # BICUBIC by default
+            # src.resize((640,640), resample=Image.LANCZOS)
+            end = perf_counter()
+            print(f"\n\n Getting image and resizing took: {(end - start):.6f}s \n\n")
             return self.__detector_v8.detect(src)
         except ScreenshotException as e:
             self.__dprint("App is scured!")
@@ -166,7 +183,7 @@ class AppLogin:
         else:
             res = self.__detect_v5()
         end = perf_counter()
-        self.__dprint(f"Detection took ({self.__using_v8=}): {(end - start):.6f}")
+        self.__dprint(f"\n\n Entire detection process took ({self.__using_v8=}): {(end - start):.6f}s \n\n")
         return res
 
     ##  Typing
@@ -239,6 +256,11 @@ class AppLogin:
         tapped = False
         detect_attempt = 0
         while not (CONTINUE_SUBMITTED and login_entered and password_entered) and detect_attempt < 3:
+            self.__dprint("App is game: ", is_game)
+            if is_game:
+                sleep(0.600)
+                self.__sleep_while_in_progress(app_package_name)
+
             self.__dprint(f"Current {results=}")
             if CONTINUE_SUBMITTED and login_entered and password_entered:
                 return True, True, True
@@ -282,11 +304,6 @@ class AppLogin:
                 results[CONTINUE], tapped = self.__click_button(results[CONTINUE])
                 del results[CONTINUE]
 
-                self.__dprint("App is game: ", is_game)
-                if is_game:
-                    sleep(0.600)
-                    self.__sleep_while_in_progress(app_package_name)
-
                 self.__dprint(f"Cont w/ login and password entered {login_entered=} {password_entered=}")
                 if login_entered and password_entered:
                     sleep(5)  # Wait for a possible login to happen
@@ -309,10 +326,6 @@ class AppLogin:
                 results = self.__detect()
                 if not len(results.keys()):
                     return False, login_entered, password_entered
-
-                if not self.__get_test_ss():
-                    return False, login_entered, password_entered
-                results = self.__detect()
 
             detect_attempt += 1
         return False, login_entered, password_entered
