@@ -101,7 +101,7 @@ if __name__ == "__main__":
     app_logger = AppLogger()
     tsv = AppListTSV()  # Create Globally
     TESTING_APPS = tsv.get_apps()
-    package_names = TESTING_APPS[0:1]
+    package_names = TESTING_APPS[60:]
 
 
     print("Creating driver...")
