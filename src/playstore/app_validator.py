@@ -166,7 +166,7 @@ class AppValidator:
             sleep(5)
             if self.__check_crash(app_package_name):
                 return
-
+        input("Check app for age slider")
         # self.__dev_SS_loop(app_package_name)
 
         # Now app is installed and launched...
