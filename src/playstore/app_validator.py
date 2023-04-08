@@ -3,6 +3,7 @@ from time import sleep
 from typing import List
 import __main__
 from appium.webdriver import Remote
+from appium.webdriver.common.appiumby import AppiumBy
 from playstore.app_installer import AppInstaller, AppInstallerResult
 from playstore.app_login import AppLogin
 from playstore.app_launcher import AppLauncher
@@ -54,6 +55,20 @@ class AppValidator:
             package_name = app_info[1]
             uninstall_app(package_name, self.__transport_id)
 
+    def __close_save_password_dialog(self):
+        '''
+            Checks for a Not now button.
+
+            We know a generic window show: mFocusedWindow=Window{81b9105 u0 android}
+             where 81b9105 changes ea time.
+        '''
+        try:
+            content_desc = f'''new UiSelector().className("android.widget.Button").text("Never")'''
+            self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
+        except Exception as error:
+            pass
+
+
     def __cleanup_run(self, app_package_name: str):
         self.__dprint(f"Cleaning up {app_package_name}")
         status_obj = self.__report.get_status_obj_by_app(app_package_name)
@@ -84,6 +99,9 @@ class AppValidator:
         close_app(app_package_name, self.__transport_id)
         if not CONFIG.skip_post_uninstall:
             uninstall_app(app_package_name, self.__transport_id)  # (save space)
+        # check to close Android diaglog asking to save password
+        self.__close_save_password_dialog()
+
         open_app(PLAYSTORE_PACKAGE_NAME, self.__transport_id, self.__device.info.arc_version)
         self.__driver.orientation = 'PORTRAIT'
 
@@ -131,7 +149,8 @@ class AppValidator:
             self.__dprint(f"{ans=}, {(not ans == 'q')}")
             if not (ans == 'q'):
                 self.__dprint("Taking SS")
-                self.__scrape_dev_test_image(package_name)
+                print(f"Current act: ", self.__driver.current_activity)
+                # self.__scrape_dev_test_image(package_name)
             else:
                 self.__dprint("Quit from SS")
 
@@ -166,7 +185,8 @@ class AppValidator:
             sleep(5)
             if self.__check_crash(app_package_name):
                 return
-        input("Check app for age slider")
+
+        # input("Check app for age slider")
         # self.__dev_SS_loop(app_package_name)
 
         # Now app is installed and launched...
@@ -175,15 +195,20 @@ class AppValidator:
             self.__report.update_app_info(app_package_name, info)
 
 
-            login_module = AppLogin(self.__driver, self.__device, self.__dprinter)
-            logged_in = login_module.login(app_title, app_package_name, info)
+            login_module = AppLogin(self.__driver, self.__device, self.__report, self.__dprinter)
+            # logged_in = login_module.login(app_title, app_package_name, info)
+            google_logged_in, facebook_logged_in, password_logged_in = login_module.login(app_title, app_package_name, info)
 
             if self.__check_crash(app_package_name):
                 return
 
+            print(f"{google_logged_in=} {facebook_logged_in=} {password_logged_in=}")
             self.__report.add_history(app_package_name,
-                "Logged in." if logged_in else "Not logged in.", self.__driver)
-            self.__report.update_status(app_package_name, ValidationReport.PASS, f"{logged_in=}")
+                "Logged in." if any([google_logged_in, facebook_logged_in, password_logged_in]) else "Not logged in.", self.__driver)
+            self.__report.update_status(app_package_name, ValidationReport.PASS, f"{google_logged_in=} {facebook_logged_in=} {password_logged_in=}")
+            # self.__report.add_history(app_package_name,
+            #     "Logged in." if logged_in else "Not logged in.", self.__driver)
+            # self.__report.update_status(app_package_name, ValidationReport.PASS, f"{logged_in=}")
 
     ##  Main Loop
     def run(self):

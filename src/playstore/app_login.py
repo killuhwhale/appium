@@ -6,12 +6,14 @@ import subprocess
 import traceback
 from time import perf_counter, sleep, time
 from typing import Dict, List
+from appium.webdriver.common.appiumby import AppiumBy
 from selenium.common.exceptions import (ScreenshotException,)
 from appium import webdriver
 from objdetector.objdetector import ObjDetector
 from objdetector.yolov8 import YoloV8
+from playstore.validation_report import ValidationReport
 from utils.accounts import ACCOUNTS
-from utils.app_utils import AppInfo, get_cur_activty, get_root_path, is_download_in_progress
+from utils.app_utils import AppInfo, clear_app, get_cur_activty, get_root_path, is_download_in_progress, open_app
 from utils.device_utils import Device
 from utils.logging_utils import get_color_printer, p_alert
 from utils.utils import (ADB_KEYCODE_ENTER, CONTINUE,
@@ -38,10 +40,13 @@ class AppLogin:
             self,
             driver: webdriver.Remote,
             device: Device,
+            report: ValidationReport,
             dprinter
         ):
         self.__driver = driver
         self.__device = device
+        self.__report = report
+
         self.__prev_act = None
         self.__cur_act = None
 
@@ -246,6 +251,232 @@ class AppLogin:
         # print(f"After {results=}")
 
 
+    def __handle_google_login(self, is_game: bool, app_package_name: str):
+        ''' Looks for Google Auth buttons and Continue buttons until reaching Google Auth button.
+
+            Clicks on account within GAuth dialogs.
+
+            Returns:
+                - True when Gauth is found and email is successfully clicked.
+        '''
+        GOOGLE_SUBMITTED = False
+        empty_retries = 2
+        attempts = 5
+
+        print("App is game: ", is_game)
+        if is_game:
+            sleep(5)
+            self.__sleep_while_in_progress(app_package_name)
+
+        while not GOOGLE_SUBMITTED and empty_retries >= 0 and attempts > 0:
+
+            # if self.__driver.current_activity == '.common.account.SimpleDialogAccountPickerActivity':
+            #     if app_package_name in ACCOUNTS:
+            #         login_val = ACCOUNTS[app_package_name][0]
+            #         content_desc = f'''new UiSelector().text("{login_val}")'''
+            #         self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
+            #         content_desc = f'''new UiSelector().className("android.widget.Button").text("OK")'''
+            #         self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
+            #         return True
+            # elif self.__driver.current_activity == '.games.ui.signinflow.SignInActivity':
+            #     if app_package_name in ACCOUNTS:
+            #         login_val = ACCOUNTS[app_package_name][0]
+            #         self.__driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value='Expand account list.').click()
+            #         content_desc = f'''new UiSelector().className("android.widget.TextView").text("{login_val}")'''
+            #         self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
+            #         self.__driver.find_element(by=AppiumBy.ID, value='continue_as_button').click()
+            #         sleep(5)
+
+            results: defaultdict = self.__detect()
+            self.__dprint(f"Results: ", results)
+            if not len(results.keys()):
+                empty_retries -= 1
+                sleep(5)
+                self.__sleep_while_in_progress(app_package_name)
+
+            elif GOOGLE_AUTH in results:
+                results[GOOGLE_AUTH], tapped = self.__click_button(results[GOOGLE_AUTH])
+                del results[GOOGLE_AUTH]
+                sleep(5)
+                if self.__driver.current_activity == '.common.account.AccountPickerActivity' and app_package_name in ACCOUNTS:
+                    login_val = ACCOUNTS[app_package_name][0]
+                    content_desc = f'''new UiSelector().text("{login_val}")'''
+                    self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
+                    self.__report.add_history(app_package_name, "Google Auth sign-in", self.__driver)
+                    GOOGLE_SUBMITTED = True
+                    return True
+                else:
+                    p_alert(f"Found Google Auth login but not associated account for {app_package_name=}")
+
+            elif CONTINUE in results:
+                print("Click Continue        <-------")
+                results[CONTINUE], tapped = self.__click_button(results[CONTINUE])
+                self.__clean_result(CONTINUE, results)
+
+                print("App is game: ", is_game)
+                if is_game:
+                    sleep(5)
+                    self.__sleep_while_in_progress(app_package_name)
+            attempts -= 1
+
+    def __handle_facebook_login(self, is_game: bool, app_package_name: str):
+        ''' Looks for Facebook Auth buttons and Continue buttons until reaching Facebook Auth button.
+
+            Clicks on account within FacebookAuth dialogs.
+
+            Returns:
+                - True when Facebook auth is found and email is successfully clicked.
+        '''
+        FACEBOOK_SUBMITTED = False
+        empty_retries = 2
+
+        print("App is game: ", is_game)
+        if is_game:
+            sleep(5)
+            self.__sleep_while_in_progress(app_package_name)
+
+        while not FACEBOOK_SUBMITTED and empty_retries >= 0:
+            input("Handling Facebook....")
+            # if self.__driver.current_activity == '.common.account.SimpleDialogAccountPickerActivity':
+            #     if app_package_name in ACCOUNTS:
+            #         login_val = ACCOUNTS[app_package_name][0]
+            #         content_desc = f'''new UiSelector().text("{login_val}")'''
+            #         self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
+            #         content_desc = f'''new UiSelector().className("android.widget.Button").text("OK")'''
+            #         self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
+            #         return True
+
+            # elif self.__driver.current_activity == '.games.ui.signinflow.SignInActivity':
+            #     if app_package_name in ACCOUNTS:
+            #         login_val = ACCOUNTS[app_package_name][0]
+            #         self.__driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value='Expand account list.').click()
+            #         content_desc = f'''new UiSelector().className("android.widget.TextView").text("{login_val}")'''
+            #         self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
+            #         self.__driver.find_element(by=AppiumBy.ID, value='continue_as_button').click()
+            #         sleep(5)
+
+            results: defaultdict = self.__detect()
+            self.__dprint(f"Results: ", results)
+            if not len(results.keys()):
+                empty_retries -= 1
+                sleep(5)
+                self.__sleep_while_in_progress(app_package_name)
+
+            elif FB_ATUH in results:
+                results[FB_ATUH], tapped = self.__click_button(results[FB_ATUH])
+                sleep(5) # Wait for FB Dialog to Appear..
+                if self.__driver.current_activity == '.gdp.ProxyAuthDialog':
+                    content_desc = f'''new UiSelector().className("android.widget.Button").text("Continue")'''
+                    self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
+
+                self.__report.add_history(app_package_name, "Facebook Auth sign-in", self.__driver)
+                del results[GOOGLE_AUTH]
+                return True
+
+
+            elif CONTINUE in results:
+                print("Click Continue        <-------")
+                results[CONTINUE], tapped = self.click_button(results[CONTINUE])
+                self.__clean_result(CONTINUE, results)
+
+                print("App is game: ", is_game)
+                if is_game:
+                    sleep(5)
+                    self.__sleep_while_in_progress(app_package_name)
+
+
+    def __attempt_click_continue(self):
+        '''
+            Attempts new detection and clicks a continue button.
+
+            Used to click 'save' when loggin into Facebook app.
+        '''
+        results: defaultdict = self.__detect()
+        if CONTINUE in results:
+            results[CONTINUE], tapped = self.__click_button(results[CONTINUE])
+            return True
+        return False
+
+    def __handle_password_login(self, is_game: bool,
+                              app_package_name: str):
+
+        login_entered = password_entered = False
+        CONTINUE_SUBMITTED = False
+        empty_retries = 5
+
+        print("App is game: ", is_game)
+        if is_game:
+            sleep(5)
+            self.__sleep_while_in_progress(app_package_name)
+
+        while not (CONTINUE_SUBMITTED and login_entered and password_entered) and empty_retries >= 0:
+            if CONTINUE_SUBMITTED and login_entered and password_entered:
+                return True, True, True
+
+            results: defaultdict = self.__detect()
+            self.__dprint(f"Results: ", results)
+            if not len(results.keys()):
+                empty_retries -= 1
+                sleep(2)
+                if empty_retries == 0:
+                    return False
+
+            elif LOGIN in results and not login_entered:
+                print("Click login        <-------")
+                results[LOGIN], tapped = self.__click_button(results[LOGIN])
+                del results[LOGIN]
+
+                if app_package_name in ACCOUNTS:
+                    login_val = ACCOUNTS[app_package_name][0]
+                    self.__send_keys_ADB(login_val, False, False)
+                    print(f"Send Login - {login_val}        <-------")
+
+                else:
+                    p_alert(f"Login info not created for {app_package_name} but found an email/password login")
+                login_entered = True
+
+            elif PASSWORD in results and not password_entered:
+                print("Click Password        <-------")
+                results[PASSWORD], tapped = self.__click_button(results[PASSWORD])
+                del results[PASSWORD]
+                if app_package_name in ACCOUNTS:
+                    pass_val = ACCOUNTS[app_package_name][1]
+                    self.__send_keys_ADB(f"{pass_val}\n", False, False)
+                    print(f"Send Password - {pass_val}       <-------")
+                    password_entered = True
+                else:
+                    p_alert(f"Password info not created for {app_package_name} but found an email/password login")
+                sleep(3)
+
+            elif CONTINUE in results:
+                print("Click Continue        <-------")
+                # input("Click Continue...")
+                results[CONTINUE], tapped = self.__click_button(results[CONTINUE])
+                self.__clean_result(CONTINUE, results)
+
+                print("App is game: ", is_game)
+                if is_game:
+                    sleep(5)
+                    self.__sleep_while_in_progress(app_package_name)
+
+                print(f"Cont w/ login and password entered {login_entered=} {password_entered=}")
+                if login_entered and password_entered:
+                    CONTINUE_SUBMITTED = True
+                    if app_package_name == FACEBOOK_PACKAGE_NAME:
+                        # Click one more contine button
+                        sleep(5)  # Wait for a possible login to happen
+                        fb_attempts = 3
+                        while not self.__attempt_click_continue() and fb_attempts > 0:
+                            fb_attempts -= 1
+                            sleep(1)
+
+                    sleep(5)  # Wait once more for app loading
+                    self.__report.add_history(app_package_name, "Email/ password sign-in", self.__driver)
+                    return True
+
+        return False
+
+    # Old
     def __handle_login(self, login_entered_init: bool, password_entered_init:bool, is_game: bool, app_package_name: str) -> bool:
         '''
             On a given page we will look at it and perform an action, if there is one .
@@ -278,6 +509,10 @@ class AppLogin:
                 self.__sleep_while_in_progress(app_package_name)
 
             self.__dprint(f"Current {results=}")
+
+
+
+
             if CONTINUE_SUBMITTED and login_entered and password_entered:
                 return True, True, True
 
@@ -344,7 +579,7 @@ class AppLogin:
 
             detect_attempt += 1
         return False, login_entered, password_entered
-
+    # Old
     def __attempt_login(self, app_title: str, app_package_name: str, is_game: bool):
         # We need to press the submit buttton on the screen following the login
         # in order to use Facebook as an auth app for other apps like games.
@@ -374,6 +609,31 @@ class AppLogin:
             login_attemps += 1
         return logged_in
 
+
+    def __attempt_logins(self, app_title:str, package_name: str, is_game: bool):
+        '''
+            Attempts 3 login methods: Google, Facebook and Email/Password.
+        '''
+        google_logged_in = facebook_logged_in = password_logged_in = False
+        try:
+            google_logged_in = self.__handle_google_login(is_game, package_name)
+        except Exception as error:
+            p_alert(error)
+        try:
+            clear_app(package_name, self.__device.info.transport_id)
+            open_app(package_name, self.__device.info.transport_id, self.__device.info.arc_version)
+            facebook_logged_in = self.__handle_facebook_login(is_game, package_name)
+        except Exception as error:
+            p_alert(error)
+        try:
+            clear_app(package_name, self.__device.info.transport_id)
+            open_app(package_name, self.__device.info.transport_id, self.__device.info.arc_version)
+            password_logged_in = self.__handle_password_login(is_game, package_name)
+        except Exception as error:
+            p_alert(error)
+
+        return [google_logged_in, facebook_logged_in, password_logged_in]
+
     ## PlayStore install discovery
     def login(self, app_title: str, app_package_name: str, app_info: AppInfo):
         ''' Attempts to log in to an app.
@@ -386,12 +646,12 @@ class AppLogin:
         '''
         try:
             sleep(3)
-            return self.__attempt_login(app_title, app_package_name, app_info.is_game)
-
+            return self.__attempt_logins(app_title, app_package_name, app_info.is_game)
+            # return self.__attempt_login(app_title, app_package_name, app_info.is_game)
         except Exception as error:
             p_alert(f"{self.__device.info.ip} - ", f"Error in login: {app_title} - {app_package_name}", error)
             traceback.print_exc()
-            return False
+        return [False, False, False]
 
 
 if __name__ == "__main__":

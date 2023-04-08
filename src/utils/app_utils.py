@@ -117,6 +117,11 @@ def dumpysys_activity(transport_id: str, ArcVersion: ArcVersions) -> str:
 def get_cur_activty(transport_id: str, ArcVersion: ArcVersions, package_name: str) -> Dict:
     ''' Gets the current activity running in the foreground.
 
+
+        Google Smart lock/ Save passwords to Google is problematic
+        text=mFocusedWindow=Window{81b9105 u0 android}
+
+
         ARC-P
             mResumedActivity: ActivityRecord{9588d06 u0 com.netflix.mediaclient/o.cwK t127}
         ARC-R
@@ -193,6 +198,7 @@ def open_app(package_name: str, transport_id: int, ArcVersion: ArcVersions = Arc
         while (not cur_package in packages and
             int(time() - t) < MAX_WAIT_FOR_OPEN_APP):
             try:
+
                 res = get_cur_activty(transport_id, ArcVersion, package_name)
                 cur_package = res['package_name']
             except Exception as err:
@@ -225,6 +231,21 @@ def close_app(package_name: str, transport_id: int):
         print("Error closing app ", err)
         return False
     return True
+
+def clear_app(package_name: str, transport_id: str):
+    ''' Clears an app's storage and cache data.
+            adb shell pm clear <package_name>
+    '''
+    try:
+        cmd = ('adb','-t', transport_id, 'shell', 'pm', 'clear', package_name)
+        outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+                                    capture_output=True).stdout.strip()
+        print(f"Clear app {outstr=}")
+        return True
+    except Exception as error:
+        print(f"Error clearing {package_name=}: {error}")
+    return False
+
 
 def is_package_installed(transport_id: str, package_name: str):
     ''' Checks if package is installed via ADB. '''
