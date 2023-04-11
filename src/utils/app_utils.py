@@ -5,8 +5,8 @@ import subprocess
 from typing import Dict, Union
 import __main__
 from time import sleep, time
+from appium.webdriver.common.appiumby import AppiumBy
 from utils.device_utils import ArcVersions
-from utils.logging_utils import get_color_printer
 from utils.utils import FACEBOOK_PACKAGE_NAME, file_exists
 
 
@@ -247,6 +247,32 @@ def clear_app(package_name: str, transport_id: str):
     return False
 
 
+def close_save_password_dialog(driver):
+        '''
+            Checks for a Not now button.
+
+            We know a generic window show: mFocusedWindow=Window{81b9105 u0 android}
+             where 81b9105 changes ea time.
+        '''
+        try:
+            content_desc = f'''new UiSelector().className("android.widget.Button").text("Never")'''
+            driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
+        except Exception as error:
+            print("Failed to click Never btn")
+
+        try:
+            content_desc = f'''new UiSelector().className("android.widget.Button").text("NOT NOW")'''
+            driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
+        except Exception as error:
+            print("Failed to click NOt NOW btn")
+
+        try:
+            content_desc = f'''new UiSelector().className("android.widget.Button").text("NO THANKS")'''
+            driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
+        except Exception as error:
+            print("Failed to click No Thanks")
+
+
 def is_package_installed(transport_id: str, package_name: str):
     ''' Checks if package is installed via ADB. '''
     # Call the adb shell pm list packages command
@@ -288,7 +314,10 @@ def get_views(transport_id: str):
         ).stdout.strip()
     print(f"Get_views {result=}")
 
+# app_info_pattern = r".*(?:name='[0-9a-zA-Z.]*')?.*(?:versionCode='[0-9a-zA-Z.]*')?.*(?:versionName='[0-9a-zA-Z.]*')?.*(?:compileSdkVersion='[0-9a-zA-Z.]*')?.*(?:compileSdkVersionCodename='[0-9a-zA-Z.]*')?.*(?:platformBuildVersionName='[0-9a-zA-Z.]*')?"
 
+app_info_pattern = r"(?P<name>name='[\s\w\.]*')?(?P<versionCode>versionCode='[\s\w]*')?(?P<versionName>versionName='[\s\w\.]*')?(?P<compileSdkVersion>compileSdkVersion='[\s\w]*')?(?P<compileSdkVersionCodename>compileSdkVersionCodename='[\s\w\d]*')?(?P<platformBuildVersionName>platformBuildVersionName='[\s\w0-9]*')?"
+app_info_re = re.compile(app_info_pattern)
 
 @dataclass(frozen=True)
 class AppData:
@@ -493,24 +522,23 @@ class AppInfo:
         '''
         if not manifest_text:
             return Dict()
-        info_line = manifest_text.split("\n")[0]
+        info_line = manifest_text.split("\n")[0][len("package: "):]
+        # package: name='com.netflix.mediaclient' versionCode='50352' versionName='8.56.0 build 12 50352' compileSdkVersion='33' compileSdkVersionCodename='13'
+        regex = r"(?P<name>name='[\s\w\.]*')?(?P<versionCode>versionCode='[\s\w]*')?(?P<versionName>versionName='[\s\w\.]*')?(?P<compileSdkVersion>compileSdkVersion='[\s\w]*')?(?P<compileSdkVersionCodename>compileSdkVersionCodename='[\s\w\d]*')?(?P<platformBuildVersionName>platformBuildVersionName='[\s\w0-9]*')?"
 
-        try:
-            parts = info_line.split(" ")[1: ]
-            for part in parts:
-                print(f"AppInfo: {part=}")
-                pieces = part.split("=")
-                pieces[1] = pieces[1].replace("'", "")
-                print(f"Pieces: {pieces=}")
-                # Add the app information that we are looking for
-                if pieces[0] in self.__info:
-                    self.__info[pieces[0]] = pieces[1]
-                else:
-                    # Skips adding additional information found to avoid an error
-                    # When creating AppData w/ extra keys/ keyword args....
-                    print(f"Found extra app info {part=}")
-        except Exception as error:
-            print("Error w/ __get_app_info: ", error)
+
+
+        matches = re.finditer(regex, info_line)
+
+        for matchNum, match in enumerate(matches, start=1):
+            if match.end() - match.start() == 0:
+                continue
+            print ("Match {matchNum} was found at {start}-{end}: {match}".format(matchNum = matchNum, start = match.start(), end = match.end(), match = match.group()))
+            pieces = match.group().replace("'", "").split("=")
+            self.__info[pieces[0]] = pieces[1]
+
+
+
         self.__info['is_pwa'] = self.__check_chromium_webapk(manifest_text)
         self.__info['is_game'] = self.__has_surface_name()
 

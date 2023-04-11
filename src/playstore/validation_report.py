@@ -3,6 +3,7 @@ from appium.webdriver import Remote
 from copy import deepcopy
 from typing import Dict, List
 import __main__
+from playstore.app_login import AppLoginResults
 from utils.app_utils import AppData, create_dir_if_not_exists, get_root_path
 from utils.device_utils import Device
 from utils.logging_utils import ( p_blue, p_cyan, p_green,
@@ -60,6 +61,12 @@ class ValidationReport:
             'history': [],
             'app_info': {},
             'logs': '',
+            'google_logged_in': '',  # Logged into app w/...
+            'facebook_logged_in': '',  # Logged into app w/...
+            'email_logged_in': '',  # Logged into app w/...
+            'has_google': '',  # Found w/ detection
+            'has_facebook': '',  # Found w/ detection
+            'has_email': '',  # Found w/ detection
         }
 
     def __init__(self, device: Device):
@@ -92,6 +99,13 @@ class ValidationReport:
         self.__report[self.__report_title][package_name]['reason'] = reason
         self.__report[self.__report_title][package_name]['new_name'] = new_name
         self.__report[self.__report_title][package_name]['invalid'] = invalid
+
+    def update_status_login(self, package_name: str, login_results: AppLoginResults):
+        ''' Updates app status to indicate if the app used a specificed login method or has a specific method. '''
+        for key, val in login_results.__dict__.items():
+            if val:
+                self.__report[self.__report_title][package_name][key] = val
+
 
     def add_history(self, package_name: str, history_msg: str, driver: Remote):
         full_path = ''
@@ -207,6 +221,24 @@ class ValidationReport:
         if len(status_obj['reason']) > 0:
             logger.print_log("\t", "Final status: ", end="")
             p_green( status_obj['reason']) if is_good else p_red( status_obj['reason'])
+
+        # Print Logged in status
+        logged_in_msg = [
+            "\tLogged in with: ",
+            f"Google, " if status_obj['google_logged_in'] else "",
+            f"Facebook, " if status_obj['facebook_logged_in'] else "",
+            f"Email " if status_obj['email_logged_in'] else ""
+        ]
+        p_cyan(" ".join(logged_in_msg))
+
+        log_in_methods = [
+            "\tDetected log in methods: ",
+            f"Google, " if status_obj['has_google'] else "",
+            f"Facebook, " if status_obj['has_facebook'] else "",
+            f"Email " if status_obj['has_email'] else "",
+        ]
+        p_purple(" ".join(log_in_methods))
+
 
         # Print History
         for hist in status_obj['history']:

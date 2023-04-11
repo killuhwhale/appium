@@ -3,12 +3,13 @@ from time import sleep
 from typing import List
 import __main__
 from appium.webdriver import Remote
-from appium.webdriver.common.appiumby import AppiumBy
+
 from playstore.app_installer import AppInstaller, AppInstallerResult
 from playstore.app_login import AppLogin
 from playstore.app_launcher import AppLauncher
+from playstore.app_login_results import AppLoginResults
 from playstore.validation_report import ValidationReport
-from utils.app_utils import AppInfo, close_app, get_cur_activty, get_views, open_app, uninstall_app
+from utils.app_utils import AppInfo, close_app, close_save_password_dialog, get_cur_activty, get_views, open_app, uninstall_app
 from utils.device_utils import Device
 from utils.error_utils import CrashTypes, ErrorDetector
 from utils.logging_utils import AppLogger, get_color_printer
@@ -55,18 +56,6 @@ class AppValidator:
             package_name = app_info[1]
             uninstall_app(package_name, self.__transport_id)
 
-    def __close_save_password_dialog(self):
-        '''
-            Checks for a Not now button.
-
-            We know a generic window show: mFocusedWindow=Window{81b9105 u0 android}
-             where 81b9105 changes ea time.
-        '''
-        try:
-            content_desc = f'''new UiSelector().className("android.widget.Button").text("Never")'''
-            self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
-        except Exception as error:
-            pass
 
 
     def __cleanup_run(self, app_package_name: str):
@@ -100,7 +89,7 @@ class AppValidator:
         if not CONFIG.skip_post_uninstall:
             uninstall_app(app_package_name, self.__transport_id)  # (save space)
         # check to close Android diaglog asking to save password
-        self.__close_save_password_dialog()
+        close_save_password_dialog(self.__driver)
 
         open_app(PLAYSTORE_PACKAGE_NAME, self.__transport_id, self.__device.info.arc_version)
         self.__driver.orientation = 'PORTRAIT'
@@ -137,6 +126,10 @@ class AppValidator:
             self.dev_ss_count += 1
         except Exception as error:
             self.__dprint("Error w/ dev ss: ", error)
+
+    def __update_report_logged_in_status(self, package_name: str, login_results: AppLoginResults):
+        print(f"Updating report with: {login_results.__dict__=}")
+        self.__report.update_status_login(package_name, login_results)
 
 
     def __dev_SS_loop(self, package_name: str):
@@ -192,23 +185,28 @@ class AppValidator:
         # Now app is installed and launched...
         if not CONFIG.skip_login:
             info = AppInfo(self.__transport_id, app_package_name, self.__dprinter).info()
+            print(f"{info=}")
             self.__report.update_app_info(app_package_name, info)
 
 
             login_module = AppLogin(self.__driver, self.__device, self.__report, self.__dprinter)
             # logged_in = login_module.login(app_title, app_package_name, info)
-            google_logged_in, facebook_logged_in, password_logged_in = login_module.login(app_title, app_package_name, info)
+            login_results: AppLoginResults = login_module.login(app_title, app_package_name, info)
+            print(f"{login_results.__dict__=}")
+            as_byte_num = login_results.to_byte()
+            print(f"{as_byte_num=}")
+            new_result_obj = AppLoginResults.from_byte(as_byte_num)
+            print(f"{new_result_obj.__dict__=}")
+
+
+
+            print(f"{login_results=}")
+            logged_in_msg = "Logged in." if any(login_results.__dict__.values()) else "Not logged in."
+            self.__report.update_status(app_package_name, ValidationReport.PASS, logged_in_msg)
+            self.__update_report_logged_in_status(app_package_name, login_results)
 
             if self.__check_crash(app_package_name):
                 return
-
-            print(f"{google_logged_in=} {facebook_logged_in=} {password_logged_in=}")
-            self.__report.add_history(app_package_name,
-                "Logged in." if any([google_logged_in, facebook_logged_in, password_logged_in]) else "Not logged in.", self.__driver)
-            self.__report.update_status(app_package_name, ValidationReport.PASS, f"{google_logged_in=} {facebook_logged_in=} {password_logged_in=}")
-            # self.__report.add_history(app_package_name,
-            #     "Logged in." if logged_in else "Not logged in.", self.__driver)
-            # self.__report.update_status(app_package_name, ValidationReport.PASS, f"{logged_in=}")
 
     ##  Main Loop
     def run(self):

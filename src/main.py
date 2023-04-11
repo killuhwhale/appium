@@ -46,9 +46,9 @@ if __name__ == "__main__":
     #         # '710KPMZ0409387',  # Device connected via USB (Pixel 2)
     #         # 'emulator-5554',
     #         # '192.168.1.128:5555', # Kevin ARM ARC-P          Blue,
-    #         # '192.168.1.125:5555',  # ARC-R Eve
+    #         '192.168.1.125:5555',  # ARC-R Eve
     #         # '192.168.1.248:5555', # Morphius AMD        ARC-R x86   Yellow,
-    #         '192.168.1.238:5555', # Helios   intel      ARC-R x86   RED,
+    #         # '192.168.1.238:5555', # Helios   intel      ARC-R x86   RED,
     #         # '192.168.1.149:5555', # Caroline intel      ARC-P x86   Green,
     #         # '192.168.1.113:5555', # CoachZ   snapdragon ARC-P ARM   Green,
     #         # '192.168.1.149:5555', # Careena  AMD        ARC-P x86   Green,
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     # # package_names = TESTING_APPS[start_idx: ]
 
     # # Dev, choose startin package by index.
-    # package_names = TESTING_APPS[55:]
+    # package_names = TESTING_APPS[3:10]
 
     # runner = MultiprocessTaskRunner(ips, package_names)
     # if args.clean:
@@ -87,10 +87,10 @@ if __name__ == "__main__":
     ##   Single Run
     ####################################
 
-    # ip = "192.168.1.113:5555"
+    ip = "192.168.1.113:5555"
     # ip = '192.168.1.149:5555'
     # ip = "192.168.1.125:5555"
-    ip = "192.168.1.238:5555"
+    # ip = "192.168.1.238:5555"
 
     service_manager = AppiumServiceManager([ip])
     if args.clean:
