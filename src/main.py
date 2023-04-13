@@ -27,6 +27,8 @@ from utils.logging_utils import AppListTSV, AppLogger
 from utils.parallel import MultiprocessTaskRunner
 from utils.utils import BASE_PORT, CONFIG, PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME, V8_WEIGHTS, WEIGHTS, android_des_caps, dev_scrape_start_at_app
 
+from pympler import asizeof
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="App validation.")
@@ -87,9 +89,9 @@ if __name__ == "__main__":
     ##   Single Run
     ####################################
 
-    ip = "192.168.1.113:5555"
+    # ip = "192.168.1.113:5555"
     # ip = '192.168.1.149:5555'
-    # ip = "192.168.1.125:5555"
+    ip = "192.168.1.125:5555"
     # ip = "192.168.1.238:5555"
 
     service_manager = AppiumServiceManager([ip])
@@ -134,6 +136,7 @@ if __name__ == "__main__":
         validator.uninstall_multiple()
     validator.run()
 
+    print(f"Sie of validation report dict: {(asizeof.asizeof(validator.report.report) / 1000.0):.2f} KB")
     validator.report.merge(fb_handle.validator.report)
     validator.report.print()
 

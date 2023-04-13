@@ -106,6 +106,14 @@ class ValidationReport:
             if val:
                 self.__report[self.__report_title][package_name][key] = val
 
+    def pop_win_death_after_successful_login(self):
+        ''' Removes Win Death from history.
+
+            When logging into the app multiple times, it is closed and reopened.
+            During this process oftentimes the app reports a win death.
+
+        '''
+        pass
 
     def add_history(self, package_name: str, history_msg: str, driver: Remote):
         full_path = ''

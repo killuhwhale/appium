@@ -1,3 +1,4 @@
+from pympler import asizeof
 from multiprocessing import Queue
 from time import sleep
 from typing import List
@@ -102,6 +103,9 @@ class AppValidator:
 
             Returns:
                 - True if a crash was detected.
+
+
+
         '''
         print("checkinbg for crash in app_val")
         errors = self.__err_detector.check_crash()
@@ -169,12 +173,18 @@ class AppValidator:
         if not CONFIG.skip_launch:
             launcher = AppLauncher(self.__device, self.__app_list_queue, self.__dprinter)
             app_did_open, new_app_name, invalid_app, reason  = launcher.check_open_app(app_title, app_package_name)
+            print(f"{app_did_open=} {new_app_name=} {invalid_app=} {reason=}")
             if new_app_name:
                 self.__report.add_history(app_package_name, reason, self.__driver)
                 return self.__process_app(new_app_name, app_package_name)
-            elif invalid_app or not app_did_open:
+            elif invalid_app:
                 self.__report.add_history(app_package_name, reason, self.__driver)
                 return self.__report.update_status(app_package_name, ValidationReport.FAIL, reason, '', invalid_app)
+            elif not app_did_open:
+                self.__check_crash(app_package_name)
+                self.__report.add_history(app_package_name, reason, self.__driver)
+                return self.__report.update_status(app_package_name, ValidationReport.FAIL, reason, '', invalid_app)
+
             sleep(5)
             if self.__check_crash(app_package_name):
                 return
@@ -188,9 +198,28 @@ class AppValidator:
             print(f"{info=}")
             self.__report.update_app_info(app_package_name, info)
 
+            '''
+                TODO()
+                Add error detector to App Login, we want to reset the log timer to where the logs start after we have cleared
+                  the app to avoid capturing false Win Deaths.
 
-            login_module = AppLogin(self.__driver, self.__device, self.__report, self.__dprinter)
-            # logged_in = login_module.login(app_title, app_package_name, info)
+                  1. Possibly Give AppLogin a ref to this classes ErrorDetector instance.
+                  2. We still want to check for errors during each login
+                    - We will need to report when we detect a crash....
+                    - We will want to break once we detect a crash on any login method.
+                    - how shouold we return the error?
+                    1. Return it by adding a new field to AppLoginResults()
+                        - Check results for error, if error, we call check__crash from here to update report and return
+
+
+                    So the idea is:
+                     we now check for error during ea login attempt.
+                     Once we find an error we return early with error_detected=True
+                     We then continue as normal. We just need to be able to reset the timer between each login_method attemp and return early when detecting an errror,
+                    So lets just pass in the ErrorDetector ref and update the logic in AppLogin to use this and return early. Thats it.
+
+            '''
+            login_module = AppLogin(self.__driver, self.__device, self.__report, self.__err_detector, self.__dprinter)
             login_results: AppLoginResults = login_module.login(app_title, app_package_name, info)
             print(f"{login_results.__dict__=}")
             as_byte_num = login_results.to_byte()
@@ -219,6 +248,7 @@ class AppValidator:
         '''
 
         self.__driver.orientation = 'PORTRAIT'
+        i = 0
         for app_title, app_package_name in self.__package_names:
             # q = ''
             # while q != 'q':
@@ -227,6 +257,8 @@ class AppValidator:
             #     get_cur_activty(self.__transport_id, self.__device.info.arc_version, app_package_name)
             # Allows for recursive call to retest an app.
             self.__process_app(app_title, app_package_name)
+            print(f"Size of validation report dict ({i}): {(asizeof.asizeof(self.__report.report) / 1000.0):.2f} KB")
+            i += 1
             self.__cleanup_run(app_package_name)
 
 if __name__ == "__main__":

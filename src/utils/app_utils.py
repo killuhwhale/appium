@@ -106,8 +106,7 @@ def dumpysys_activity(transport_id: str, ArcVersion: ArcVersions) -> str:
             keyword = "mResumedActivity"
         if ArcVersion == ArcVersions.ARC_R:
             keyword = "mFocusedWindow"
-        cmd = ('adb', '-t', transport_id, 'shell', 'dumpsys', 'activity',
-                '|', 'grep', keyword)
+        cmd = ('adb', '-t', transport_id, 'shell', 'dumpsys', 'activity', '|', 'grep', keyword)
         return subprocess.run(cmd, check=False, encoding='utf-8',
             capture_output=True).stdout.strip()
     except Exception as err:
@@ -223,7 +222,7 @@ def close_app(package_name: str, transport_id: int):
             # E Security-LocalReporter: category=InternalIntentScope, message=Access denied. com.facebook.katana cannot receive broadcasts from no_app_identity, cause=java.lang.SecurityException: Access denied. com.facebook.katana cannot receive broadcasts from no_app_identity
             cmd = ('adb', '-t', transport_id, 'shell', 'am', 'broadcast', "-a", "android.intent.action.ACTION_SHUTDOWN")  # throws erro and security exception
 
-        cmd = ('adb', '-t', transport_id, 'shell', 'am', 'force-stop', package_name)
+        cmd = ('adb', '-t', transport_id, 'shell', 'am', 'kill', package_name)
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
                                 capture_output=True).stdout.strip()
         print(f"Closed {package_name}...")
@@ -316,8 +315,6 @@ def get_views(transport_id: str):
 
 # app_info_pattern = r".*(?:name='[0-9a-zA-Z.]*')?.*(?:versionCode='[0-9a-zA-Z.]*')?.*(?:versionName='[0-9a-zA-Z.]*')?.*(?:compileSdkVersion='[0-9a-zA-Z.]*')?.*(?:compileSdkVersionCodename='[0-9a-zA-Z.]*')?.*(?:platformBuildVersionName='[0-9a-zA-Z.]*')?"
 
-app_info_pattern = r"(?P<name>name='[\s\w\.]*')?(?P<versionCode>versionCode='[\s\w]*')?(?P<versionName>versionName='[\s\w\.]*')?(?P<compileSdkVersion>compileSdkVersion='[\s\w]*')?(?P<compileSdkVersionCodename>compileSdkVersionCodename='[\s\w\d]*')?(?P<platformBuildVersionName>platformBuildVersionName='[\s\w0-9]*')?"
-app_info_re = re.compile(app_info_pattern)
 
 @dataclass(frozen=True)
 class AppData:
@@ -525,19 +522,13 @@ class AppInfo:
         info_line = manifest_text.split("\n")[0][len("package: "):]
         # package: name='com.netflix.mediaclient' versionCode='50352' versionName='8.56.0 build 12 50352' compileSdkVersion='33' compileSdkVersionCodename='13'
         regex = r"(?P<name>name='[\s\w\.]*')?(?P<versionCode>versionCode='[\s\w]*')?(?P<versionName>versionName='[\s\w\.]*')?(?P<compileSdkVersion>compileSdkVersion='[\s\w]*')?(?P<compileSdkVersionCodename>compileSdkVersionCodename='[\s\w\d]*')?(?P<platformBuildVersionName>platformBuildVersionName='[\s\w0-9]*')?"
-
-
-
         matches = re.finditer(regex, info_line)
-
         for matchNum, match in enumerate(matches, start=1):
             if match.end() - match.start() == 0:
                 continue
             print ("Match {matchNum} was found at {start}-{end}: {match}".format(matchNum = matchNum, start = match.start(), end = match.end(), match = match.group()))
             pieces = match.group().replace("'", "").split("=")
             self.__info[pieces[0]] = pieces[1]
-
-
 
         self.__info['is_pwa'] = self.__check_chromium_webapk(manifest_text)
         self.__info['is_game'] = self.__has_surface_name()

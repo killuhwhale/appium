@@ -213,7 +213,7 @@ class AppValidator:
 
             name_span_parent = soup.find('h1', {'itemprop': 'name'})
             name_span = name_span_parent.findChild('span')
-            self.__dprint(f"{name_span.text=}")
+            self.__dprint(f"__check_playstore_name {name_span.text=}")
             if name_span:
                 self.__name_span_text = name_span.text
                 return name_span.text
@@ -930,7 +930,7 @@ class AppValidator:
             INVALID_APP = True
             self.__app_list_queue.put(('invalid', package_name, app_title))
         elif not app_title == self.__check_playstore_name(package_name, app_title):
-            reason = f"[{app_title} !=  {self.__name_span_text}] {self.__misnamed_reason_text}"
+            reason = f"[{app_title} !=  {self.__name_span_text}(<- new name)] {self.__misnamed_reason_text}"
             NEW_APP_NAME = self.__name_span_text
             self.__app_list_queue.put(('misnamed', package_name, NEW_APP_NAME))
 

@@ -84,10 +84,13 @@ class ErrorDetector:
 
             We ideally need only the 10 lines surrounding the error.
         '''
+        if not type(match) is re.Match:
+            return
         line_len = 160 * 10  # Chars per line * num_lines
         start = match.start() - line_len if match.start() - line_len >= 0 else match.start()
         end = match.end() + line_len if match.end() + line_len < len(self.__logs) else match.end()
         self.__clean_logs.append(self.__logs[start: end])
+
 
     def __check_for_win_death(self):
         ''' Searches logs for WIN DEATH record.
@@ -168,6 +171,7 @@ class ErrorDetector:
             Returns:
                 A string representing the failing activity otherwise it returns an empty string.
         '''
+        print("\n\n Checking fatal exception... \n\n")
         ts_pattern = rf"^\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*"
         force_removed = rf"^\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*E AndroidRuntime: FATAL EXCEPTION.*\n.*{self.__package_name}.*\n.*\n.*$"
         force_removed_pattern = re.compile(force_removed, re.MULTILINE)
@@ -177,7 +181,7 @@ class ErrorDetector:
             self.__add_clean_logs(match)
             no_timestamp_string = re.sub(ts_pattern, "", match.group(0), flags=re.MULTILINE)
             failed_activity = 'Failed to open due to crash'
-            failed_msg =  '\t'.join(no_timestamp_string.split("E AndroidRuntime: ")).replace("\n", "").replace("\t\t", "\t").strip()
+            failed_msg =  ' ~ '.join(no_timestamp_string.split("E AndroidRuntime: ")).replace("\n", "").replace("\t", "").strip()
             return failed_activity, failed_msg
         return "", ""
 
@@ -191,7 +195,6 @@ class ErrorDetector:
 
             Return:
                 A string representing the failing activity otherwise it returns an empty string.
-
         '''
         try:
             self.__get_logs()
@@ -203,28 +206,23 @@ class ErrorDetector:
             errors = dict()
             failed_act, match = self.__check_fatal_exception()
             if failed_act:
-                self.__add_clean_logs(match)
                 errors[CrashTypes.FATAL_EXCEPTION] = (CrashTypes.FATAL_EXCEPTION, failed_act, match, )
-                # return (CrashTypes.FATAL_EXCEPTION, failed_act, match)
 
             failed_act, match = self.__check_for_win_death()
             if failed_act:
                 errors[CrashTypes.WIN_DEATH] = (CrashTypes.WIN_DEATH, failed_act, match, )
-                # return (CrashTypes.WIN_DEATH, failed_act, match)
 
             failed_act, match = self.__check_force_remove_record()
             if failed_act:
                 errors[CrashTypes.WIN_DEATH] = (CrashTypes.WIN_DEATH, failed_act, match, )
-                # return (CrashTypes.WIN_DEATH, failed_act, match)
 
             failed_act, match = self.__check_f_debug_crash()
             if match:
                 errors[CrashTypes.FDEBUG_CRASH] = (CrashTypes.FDEBUG_CRASH, failed_act, match, )
-                # return (CrashTypes.FDEBUG_CRASH, failed_act, match)
 
             if self.__check_for_ANR():
                 errors[CrashTypes.ANR] = (CrashTypes.ANR, "unknown activity", "ANR detected.", )
-                # return (CrashTypes.ANR, "unknown activity", "ANR detected.")
+
             if len(errors.keys()):
                 return errors
         except Exception as error:

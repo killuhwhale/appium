@@ -36,14 +36,20 @@ Prep work for Chromebook:
     - cannot interact with PWAs.
 5. Can Detect if an app is a game.
 5. Open app and detect crashing upon opening.
-6. Attempt login using Object Detection via YOLOv5
+6. Attempt login using Object Detection via YOLOv8
 7. Detect if app was logged in
     - if we are able to send username/ password or click on Google/ Facebook sign in without subsequent crash.
 8. Log reports to file.
-    - misnamed apps, invalid apps and failed apps
-9. Update misnamed apps
+    - invalid apps, failed apps, passed apps, stats of apps, summary
+9. Updates misnamed apps in app list
 10. History report for each app w/ screenshots at ea step.
+    - Includes:
+        - App Install success/ failure
+        - App Launch success/ failure
+        - App Login success/ failure
+        - App Errors
 11. Summary report of all apps from each device.
+12. Detects 3 types of login methods and attempts to login to each: Google, Facebook, Email
 
 # What we need to do but cant yet
 1. Detect if an app is O4C
@@ -84,18 +90,21 @@ Prep work for Chromebook:
 
 
 # TODOs
-    - Write utility class to install an apk
-        - We should be able to skip the installation step and install apk directly and continue like normal
-        - Create/ Curate apks that will fails to demo/ test our process is working correctly for the errors we are trying to catch.
 
-    - @Ecox() Record which log in method was used or to use, GAuth, FBAuth, email/pass
-        - Figure out how to attempt multiple logins on each app.
-            - After Installed, perform a cycle check until we find login field or GAuth or FBAuth
-                - Depending on what we find, we will attempt those methods.
-                - So we start with a general search with only Continue buttons until we find a SS w/ a login method.
-                    - If multiple methods, cycle through ea method
-                    - If one method just try that one.
-                - Then we can report which methods were tried and their status
+    Size of report:
+        1 item: 7.89 KB
+        Size of validation report dict (5): 27.77 KB
+        Size of validation report dict (6): 29.59 KB
+        Size of validation report dict (7): 32.03 KB
+
+
+    - Apps to scrape:
+        - Duolingo:
+            - Eve
+                - Facebook icon
+                - Google Auth email selection
+            - Helios
+            - CoachZ
 
     - Improve model
         -1. Explore Age verification
