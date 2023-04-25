@@ -4,6 +4,7 @@ from time import sleep
 from typing import List
 import __main__
 from appium.webdriver import Remote
+from appium.webdriver.common.appiumby import AppiumBy
 
 from playstore.app_installer import AppInstaller, AppInstallerResult
 from playstore.app_login import AppLogin
@@ -92,7 +93,7 @@ class AppValidator:
         # check to close Android diaglog asking to save password
         close_save_password_dialog(self.__driver)
 
-        open_app(PLAYSTORE_PACKAGE_NAME, self.__transport_id, self.__device.info.arc_version)
+        open_app(PLAYSTORE_PACKAGE_NAME, self.__transport_id, self.__driver, self.__device.info.arc_version)
         self.__driver.orientation = 'PORTRAIT'
 
     def __check_crash(self, package_name: str) -> bool:
@@ -171,7 +172,7 @@ class AppValidator:
 
         # Lauch App
         if not CONFIG.skip_launch:
-            launcher = AppLauncher(self.__device, self.__app_list_queue, self.__dprinter)
+            launcher = AppLauncher(self.__device, self.__driver, self.__app_list_queue, self.__dprinter)
             app_did_open, new_app_name, invalid_app, reason  = launcher.check_open_app(app_title, app_package_name)
             print(f"{app_did_open=} {new_app_name=} {invalid_app=} {reason=}")
             if new_app_name:
@@ -184,6 +185,7 @@ class AppValidator:
                 self.__check_crash(app_package_name)
                 self.__report.add_history(app_package_name, reason, self.__driver)
                 return self.__report.update_status(app_package_name, ValidationReport.FAIL, reason, '', invalid_app)
+
 
             sleep(5)
             if self.__check_crash(app_package_name):
@@ -198,27 +200,6 @@ class AppValidator:
             print(f"{info=}")
             self.__report.update_app_info(app_package_name, info)
 
-            '''
-                TODO()
-                Add error detector to App Login, we want to reset the log timer to where the logs start after we have cleared
-                  the app to avoid capturing false Win Deaths.
-
-                  1. Possibly Give AppLogin a ref to this classes ErrorDetector instance.
-                  2. We still want to check for errors during each login
-                    - We will need to report when we detect a crash....
-                    - We will want to break once we detect a crash on any login method.
-                    - how shouold we return the error?
-                    1. Return it by adding a new field to AppLoginResults()
-                        - Check results for error, if error, we call check__crash from here to update report and return
-
-
-                    So the idea is:
-                     we now check for error during ea login attempt.
-                     Once we find an error we return early with error_detected=True
-                     We then continue as normal. We just need to be able to reset the timer between each login_method attemp and return early when detecting an errror,
-                    So lets just pass in the ErrorDetector ref and update the logic in AppLogin to use this and return early. Thats it.
-
-            '''
             login_module = AppLogin(self.__driver, self.__device, self.__report, self.__err_detector, self.__dprinter)
             login_results: AppLoginResults = login_module.login(app_title, app_package_name, info)
             print(f"{login_results.__dict__=}")
@@ -230,7 +211,7 @@ class AppValidator:
 
 
             print(f"{login_results=}")
-            logged_in_msg = "Logged in." if any(login_results.__dict__.values()) else "Not logged in."
+            logged_in_msg = "Logged in." if any(list(login_results.__dict__.values())[::2]) else "Not logged in."
             self.__report.update_status(app_package_name, ValidationReport.PASS, logged_in_msg)
             self.__update_report_logged_in_status(app_package_name, login_results)
 
@@ -250,11 +231,6 @@ class AppValidator:
         self.__driver.orientation = 'PORTRAIT'
         i = 0
         for app_title, app_package_name in self.__package_names:
-            # q = ''
-            # while q != 'q':
-            #     q = input("Get act")
-            #     print(get_views(self.__transport_id))
-            #     get_cur_activty(self.__transport_id, self.__device.info.arc_version, app_package_name)
             # Allows for recursive call to retest an app.
             self.__process_app(app_title, app_package_name)
             print(f"Size of validation report dict ({i}): {(asizeof.asizeof(self.__report.report) / 1000.0):.2f} KB")

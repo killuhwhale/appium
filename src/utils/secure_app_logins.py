@@ -55,11 +55,11 @@ def login_netflix(driver: Remote, email: str, password: str) -> bool:
         driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
         sleep(3)
         close_save_password_dialog(driver)
-        return AppLoginResults(False, False, False, False, True, True)
+        return AppLoginResults(email_logged_in=True, has_email=True)
     except Exception as error:
         print("Eroor signing into netflix...", error)
 
-    return AppLoginResults(False, False, False, False, False, False)
+    return AppLoginResults()
 
 
 SECURE_APPS = {

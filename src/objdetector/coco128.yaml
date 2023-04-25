@@ -27,7 +27,7 @@ names:
   1: Continue
   2: FBAuth
   3: GoogleAuth
-  4: Two
-  5: code
+  4: Slider
+  5: Two
   6: loginfield
   7: passwordfield

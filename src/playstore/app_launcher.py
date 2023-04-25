@@ -1,3 +1,4 @@
+from appium.webdriver import Remote
 from multiprocessing import Queue
 from time import sleep
 import __main__
@@ -15,6 +16,7 @@ class AppLauncher:
     def __init__(
             self,
             device: Device,
+            driver: Remote,
             app_list_queue: Queue,
             dprinter
 
@@ -22,6 +24,7 @@ class AppLauncher:
         self.__app_list_queue = app_list_queue
         self.__device = device.info
         self.__transport_id = self.__device.transport_id
+        self.__driver = driver
         self.__arc_version = self.__device.arc_version
         self.__name_span_text = ''
         self.__misnamed_reason_text = "App name does not match the current name on the playstore."
@@ -92,7 +95,7 @@ class AppLauncher:
         return NEW_APP_NAME, INVALID_APP, reason
 
     def check_open_app(self, app_title: str, package_name: str):
-        if not open_app(package_name, self.__transport_id, self.__arc_version):
+        if not open_app(package_name, self.__transport_id, self.__driver, self.__arc_version):
             new_app_name, invalid_app, reason = self.__handle_failed_open_app(package_name, app_title, "Failed to open")
             return [False, new_app_name, invalid_app, reason]
         sleep(5)

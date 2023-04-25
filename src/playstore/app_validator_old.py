@@ -432,7 +432,7 @@ class AppValidator:
         self.__cur_act = None
         close_app(app_package_name, self.__transport_id)
         self.__uninstall_app(app_package_name)  # (save space)
-        open_app(PLAYSTORE_PACKAGE_NAME, self.__transport_id, self.__arc_version)
+        open_app(PLAYSTORE_PACKAGE_NAME, self.__transport_id, self.__driver, self.__arc_version)
         self.__driver.orientation = 'PORTRAIT'
         self.__name_span_text = ''  # reset misnamed app's new name
 
@@ -965,7 +965,7 @@ class AppValidator:
                 self.__cleanup_run(app_package_name)
                 return
 
-            if not open_app(app_package_name, self.__transport_id, self.__arc_version):
+            if not open_app(app_package_name, self.__transport_id, self.__driver, self.__arc_version):
                 reason = self.__handle_failed_open_app(app_package_name, app_title, "Failed to open")
                 if self.__misnamed_reason_text in reason:
                     # Retry app again

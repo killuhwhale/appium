@@ -38,7 +38,7 @@ class _CONFIG:
     skip_install = False # App_validator allow to skip this step
     skip_launch = False # App_validator allow to skip this step
     skip_login = False # App_validator allow to skip this step
-    skip_post_uninstall = False  #Skips post process uninstalltion of the app just tested.
+    skip_post_uninstall = True  #Skips post process uninstalltion of the app just tested.
 
 CONFIG = _CONFIG()
 BASE_PORT = 4723
@@ -47,11 +47,22 @@ weights = 'notebooks/yolov5/runs/train/exp007/weights/best_309.pt'
 weights = 'notebooks/yolov5/runs/train/exp4/weights/best.pt'  # Lastest RoboFlow Model V1
 weights = 'notebooks/yolov5/runs/train/exp6/weights/best.pt'  # Lastest RoboFlow Model V2
 weights = 'notebooks/yolov5/runs/train/exp7/weights/best.pt'  # Lastest RoboFlow Model V3
-WEIGHTS = 'notebooks/yolov5/runs/train/exp8/weights/best.pt'  # Lastest RoboFlow Model V4
+weights = 'notebooks/yolov5/runs/train/exp8/weights/best.pt'  # Lastest RoboFlow Model V4
 WEIGHTS = 'notebooks/yolov5/runs/train/exp10/weights/best.pt'  # Lastest RoboFlow Model V5
-V8_WEIGHTS = 'objdetector/weights/best_v5.pt'  # Lastest RoboFlow Model V5 dataset, yolov8 trained.
+v8_weights = 'objdetector/weights/best_v5.pt'  # Lastest RoboFlow Model V5 dataset, yolov8 trained.
+v8_weights = 'objdetector/weights/best_v5_m.pt'  # Lastest RoboFlow Model V5 dataset, yolov8 trained on medium 	640	50.2	234.7	1.83	25.9	78.9.
+v8_weights = 'objdetector/weights/best_v8m_v6d.pt'  # Lastest RoboFlow Model V6 dataset, yolov8 medium trained this was the same as v5, no new images were added by mistake..
+v8_weights = 'objdetector/weights/best_v8m_v7.pt'  # Lastest RoboFlow Model V7 dataset, yolov8 medium trained. (missing some FB labels, started failing on login/password for Duolingo when it was previously working well with 90%+ confidence)
+v8_weights = 'objdetector/weights/best_v8m_v8.pt'  # Lastest RoboFlow Model V8 dataset
+v8_weights = 'objdetector/weights/best_v8n_v8.pt'  # Lastest RoboFlow Model V8 dataset
+V8_WEIGHTS = 'objdetector/weights/best_1080_v8m_v1.pt'  # yolo_1080 - all source images were resized to 1920x1080. Then they were relabed. Trained yolov8 Medium v1
+V8_WEIGHTS = 'objdetector/weights/last.pt'  # yolo_1080 - all source images were resized to 1920x1080. Then they were relabed. Trained yolov8 Medium v1
+V8_WEIGHTS = 'objdetector/weights/best_1080_v8m_v2.pt'  # yolo_1080 - all source images were resized to 1920x1080. Then they were relabed. Trained yolov8 Medium v1
+V8_WEIGHTS = 'objdetector/weights/best_1080_fixedlabels_20epcohs.pt'  # yolo_1080 - all source images were resized to 1920x1080. Then they were relabed. Trained yolov8 Medium v1
+V8_WEIGHTS = 'objdetector/weights/best_1080_ v8m_v2_fixedlabels.pt'  # yolo_1080 - all source images were resized to 1920x1080. Then they were relabed. Trained yolov8 Medium v1
+V8_WEIGHTS = 'objdetector/weights/best_1080_v8m_v3.pt'  # yolo_1080 - all source images were resized to 1920x1080. Then they were relabed. Trained yolov8 Medium v1
+
 # https://docs.ultralytics.com/tasks/detect/?h=model
-V8_WEIGHTS = 'objdetector/weights/best_v5_m.pt'  # Lastest RoboFlow Model V5 dataset, yolov8 trained on medium 	640	50.2	234.7	1.83	25.9	78.9.
 
 PLAYSTORE_PACKAGE_NAME = "com.android.vending"
 PLAYSTORE_MAIN_ACT = "com.google.android.finsky.activities.MainActivity"
@@ -147,9 +158,6 @@ def transform_coord_from_resized(original_size: Tuple, resized_to: Tuple, resize
 def save_resized_image(image_bytes: bytes, new_size: Tuple, output_path: str):
     """
     Resize the input PNG image bytes to the given size using OpenCV2 and save it as a PNG file.
-
-    TODO() Need to transform coordinates now....
-
 
     Args:
         image_bytes: The input PNG image as bytes.

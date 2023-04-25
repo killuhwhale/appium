@@ -12,3 +12,14 @@ src/appium/
 src/apks/
 src/latest_report.txt
 src/accounts.json
+src/objdetector/yolo_images/*
+src/runner.py
+src/yolov8l.pt
+src/yolov8m.pt
+src/yolov8x.pt
+src/objdetector/weights/*
+src/notebooks/yolo_images/*
+src/images/history/*
+runs/*
+src/notebooks/.ipynb_checkpoints/*
+etc/*

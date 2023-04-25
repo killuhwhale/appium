@@ -67,7 +67,7 @@ if __name__ == "__main__":
     # # package_names = TESTING_APPS[start_idx: ]
 
     # # Dev, choose startin package by index.
-    # package_names = TESTING_APPS[3:10]
+    # package_names = TESTING_APPS
 
     # runner = MultiprocessTaskRunner(ips, package_names)
     # if args.clean:
@@ -91,8 +91,9 @@ if __name__ == "__main__":
 
     # ip = "192.168.1.113:5555"
     # ip = '192.168.1.149:5555'
-    ip = "192.168.1.125:5555"
+    # ip = "192.168.1.125:5555"
     # ip = "192.168.1.238:5555"
+    ip = "192.168.1.149:5555"
 
     service_manager = AppiumServiceManager([ip])
     if args.clean:
@@ -103,7 +104,8 @@ if __name__ == "__main__":
     app_logger = AppLogger()
     tsv = AppListTSV()  # Create Globally
     TESTING_APPS = tsv.get_apps()
-    package_names = TESTING_APPS[:1]
+
+    package_names = TESTING_APPS
 
 
     print("Creating driver...")
@@ -115,9 +117,17 @@ if __name__ == "__main__":
             PLAYSTORE_MAIN_ACT
         )
     )
-
     driver.implicitly_wait(5)
     driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
+
+    # from appium.webdriver.common.appiumby import AppiumBy
+    # q = ""
+    # while q != "q":
+    #     q = input("Get a session")
+    #     print(f"{driver.current_activity=}")
+        # text = "NONE OF THE ABOVE"
+        # content_desc = f'''new UiSelector().className("android.widget.Button").text("{text}")'''
+        # driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
 
     fb_handle = FacebookApp(driver, app_logger,  device, BASE_PORT, Queue(),)
     fb_handle.install_and_login()
@@ -139,4 +149,5 @@ if __name__ == "__main__":
     print(f"Sie of validation report dict: {(asizeof.asizeof(validator.report.report) / 1000.0):.2f} KB")
     validator.report.merge(fb_handle.validator.report)
     validator.report.print()
+
 

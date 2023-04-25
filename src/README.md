@@ -91,28 +91,85 @@ Prep work for Chromebook:
 
 # TODOs
 
+    - Free Fire failed to detect Facebook (most likely download took to long)
+        - Try to detect Free Fire download via adb
+    - Messenger Kids - Failed to click/recognize 'Authorize device" as continue btn to finish logging in.
+        - Scraped, need to add to dataset.
+
+    - Facebook takes like 43 seconds to open when trying to login with email/password which made the login attempts run out while wainting for FB....
+        - Check to see if we can see any loading activity from ADB.
+
+     - Explore  OCR on bounding boxes for continue to see what button we have.
+        - We can then decided which order or what not to click based on the text of the button.
+
+
+
+    Raw Image sizes from device SS:
+        - W x H
+        - 2400 x 1600 Eve
+        - 1920 x 1080 Helios
+        - 2700 x 1800 CoachZ
+        - 2160, 1440 (Ethan eve?)
+
+
+        ____________________
+        ________________|  |
+        _____________|  |  |
+                     |  |  |
+        HElios    -->|  |  |
+        Eve       -->-->|  |
+        CoachZ    -->-->-->|
+
+
+
     Size of report:
+        ~ 5kB per app - 1000 apps -> 5mB
         1 item: 7.89 KB
         Size of validation report dict (5): 27.77 KB
         Size of validation report dict (6): 29.59 KB
         Size of validation report dict (7): 32.03 KB
 
 
-    - Apps to scrape:
-        - Duolingo:
-            - Eve
-                - Facebook icon
-                - Google Auth email selection
-            - Helios
-            - CoachZ
+    - Test demo list with new model.
+        - Free fire should work,
+        - Facebook on Duolingo should work
 
     - Improve model
+        - Slider label added,
+            - Train on new dataset
+            - Update program to use new model
+            - Add to login methods, AppLogin
+                - If game, look for age and sliders...
+                - Separate login_methoid so to speak
+                    - It is more of an exploration on games to get them to load even if they dont have a login...
+
         -1. Explore Age verification
-            - input age or slider
-            - we are detecting "2" for num pads
-            - WE WILL NEED TO detect slider age bars.
-                - click in center of view
             - Empty form fields to type age will probably be the trickiest...
+
+
+
+
+
+
+ Make Money: Play & Earn Cash   us.current.android   PASSED   - [eve_192.168.1.125:5555]
+ AppData(name='us.current.android', versionCode='647', versionName='1.177.1', compileSdkVersion='33', compileSdkVersionCodename='13', platformBuildVersionName='', is_pwa=False, is_game=False)
+         Final status:   Logged in.
+         Logged in with: Google, Email
+         Detected log in methods: Google, Email
+         App install successfull.
+                 Img: /home/killuh/ws_p38/appium/src/images/history/192.168.1.125:5555/us.current.android/0.png
+         Google Auth sign-in
+                 Img: /home/killuh/ws_p38/appium/src/images/history/192.168.1.125:5555/us.current.android/1.png
+         Email/ password sign-in
+                 Img: /home/killuh/ws_p38/appium/src/images/history/192.168.1.125:5555/us.current.android/2.png
+
+
+
+
+
+
+
+
 
 
 

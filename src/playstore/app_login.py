@@ -15,14 +15,14 @@ from objdetector.yolov8 import YoloV8
 from playstore.app_login_results import AppLoginResults
 from playstore.validation_report import ValidationReport
 from utils.accounts import ACCOUNTS
-from utils.app_utils import AppInfo, clear_app, close_app, get_cur_activty, get_root_path, is_download_in_progress, open_app
+from utils.app_utils import AppInfo, check_and_close_smartlock, clear_app, close_app, get_cur_activty, get_root_path, is_download_in_progress, open_app
 from utils.device_utils import Device
 from utils.error_utils import CrashTypes, ErrorDetector
 from utils.logging_utils import get_color_printer, p_alert
 from utils.secure_app_logins import SECURE_APPS
 from utils.utils import (ADB_KEYCODE_ENTER, CONTINUE,
                          FACEBOOK_PACKAGE_NAME, FB_ATUH, GOOGLE_AUTH, LOGIN,
-                         PASSWORD, V8_WEIGHTS, WEIGHTS, save_resized_image)
+                         PASSWORD, V8_WEIGHTS, WEIGHTS, save_resized_image, transform_coord_from_resized)
 
 
 class ANRThrownException(Exception):
@@ -114,12 +114,12 @@ class AppLogin:
         x = (btn[0][0] + btn[1][0]) / 2
         y = (btn[0][1] + btn[1][1]) / 2
 
-        # coords = transform_coord_from_resized(
-        #     (self.__device['wxh']),
-        #     (1200, 800),
-        #     (int(x), int(y))
-        # )
-        # return str(int(coords[0])), str(int(coords[1]))
+        coords = transform_coord_from_resized(
+            (self.__device.info.wxh),
+            (1920, 1080),
+            (int(x), int(y))
+        )
+        return str(int(coords[0])), str(int(coords[1]))
         return str(int(x)), str(int(y))
 
     def __click_button(self, btns: List) -> List:
@@ -175,11 +175,13 @@ class AppLogin:
             png_bytes = self.__driver.get_screenshot_as_png()
             src = Image.open(BytesIO(png_bytes))
             # src.resize((640,640), resample=Image.NEAREST)
-            # src.resize((640,640))  # BICUBIC by default
+            # resized = src.resize((640,640))  # BICUBIC by default
+            resized = src.resize((1920,1080), resample=Image.BILINEAR)  # letterbox mimic like Roboflow
+            # resized_final = resized.resize((640,640), resample=Image.BILINEAR)  # letterbox mimic like Roboflow
             # src.resize((640,640), resample=Image.LANCZOS)
             end = perf_counter()
             print(f"\n\n Getting image and resizing took: {(end - start):.6f}s \n\n")
-            return self.__detector_v8.detect(src)
+            return self.__detector_v8.detect(resized)
         except ScreenshotException as e:
             self.__dprint("App is scured!")
         except Exception as e:
@@ -256,6 +258,18 @@ class AppLogin:
             del results[key]
         # print(f"After {results=}")
 
+    def __attempt_click_continue(self):
+        '''
+            Attempts new detection and clicks a continue button.
+
+            Used to click 'save' when loggin into Facebook app.
+        '''
+        results: defaultdict = self.__detect()
+        if CONTINUE in results:
+            results[CONTINUE], tapped = self.__click_button(results[CONTINUE])
+            return True
+        return False
+
 
     def __handle_google_login(self, is_game: bool, app_package_name: str) -> List[bool]:
         ''' Looks for Google Auth buttons and Continue buttons until reaching Google Auth button.
@@ -269,7 +283,6 @@ class AppLogin:
         has_google = False
         empty_retries = 2
         attempts = 3
-
         print("App is game: ", is_game)
         if is_game:
             sleep(5)
@@ -277,6 +290,7 @@ class AppLogin:
 
         while not GOOGLE_SUBMITTED and empty_retries >= 0 and attempts > 0:
             attempts -= 1
+            check_and_close_smartlock(self.__driver)
             # if self.__driver.current_activity == '.common.account.SimpleDialogAccountPickerActivity':
             #     if app_package_name in ACCOUNTS:
             #         login_val = ACCOUNTS[app_package_name][0]
@@ -306,6 +320,8 @@ class AppLogin:
                 has_google = True
                 del results[GOOGLE_AUTH]
                 sleep(5)
+                print("Current GAuth act: ", self.__driver.current_activity)
+                print(f"{(app_package_name in ACCOUNTS)=}")
                 if self.__driver.current_activity == '.common.account.AccountPickerActivity' and app_package_name in ACCOUNTS:
                     login_val = ACCOUNTS[app_package_name][0]
 
@@ -314,9 +330,10 @@ class AppLogin:
                     self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
                     self.__report.add_history(app_package_name, "Google Auth sign-in", self.__driver)
                     GOOGLE_SUBMITTED = True
+                    self.__dprint("Logged in Google!")
                     return True, has_google
                 else:
-                    p_alert(f"Found Google Auth login but not associated account for {app_package_name=}")
+                    p_alert(f"{self.__device.info.ip} - Found Google Auth login but not associated account for {app_package_name=} {(app_package_name in ACCOUNTS)=} or perhaps wrong actiity showing, which we need to extend overage... {self.__driver.current_activity=}")
 
             elif CONTINUE in results:
                 print("Click Continue        <-------")
@@ -349,6 +366,7 @@ class AppLogin:
 
         while not FACEBOOK_SUBMITTED and empty_retries >= 0 and attempts >=0:
             attempts -= 1
+            check_and_close_smartlock(self.__driver)
             # if self.__driver.current_activity == '.common.account.SimpleDialogAccountPickerActivity':
             #     if app_package_name in ACCOUNTS:
             #         login_val = ACCOUNTS[app_package_name][0]
@@ -384,6 +402,7 @@ class AppLogin:
 
                 self.__report.add_history(app_package_name, "Facebook Auth sign-in", self.__driver)
                 del results[GOOGLE_AUTH]
+                self.__dprint("Logged in Facebook!")
                 return True, has_facebook
 
 
@@ -398,17 +417,6 @@ class AppLogin:
                     self.__sleep_while_in_progress(app_package_name)
         return False, has_facebook
 
-    def __attempt_click_continue(self):
-        '''
-            Attempts new detection and clicks a continue button.
-
-            Used to click 'save' when loggin into Facebook app.
-        '''
-        results: defaultdict = self.__detect()
-        if CONTINUE in results:
-            results[CONTINUE], tapped = self.__click_button(results[CONTINUE])
-            return True
-        return False
 
     def __handle_password_login(self, is_game: bool,
                               app_package_name: str) -> List[bool]:
@@ -416,7 +424,7 @@ class AppLogin:
         login_entered = password_entered = False
         CONTINUE_SUBMITTED = False
         has_email = False
-        empty_retries = 3
+        empty_retries = 5
         attemtps = 7 # When a detect occurs on a non-clickable element, we need to break from the loop
 
         print("App is game: ", is_game)
@@ -430,11 +438,13 @@ class AppLogin:
             if CONTINUE_SUBMITTED and login_entered and password_entered:
                 return True, has_email
 
+            check_and_close_smartlock(self.__driver)
+
             results: defaultdict = self.__detect()
             self.__dprint(f"Results: ", results)
             if not len(results.keys()):
                 empty_retries -= 1
-                sleep(4)
+                sleep(5)
                 if empty_retries == 0:
                     return False, has_email
 
@@ -450,7 +460,7 @@ class AppLogin:
                     print(f"Send Login - {login_val}        <-------")
 
                 else:
-                    p_alert(f"Login info not created for {app_package_name} but found an email/password login")
+                    p_alert(f"{self.__device.info.ip} - Login info not created for {app_package_name} but found an email/password login")
                     return False, has_email
                 login_entered = True
 
@@ -465,7 +475,7 @@ class AppLogin:
                     print(f"Send Password - {pass_val}       <-------")
                     password_entered = True
                 else:
-                    p_alert(f"Password info not created for {app_package_name} but found an email/password login")
+                    p_alert(f"{self.__device.info.ip} - Password info not created for {app_package_name} but found an email/password login")
                     return False, has_email
                 sleep(3)
 
@@ -493,27 +503,40 @@ class AppLogin:
 
                     sleep(5)  # Wait once more for app loading
                     self.__report.add_history(app_package_name, "Email/ password sign-in", self.__driver)
+                    self.__dprint("Logged in Email!")
                     return True, has_email
 
         return False, has_email
+
+    def __get_login_methods(self, package_name):
+        email_only = []
+        facebook_only = ['com.dts.freefireth']
+        google_only = ['com.facebook.katana']
+        if package_name in google_only:
+            return [self.__handle_google_login, None, None]
+        if package_name in facebook_only:
+            return [None, self.__handle_facebook_login, None]
+        if package_name in email_only:
+            return [None, None, self.__handle_password_login]
+
 
     def __attempt_logins(self, app_title:str, package_name: str, is_game: bool):
         '''
             Attempts 3 login methods: Google, Facebook and Email/Password.
         '''
-        login_methods = [self.__handle_google_login, self.__handle_facebook_login, self.__handle_password_login]
-
+        login_methods = self.__get_login_methods(package_name)
         login_result = AppLoginResults(error_detected=True)
         for i, login_method in enumerate(login_methods):
+            if not login_method: continue
             try:
                 if i > 0:
                     close_app(package_name, self.__device.info.transport_id)
                     clear_app(package_name, self.__device.info.transport_id)
-                    open_app(package_name, self.__device.info.transport_id, self.__device.info.arc_version)
+                    open_app(package_name, self.__device.info.transport_id, self.__driver, self.__device.info.arc_version)
                     self.__err_detector.reset_start_time()
                 if is_game:
-                    sleep(5)
-                p_alert(f"Attempting {login_method.__name__}")
+                    sleep(10)
+                p_alert(f"{self.__device.info.ip} - Attempting {login_method.__name__}")
 
                 logged_in, has_login = login_method(is_game, package_name)
                 login_result.update_field(i, logged_in, has_login)
@@ -521,12 +544,12 @@ class AppLogin:
                 errors = self.__err_detector.check_crash()
                 if(not CrashTypes.SUCCESS in errors):
                     login_result.error_detected = True
-                    return login_result
+
 
 
             except Exception as error:
 
-                p_alert(f"{login_method.__name__}: ", error)
+                p_alert(f"{self.__device.info.ip} - {login_method.__name__}: ", error)
                 traceback.print_exc()
         # return AppLoginResults(*raw_results)
         return login_result
@@ -534,7 +557,6 @@ class AppLogin:
     ## PlayStore install discovery
     def login(self, app_title: str, app_package_name: str, app_info: AppInfo):
         ''' Attempts to log in to an app.
-            TODO() implement behavior below.
             Args:
                 - login_method: The method to use to login with.
 

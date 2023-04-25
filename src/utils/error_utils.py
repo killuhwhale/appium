@@ -134,9 +134,6 @@ class ErrorDetector:
     def __check_f_debug_crash(self):
         ''' Searches logs for F DEBUG crash logs.
 
-            TODO() com.miniclip.eightballpool - Is failing - Should get more info for this crash
-                - helios_192.168.1.238:5555
-
             03-03 14:36:13.060 19417 19417 F DEBUG   : pid: 19381, tid: 19381, name: lay.KingsCastle  >>> com.PepiPlay.KingsCastle <<<
             alskdnlaksndlkasndklasnd
             03-01 15:50:25.856 22026 22026 F DEBUG   : pid: 21086, tid: 21241, name: UnityMain  >>> zombie.survival.craft.z <<<
@@ -171,7 +168,6 @@ class ErrorDetector:
             Returns:
                 A string representing the failing activity otherwise it returns an empty string.
         '''
-        print("\n\n Checking fatal exception... \n\n")
         ts_pattern = rf"^\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*"
         force_removed = rf"^\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*E AndroidRuntime: FATAL EXCEPTION.*\n.*{self.__package_name}.*\n.*\n.*$"
         force_removed_pattern = re.compile(force_removed, re.MULTILINE)

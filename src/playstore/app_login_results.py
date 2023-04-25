@@ -14,11 +14,17 @@ class AppLoginResults:
 
 
     def update_field(self, attempt_num: int, logged_in: bool, has_login: bool):
+        ''' Updates class fields in pairs of 2.
+        Attempt num -> index num -> Field to update
+        0 - 0  google_logged_in
+            1  has_google
+        1 - 2  facebook_logged_in
+            3  has_facebook
+        2 - 4  email_logged_in
+            5  has_email
         '''
-        0 - 0
-        1 - 2
-        2 - 4
-        '''
+        if attempt_num < 0 or attempt_num > 2:
+            return
         logged_in_idx = attempt_num*2
         has_log_in_idx = logged_in_idx + 1
         setattr(self, fields(self)[logged_in_idx].name, logged_in)

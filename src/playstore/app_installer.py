@@ -143,7 +143,6 @@ class AppInstaller:
                 ready = True
             except Exception as e:
                 self.__dprint("App not ready to open, retrying...")
-                # TODO() rethink this part.
                 if t > max_wait * 0.25:
                     self.__check_playstore_crash()
                 sleep(0.5)
@@ -194,11 +193,19 @@ class AppInstaller:
          '''
         self.__dprint("Clicking search icon...")
         search_icon = None
-        content_desc = f'''
-            new UiSelector().className("android.widget.TextView").text("Search for apps & games")
-        '''
-        search_icon = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
-        search_icon.click()
+        try:
+            content_desc = f'''
+                new UiSelector().className("android.widget.TextView").text("Search for apps & games")
+            '''
+            search_icon = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+            search_icon.click()
+        except Exception as error:
+            # Playstore version Eve (4-13-2023): version 35.2.19-21 [0] [PR] 522404461
+            content_desc = f'''
+                new UiSelector().className("android.widget.TextView").text("Search apps & games")
+            '''
+            search_icon = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+            search_icon.click()
 
     def __check_playstore_crash(self):
         # 01-05 22:08:57.546   129   820 I WindowManager: WIN DEATH: Window{afca274 u0 com.android.vending/com.google.android.finsky.activities.MainActivity}
@@ -213,7 +220,6 @@ class AppInstaller:
             for key, val in errors.items():
                 crash_type, crashed_act, msg = val
                 all_errors_msg.append(crash_type.value)
-                # TODO() Determine what to do when this scenario happens.
             self.__dprint("PlayStore crashed ", ' '.join(all_errors_msg))
             raise PlaystoreCrashException()
         return False
@@ -263,9 +269,10 @@ class AppInstaller:
                     if "Image" in cont_desc or title_first in cont_desc:
                         self.__dprint("Clicked: ", icon.id, cont_desc)
                         bounds = icon.get_attribute("bounds")
-                        # icon.click()  # TODO() bug on Eve, Caroline it wont click the app icon to get into the detail view.
-                        self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds))) # This second click will not affect anything when the first click is successful.
-                        self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds))) # This second click will not affect anything when the first click is successful.
+                        # icon.click()  # NOTE bug on Eve, Caroline it wont click the app icon to get into the detail view.
+                        # Trial and error: this has been working without issues...
+                        self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds)))
+                        self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds)))
                         sleep(1)
                         return
             except Exception as e:
@@ -361,7 +368,7 @@ class AppInstaller:
             # The app foogame, by com.zyx.foogames is actually showing.
             # So we check if the packge is installed via ADB cmd because this will be a source of truth
             # Therefore, at this point we have an installed app, that doesnt match our targeted package name.
-            # TODO() :NOTE: On the first run, it will install this package and report as correct....
+            # NOTE: On the first run, it will install this package and report as correct....
             self.__dprint(f"Program may have installed an incorrect package, {install_package_name} was not actually installed")
             #  Exception(f"{install_package_name} was not installed.")
             raise NotInstalledException()
@@ -409,6 +416,8 @@ class AppInstaller:
         except FailedClickIconException:
             return self.__return_error(last_step, 'Failed to click app icon.')
         except Exception as error:
+            print("General failure in installer: ", error)
+            traceback.print_exc()
             return self.__return_error(last_step, error)
         return AppInstallerResult(True, "")
 

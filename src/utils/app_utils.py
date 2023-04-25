@@ -1,3 +1,4 @@
+from appium.webdriver import Remote
 from dataclasses import dataclass
 import os
 import re
@@ -82,7 +83,6 @@ def uninstall_app(package_name: str, transport_id: str, force_rm: bool= False):
     return True
 
 def is_ANR(dumpsys_act_text: str, package_name: str) -> bool:
-    # TODO confirm this works by finding an APP that throws ANR consistently. OR create an app that crashes.
     ''' Given a string, dumpsys_act_text, determine if an ANR window is present.
 
         ANR Text:
@@ -115,7 +115,7 @@ def dumpysys_activity(transport_id: str, ArcVersion: ArcVersions) -> str:
 
 def get_cur_activty(transport_id: str, ArcVersion: ArcVersions, package_name: str) -> Dict:
     ''' Gets the current activity running in the foreground.
-
+         adb shell dumpsys activity | grep mFocusedWindow
 
         Google Smart lock/ Save passwords to Google is problematic
         text=mFocusedWindow=Window{81b9105 u0 android}
@@ -174,7 +174,19 @@ def get_cur_activty(transport_id: str, ArcVersion: ArcVersions, package_name: st
         "ANR_for_package": ''
     }
 
-def open_app(package_name: str, transport_id: int, ArcVersion: ArcVersions = ArcVersions.ARC_R):
+
+def check_and_close_smartlock(driver: Remote):
+    cred_picker_acts = ["com.google.android.gms.auth.api.credentials.ui.CredentialPickerActivity", ".auth.api.credentials.ui.CredentialPickerActivity"]
+    if driver.current_activity in cred_picker_acts:
+        try:
+            text = "NONE OF THE ABOVE"
+            content_desc = f'''new UiSelector().className("android.widget.Button").text("{text}")'''
+            el = driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+            el.click()
+        except Exception as error:
+            print("Failed to click NONE OF THE ABOVE on Google Smart Lock.")
+
+def open_app(package_name: str, transport_id: int, driver: Remote, ArcVersion: ArcVersions = ArcVersions.ARC_R):
     ''' Opens an app using ADB monkey.
 
         Params:
@@ -183,6 +195,7 @@ def open_app(package_name: str, transport_id: int, ArcVersion: ArcVersions = Arc
             ArcVersion: ArcVersion Enum for the device.
     '''
     packages = [package_name, "com.google.android.permissioncontroller", "org.chromium.arc.applauncher"]
+
     try:
         cmd = ('adb','-t', transport_id, 'shell', 'monkey', '--pct-syskeys', '0', '-p', package_name, '-c', 'android.intent.category.LAUNCHER', '1')
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
@@ -200,12 +213,22 @@ def open_app(package_name: str, transport_id: int, ArcVersion: ArcVersions = Arc
 
                 res = get_cur_activty(transport_id, ArcVersion, package_name)
                 cur_package = res['package_name']
+                # Typical flow -> Open app, com.facebook.messenger.splashscreen.MessengerSplashScreenActivity -> CredentialPickerActivity
+                # Theres a race condition where  sometimes we miss the splash screen and get stuck with CredentialPickerActivity
+                # OR we hit splash screen and are still left with getting stuck with CredentialPickerActivity since we missed it here.
+                check_and_close_smartlock(driver)
+
             except Exception as err:
                 print("Err getting cur act", err)
                 return False
+
     except Exception as err:
         print("Error opening app with monkey", err)
         return False
+
+    sleep(2)
+    check_and_close_smartlock(driver)
+
     return cur_package in packages
 
 def close_app(package_name: str, transport_id: int):
@@ -222,7 +245,7 @@ def close_app(package_name: str, transport_id: int):
             # E Security-LocalReporter: category=InternalIntentScope, message=Access denied. com.facebook.katana cannot receive broadcasts from no_app_identity, cause=java.lang.SecurityException: Access denied. com.facebook.katana cannot receive broadcasts from no_app_identity
             cmd = ('adb', '-t', transport_id, 'shell', 'am', 'broadcast', "-a", "android.intent.action.ACTION_SHUTDOWN")  # throws erro and security exception
 
-        cmd = ('adb', '-t', transport_id, 'shell', 'am', 'kill', package_name)
+        cmd = ('adb', '-t', transport_id, 'shell', 'am', 'force-stop', package_name)
         outstr = subprocess.run(cmd, check=True, encoding='utf-8',
                                 capture_output=True).stdout.strip()
         print(f"Closed {package_name}...")
@@ -287,6 +310,7 @@ def is_download_in_progress(transport_id: str, package_name: str):
         adb shell dumpsys activity services | grep <package_name>
         and if anything is returned, then return True as there is a download in progress.
         Good for waiting for games to downlaod extra content.
+        adb shell dumpsys activity services | grep com.google.android.finsky.assetmoduleservice.AssetModuleService:com.xyz
     '''
     try:
         # command = f'adb -t {transport_id} shell dumpsys activity services | grep com.google.android.finsky.assetmoduleservice.AssetModuleService:{package_name}'

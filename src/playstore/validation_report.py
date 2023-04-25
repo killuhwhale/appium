@@ -7,7 +7,7 @@ from playstore.app_login import AppLoginResults
 from utils.app_utils import AppData, create_dir_if_not_exists, get_root_path
 from utils.device_utils import Device
 from utils.logging_utils import ( p_blue, p_cyan, p_green,
-                         p_purple, p_red, p_yellow, logger)
+                         p_purple, p_red, p_yellow)
 
 
 class ValidationReport:
@@ -105,15 +105,6 @@ class ValidationReport:
         for key, val in login_results.__dict__.items():
             if val:
                 self.__report[self.__report_title][package_name][key] = val
-
-    def pop_win_death_after_successful_login(self):
-        ''' Removes Win Death from history.
-
-            When logging into the app multiple times, it is closed and reopened.
-            During this process oftentimes the app reports a win death.
-
-        '''
-        pass
 
     def add_history(self, package_name: str, history_msg: str, driver: Remote):
         full_path = ''
@@ -227,32 +218,32 @@ class ValidationReport:
         p_blue(status_obj['app_info'], end='\n')
 
         if len(status_obj['reason']) > 0:
-            logger.print_log("\t", "Final status: ", end="")
+            p_blue("\t", "Final status: ", end="")
             p_green( status_obj['reason']) if is_good else p_red( status_obj['reason'])
 
         # Print Logged in status
         logged_in_msg = [
-            "\tLogged in with: ",
+            "\t Logged in with: ",
             f"Google, " if status_obj['google_logged_in'] else "",
             f"Facebook, " if status_obj['facebook_logged_in'] else "",
             f"Email " if status_obj['email_logged_in'] else ""
         ]
-        p_cyan(" ".join(logged_in_msg))
+        p_cyan("".join(logged_in_msg))
 
         log_in_methods = [
-            "\tDetected log in methods: ",
+            "\t Detected log in methods: ",
             f"Google, " if status_obj['has_google'] else "",
             f"Facebook, " if status_obj['has_facebook'] else "",
             f"Email " if status_obj['has_email'] else "",
         ]
-        p_purple(" ".join(log_in_methods))
+        p_purple("".join(log_in_methods))
 
 
         # Print History
         for hist in status_obj['history']:
             p_yellow("\t", hist['msg'])
             p_yellow("\t\t", f"Img: {hist['img']}")
-        logger.print_log()
+        p_blue()
 
     @staticmethod
     def print_report(report: 'ValidationReport'):
