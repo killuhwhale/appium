@@ -518,6 +518,7 @@ class AppLogin:
             return [None, self.__handle_facebook_login, None]
         if package_name in email_only:
             return [None, None, self.__handle_password_login]
+        return [self.__handle_google_login, self.__handle_facebook_login, self.__handle_password_login]
 
 
     def __attempt_logins(self, app_title:str, package_name: str, is_game: bool):
