@@ -37,8 +37,8 @@ class _CONFIG:
     skip_pre_multi_uninstall = False  # Skips pre process uninstalltion of all apps to be tested.
     skip_install = False # App_validator allow to skip this step
     skip_launch = False # App_validator allow to skip this step
-    skip_login = False # App_validator allow to skip this step
-    skip_post_uninstall = True  #Skips post process uninstalltion of the app just tested.
+    skip_login = True # App_validator allow to skip this step
+    skip_post_uninstall = False  #Skips post process uninstalltion of the app just tested.
 
 CONFIG = _CONFIG()
 BASE_PORT = 4723

@@ -46,6 +46,7 @@ class AppLauncher:
                 return True
             else:
                 return False
+
         else:
             return True
 

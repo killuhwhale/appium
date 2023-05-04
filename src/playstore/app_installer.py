@@ -230,12 +230,14 @@ class AppInstaller:
 
     def __check_playstore_anr(self):
 
-        content_desc = f'''new UiSelector().className("android.widget.TextView").text("Wait")'''
-        wait_button = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
-        if wait_button != None:
+        try:
+            content_desc = f'''new UiSelector().className("android.widget.Button").text("Wait")'''
+            wait_button = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
             wait_button.click()
             self.__dprint("PlayStore stopped responding")
             raise PlaystoreANRException()
+        except Exception as e:
+            return
         return False
 
 
