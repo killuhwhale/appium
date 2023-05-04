@@ -37,6 +37,9 @@ class FailedClickIconException(Exception):
 class PlaystoreCrashException(Exception):
     pass
 
+class PlaystoreANRException(Exception):
+    pass
+
 @dataclass
 class AppInstallerResult:
     installed: bool
@@ -145,6 +148,7 @@ class AppInstaller:
                 self.__dprint("App not ready to open, retrying...")
                 if t > max_wait * 0.25:
                     self.__check_playstore_crash()
+                    self.__check_playstore_anr()
                 sleep(0.5)
             self.__driver.orientation = 'PORTRAIT'
         return ready
@@ -222,6 +226,16 @@ class AppInstaller:
                 all_errors_msg.append(crash_type.value)
             self.__dprint("PlayStore crashed ", ' '.join(all_errors_msg))
             raise PlaystoreCrashException()
+        return False
+
+    def __check_playstore_anr(self):
+
+        content_desc = f'''new UiSelector().className("android.widget.TextView").text("Wait")'''
+        wait_button = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+        if wait_button != None:
+            wait_button.click()
+            self.__dprint("PlayStore stopped responding")
+            raise PlaystoreANRException()
         return False
 
 
@@ -387,22 +401,29 @@ class AppInstaller:
             last_step = 0  # track last sucessful step to, atleast, report in console.
             self.__click_playstore_search()
             self.__check_playstore_crash()
+            self.__check_playstore_anr()
 
             last_step = 1
             self.__search_playstore(title)
             self.__check_playstore_crash()
+            self.__check_playstore_anr()
 
             last_step = 2
             self.__click_app_icon(title, install_package_name)
             self.__check_playstore_crash()
+            self.__check_playstore_anr()
 
             last_step = 3
             self.__install_app_UI(install_package_name)
             self.__check_playstore_crash()
+            self.__check_playstore_anr()
             self.__driver.back()  # back to seach results
             self.__driver.back()  # back to home page
+
         except PlaystoreCrashException as e:
             raise PlaystoreCrashException()
+        except PlaystoreANRException as e:
+            raise PlaystoreANRException()
         except NeedsPurchaseException as price:
             error = self.__return_error(last_step, "Needs purchase.")
             error.price = float(price.message)

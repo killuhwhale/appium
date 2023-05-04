@@ -9,10 +9,11 @@ Arguments:
     ips: (Required) ip addresses of the DUT.
 
 Example:
-    python3 main.py 192.168.1.125 192.168.1.113
+    python3 main.py --ips 192.168.1.125:5555 192.168.1.113:5555
 """
 import argparse
 from multiprocessing import Queue
+
 import sys
 from appium import webdriver
 from objdetector.yolov8 import YoloV8
@@ -35,9 +36,9 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--clean",
                         help="Clean up appium server..",
                         action='store_true')
-    parser.add_argument("-i", "--ips",
+    parser.add_argument("-i", "--ips", nargs='+',
                         help="Ip address of DUTs.",
-                        default=[], type=list)
+                        default=[])
 
     args = parser.parse_args()
     ips = args.ips
@@ -57,8 +58,8 @@ if __name__ == "__main__":
     #     ]
     # print("ips: ", ips)
 
-    # tsv = AppListTSV()  # Create Globally
-    # TESTING_APPS = tsv.get_apps()
+    tsv = AppListTSV()  # Create Globally
+    TESTING_APPS = tsv.get_apps()
 
     # # Dev, choose startin package by name.
     # # starting_app = "com.mojang.minecraftpe"
@@ -67,23 +68,23 @@ if __name__ == "__main__":
     # # package_names = TESTING_APPS[start_idx: ]
 
     # # Dev, choose startin package by index.
-    # package_names = TESTING_APPS
+    package_names = TESTING_APPS
 
-    # runner = MultiprocessTaskRunner(ips, package_names)
-    # if args.clean:
-    #     runner.cleanup_appium_server()
-    # if not runner.start_appium_server():
-    #     print("Error starting server...")
-    #     sys.exit(1)
+    runner = MultiprocessTaskRunner(ips, package_names)
+    if args.clean:
+        runner.cleanup_appium_server()
+    if not runner.start_appium_server():
+        print("Error starting server...")
+        sys.exit(1)
 
-    # runner.run()
-    # runner.print_devices()
+    runner.run()
+    runner.print_devices()
 
-    # stats, device = ValidationReportStats.calc(runner.reports_dict)
+    stats, device = ValidationReportStats.calc(runner.reports_dict)
 
-    # ValidationReportStats.print_stats(stats, device)
+    ValidationReportStats.print_stats(stats, device)
 
-    # ValidationReport.print_reports_by_app(runner.reports)
+    ValidationReport.print_reports_by_app(runner.reports)
 
     ####################################
     ##   Single Run
@@ -93,9 +94,9 @@ if __name__ == "__main__":
     # ip = '192.168.1.149:5555'
     # ip = "192.168.1.125:5555"
     # ip = "192.168.1.238:5555"
-    ip = "192.168.1.149:5555"
+    #ip = "192.168.1.149:5555"
 
-    service_manager = AppiumServiceManager([ip])
+    '''service_manager = AppiumServiceManager([ip])
     if args.clean:
         service_manager.cleanup_services()  # Will exit
     service_manager.start_services()
@@ -125,11 +126,11 @@ if __name__ == "__main__":
     # while q != "q":
     #     q = input("Get a session")
     #     print(f"{driver.current_activity=}")
-        # text = "NONE OF THE ABOVE"
+        # text = "NONE OF THE ABOVE"'''
         # content_desc = f'''new UiSelector().className("android.widget.Button").text("{text}")'''
         # driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
 
-    fb_handle = FacebookApp(driver, app_logger,  device, BASE_PORT, Queue(),)
+    '''fb_handle = FacebookApp(driver, app_logger,  device, BASE_PORT, Queue(),)
     fb_handle.install_and_login()
 
     validator = AppValidator(
@@ -148,6 +149,6 @@ if __name__ == "__main__":
 
     print(f"Sie of validation report dict: {(asizeof.asizeof(validator.report.report) / 1000.0):.2f} KB")
     validator.report.merge(fb_handle.validator.report)
-    validator.report.print()
+    validator.report.print()'''
 
 
