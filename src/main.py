@@ -68,7 +68,7 @@ if __name__ == "__main__":
     # # package_names = TESTING_APPS[start_idx: ]
 
     # # Dev, choose startin package by index.
-    package_names = TESTING_APPS
+    package_names = TESTING_APPS[0:2]
 
     runner = MultiprocessTaskRunner(ips, package_names)
     if args.clean:
