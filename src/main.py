@@ -41,7 +41,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     ips = args.ips
-
+    logger.print_log(f"{CONFIG=}")
+    logger.print_log(f"CLI input: {ips=}")
     # Multiprocessing Runs
     if len(ips) == 0:
         ips = [
@@ -55,7 +56,7 @@ if __name__ == "__main__":
             # '192.168.1.113:5555', # CoachZ   snapdragon ARC-P ARM   Green,
             # '192.168.1.149:5555', # Careena  AMD        ARC-P x86   Green,
         ]
-    print("ips: ", ips)
+    logger.print_log("ips: ", ips)
 
     tsv = AppListTSV()  # Create Globally
     TESTING_APPS = tsv.get_apps()
@@ -67,7 +68,7 @@ if __name__ == "__main__":
     # package_names = TESTING_APPS[start_idx: ]
 
     # Dev, choose startin package by index.
-    package_names = TESTING_APPS
+    package_names = TESTING_APPS[:1]
 
     runner = MultiprocessTaskRunner(ips, package_names)
     if args.clean:

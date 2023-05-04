@@ -1,3 +1,4 @@
+from datetime import datetime
 from pympler import asizeof
 from multiprocessing import Queue
 from time import sleep
@@ -74,11 +75,13 @@ class AppValidator:
             'history': [],
             'logs', ''
         '''
+        #  Log results to tsv File
         self.__app_logger.log(
             status_obj['status'],
             status_obj['package_name'],
             status_obj['name'],
             status_obj['report_title'],
+            datetime.now().strftime("%A, %B %d, %Y %I:%M:%S %p"),
             status_obj['reason'],
             status_obj['new_name'],
             status_obj['invalid'],
