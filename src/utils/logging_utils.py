@@ -18,8 +18,8 @@ class AppListTSV:
 
     def __init__(self):
         self.__app_list = list()
-        # self.__filename = "app_list.tsv" # This file should be place in the home dir on linux ~/
-        self.__filename = "app_list_demo.tsv" # This file should be place in the home dir on linux ~/
+        self.__filename = "app_list.tsv" # This file should be place in the home dir on linux ~/
+        # self.__filename = "app_list_demo.tsv" # This file should be place in the home dir on linux ~/
         self.__badfilename = "bad_app_list.tsv" # This will be created in the home dir ~/
         self.__all_bad_apps = dict()
         self.__home_dir = users_home_dir()
@@ -221,7 +221,7 @@ class __AppEventLogger:
 
 
     def log(self, *args, **kwargs):
-        message = ' '.join(map(str, args)) + kwargs['end']
+        message = ' '.join(map(str, args)) + kwargs['end'] if 'end' in kwargs else '\n'
         self.logger.info(message)
 
     def print_log(self, *args, **kwargs):

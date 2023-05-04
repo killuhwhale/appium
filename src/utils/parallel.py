@@ -208,10 +208,12 @@ class MultiprocessTaskRunner:
 
     def __start_process(self, ip, port_number, apps: List[List[str]]):
         device = Device(ip)
+        dev_info = device.info
         self.__devices.append(device)
         process = Process(target=validate_task, args=(self.__queue, self.__app_list_queue, self.__app_logger, self.__stats_queue, self.__price_queue, apps, ip, device, port_number))
         process.start()
         self.__processes.append(process)
+        logger.print_log(f"Started run on device: {dev_info=}", end="\n")
 
     def __start_runs(self) -> List[webdriver.Remote]:
         '''

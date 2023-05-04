@@ -106,10 +106,10 @@ Prep work for Chromebook:
 
     Raw Image sizes from device SS:
         - W x H
-        - 2400 x 1600 Eve
+        - 2400 x 1600 Eve, Caroline
         - 1920 x 1080 Helios
         - 2700 x 1800 CoachZ
-        - 2160, 1440 (Ethan eve?)
+        - 2160, 1440 (Ethan eve? screenshots straight from device)
 
 
         ____________________
@@ -128,27 +128,6 @@ Prep work for Chromebook:
         Size of validation report dict (5): 27.77 KB
         Size of validation report dict (6): 29.59 KB
         Size of validation report dict (7): 32.03 KB
-
-
-    - Test demo list with new model.
-        - Free fire should work,
-        - Facebook on Duolingo should work
-
-    - Improve model
-        - Slider label added,
-            - Train on new dataset
-            - Update program to use new model
-            - Add to login methods, AppLogin
-                - If game, look for age and sliders...
-                - Separate login_methoid so to speak
-                    - It is more of an exploration on games to get them to load even if they dont have a login...
-
-        -1. Explore Age verification
-            - Empty form fields to type age will probably be the trickiest...
-
-
-
-
 
 
  Make Money: Play & Earn Cash   us.current.android   PASSED   - [eve_192.168.1.125:5555]

@@ -104,6 +104,7 @@ class BasePredictor:
         self.data_path = None
         self.source_type = None
         self.batch = None
+        self.call_idx = 0
         self.callbacks = defaultdict(list, callbacks.default_callbacks)  # add callbacks
         callbacks.add_integration_callbacks(self)
 
@@ -120,8 +121,9 @@ class BasePredictor:
         return preds
 
     def __call__(self, source=None, model=None, stream=False):
+        self.call_idx += 1
         self.stream = stream
-        self.save_dir = increment_path(Path(self.project) / self.name, exist_ok=self.args.exist_ok)
+        self.save_dir = increment_path(Path(self.project) / self.name, exist_ok=True)
         if stream:
             return self.stream_inference(source, model)
         else:
@@ -265,7 +267,7 @@ class BasePredictor:
         im0 = self.annotator.result()
         # save imgs
         if self.dataset.mode == 'image':
-            cv2.imwrite(f"{self.save_dir}/img.png", im0)
+            cv2.imwrite(f"{self.save_dir}/img_{self.call_idx}.png", im0)
         else:  # 'video' or 'stream'
             if self.vid_path[idx] != save_path:  # new video
                 self.vid_path[idx] = save_path

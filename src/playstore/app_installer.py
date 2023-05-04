@@ -61,7 +61,7 @@ class AppInstaller:
         self.__transport_id = self.__device.transport_id
         self.__arc_version = self.__device.arc_version
         self.__is_emu = self.__device.is_emu
-        self.__err_detector = ErrorDetector(self.__transport_id, self.__arc_version)
+        self.__err_detector = ErrorDetector(device.info, self.__arc_version)
 
         self.__steps = [
             'Click search icon',

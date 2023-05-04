@@ -36,7 +36,7 @@ class AppValidator:
         self.__device = device
         self.__transport_id = device.info.transport_id
         self.__report = ValidationReport(device)
-        self.__err_detector = ErrorDetector(self.__transport_id, self.__device.info.arc_version)
+        self.__err_detector = ErrorDetector(device.info, self.__device.info.arc_version)
         self.__app_list_queue = app_list_queue
         self.__stats_queue = stats_queue
         self.__price_queue = price_queue

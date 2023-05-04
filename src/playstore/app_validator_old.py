@@ -49,7 +49,7 @@ class AppValidator:
         self.__is_emu = self.__device.is_emu
         self.__package_names = package_names  # List of packages to test as [app_title, app_package_name]
         self.__current_package = None
-        self.__err_detector = ErrorDetector(self.__transport_id, self.__arc_version)
+        self.__err_detector = ErrorDetector(device.info, self.__arc_version)
         self.__report = ValidationReport(device)
 
         self.__steps = [
