@@ -49,6 +49,8 @@ if __name__ == "__main__":
     logger.print_log(f"CLI input: {args.parallel=}")
     logger.print_log(f"CLI input: {ips=}")
 
+
+
     if (args.parallel):
         # Multiprocessing Runs
         if len(ips) == 0:
@@ -78,11 +80,6 @@ if __name__ == "__main__":
         package_names = TESTING_APPS[:1]
 
         runner = MultiprocessTaskRunner(ips, package_names)
-        if args.clean:
-            runner.cleanup_appium_server()
-        if not runner.start_appium_server():
-            print("Error starting server...")
-            sys.exit(1)
 
         runner.run()
         runner.print_devices()
@@ -102,7 +99,8 @@ if __name__ == "__main__":
         # ip = "192.168.1.125:5555"
         # ip = "192.168.1.238:5555"
         # ip = "192.168.1.149:5555"
-        ip = ips[0]
+
+        ip = ips[0] if not args.clean else ""
         service_manager = AppiumServiceManager([ip])
         if args.clean:
             service_manager.cleanup_services()  # Will exit

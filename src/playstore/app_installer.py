@@ -402,18 +402,22 @@ class AppInstaller:
             last_step = 0  # track last sucessful step to, atleast, report in console.
             self.__click_playstore_search()
             self.__check_playstore_crash()
+            self.__check_playstore_anr()
 
             last_step = 1
             self.__search_playstore(title)
             self.__check_playstore_crash()
+            self.__check_playstore_anr()
 
             last_step = 2
             self.__click_app_icon(title, install_package_name)
             self.__check_playstore_crash()
+            self.__check_playstore_anr()
 
             last_step = 3
             self.__install_app_UI(install_package_name)
             self.__check_playstore_crash()
+            self.__check_playstore_anr()
             self.__driver.back()  # back to seach results
             self.__driver.back()  # back to home page
         except PlaystoreCrashException as e:
