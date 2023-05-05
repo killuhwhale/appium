@@ -46,6 +46,7 @@ def validate_task(queue: Queue, app_list_queue: Queue, app_logger: AppLogger, st
         A single task to validate apps on a given device.
     '''
     if not device.is_connected:
+        print("device is not connected")
         queue.put({})
         return
 
@@ -110,8 +111,8 @@ class MultiprocessTaskRunner:
         self.__packages_recvd = defaultdict(list)
         self.__price_queue = Queue()
         self.__prices = Prices(self.__price_queue)
-
         self.__appium_service_manager = AppiumServiceManager(ips)
+        self.__appium_service_manager.start_services()
         signal.signal(signal.SIGINT, self.handle_sigint)
 
 
@@ -164,7 +165,6 @@ class MultiprocessTaskRunner:
             self.__start_runs_split()
         else:
             self.__start_runs()
-        print("started running, waiting for drivers and validators")
 
         validators = 0
         while validators < len(self.__ips):
@@ -207,13 +207,17 @@ class MultiprocessTaskRunner:
             logger.print_log(f'\t{d}\n')
 
     def __start_process(self, ip, port_number, apps: List[List[str]]):
-        device = Device(ip)
-        dev_info = device.info
-        self.__devices.append(device)
-        process = Process(target=validate_task, args=(self.__queue, self.__app_list_queue, self.__app_logger, self.__stats_queue, self.__price_queue, apps, ip, device, port_number))
-        process.start()
-        self.__processes.append(process)
-        logger.print_log(f"Started run on device: {dev_info=}", end="\n")
+        try:
+            device = Device(ip)
+            dev_info = device.info
+            self.__devices.append(device)
+            process = Process(target=validate_task, args=(self.__queue, self.__app_list_queue, self.__app_logger, self.__stats_queue, self.__price_queue, apps, ip, device, port_number))
+            process.start()
+            self.__processes.append(process)
+            logger.print_log(f"Started run on device: {dev_info=}", end="\n")
+        except Exception as error:
+            print("Error start process: ",  error)
+
 
     def __start_runs(self) -> List[webdriver.Remote]:
         '''

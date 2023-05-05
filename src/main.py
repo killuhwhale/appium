@@ -80,7 +80,6 @@ if __name__ == "__main__":
         package_names = TESTING_APPS[:1]
 
         runner = MultiprocessTaskRunner(ips, package_names)
-
         runner.run()
         runner.print_devices()
 
