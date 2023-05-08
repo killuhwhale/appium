@@ -4,9 +4,10 @@ from enum import Enum
 import re
 import subprocess
 from time import time
+import traceback
 from typing import Dict, Tuple
 from utils.app_utils import dumpysys_activity, is_ANR
-from utils.device_utils import ArcVersions
+from utils.device_utils import ArcVersions, Device, DeviceData
 from utils.logging_utils import p_alert
 
 
@@ -31,8 +32,10 @@ class ErrorDetector:
         Each time we check for a crash, we grab the logs from the beginning and then check for
         a variety of crash types.
     '''
-    def __init__(self, transport_id: str, ArcVersion: ArcVersions):
-        self.__transport_id = transport_id
+    def __init__(self, device_info: DeviceData, ArcVersion: ArcVersions):
+        self.__device_info: DeviceData = device_info
+        self.__transport_id = device_info.transport_id
+
         self.__package_name = ""
         self.__ArcVersion = ArcVersion
         self.__start_time = None  # Logcat logs starting at time
@@ -222,8 +225,10 @@ class ErrorDetector:
             if len(errors.keys()):
                 return errors
         except Exception as error:
-            p_alert(f"Error in ErrorDetector: {self.__transport_id=} {self.__package_name}", error)
+            traceback.print_exc()
+            p_alert(f"Error in ErrorDetector: {self.__device_info.device_name=} {self.__device_info.ip=} {self.__package_name}", error)
             self.reset_start_time()
+
         return {CrashTypes.SUCCESS: (CrashTypes.SUCCESS, "", "",)}
 
     def __get_start_time(self, ):

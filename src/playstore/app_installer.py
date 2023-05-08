@@ -64,7 +64,7 @@ class AppInstaller:
         self.__transport_id = self.__device.transport_id
         self.__arc_version = self.__device.arc_version
         self.__is_emu = self.__device.is_emu
-        self.__err_detector = ErrorDetector(self.__transport_id, self.__arc_version)
+        self.__err_detector = ErrorDetector(device.info, self.__arc_version)
 
         self.__steps = [
             'Click search icon',
@@ -114,6 +114,18 @@ class AppInstaller:
             return AppInstallerResult(False, f"Failed: {self.__steps[3]} :: {error}")
 
     ## PlayStore install discovery
+    def __check_playstore_anr(self):
+
+        try:
+            content_desc = f'''new UiSelector().className("android.widget.Button").text("Wait")'''
+            wait_button = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+            wait_button.click()
+            self.__dprint("PlayStore stopped responding")
+            raise PlaystoreANRException()
+        except Exception as e:
+            return
+        return False
+
     def __is_installed_UI(self):
         '''
             Checks for the presence of the Uninstall button indicating that the
@@ -438,6 +450,8 @@ class AppInstaller:
             return self.__return_error(last_step, "Wrong package found in playstore.")
         except FailedClickIconException:
             return self.__return_error(last_step, 'Failed to click app icon.')
+        except PlaystoreANRException as e:
+            raise PlaystoreANRException()
         except Exception as error:
             print("General failure in installer: ", error)
             traceback.print_exc()

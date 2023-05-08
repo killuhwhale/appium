@@ -3,7 +3,7 @@ from subprocess import Popen
 import sys
 from typing import List
 from appium.webdriver.appium_service import AppiumService
-
+from utils.logging_utils import logger
 from utils.utils import BASE_PORT
 
 @dataclass(frozen=True)
@@ -36,11 +36,11 @@ class AppiumServiceManager:
 
         Trial and error...
         '''
-        print(f"starting services for {self.__ips=}")
+        logger.print_log(f"starting services for {self.__ips=}")
         for i, ip in enumerate(self.__ips):
             try:
                 port = self.__base_port + i
-                print(f"Starting service: {port=} for device at {ip=}")
+                logger.print_log(f"Starting service: {port=} for device at {ip=}")
                 service = AppiumService()
                 service.start(args=['--address', '0.0.0.0', '-p', str(port), '--base-path', '/wd/hub'])
                 while not service.is_listening or not service.is_running:
