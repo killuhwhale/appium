@@ -134,7 +134,8 @@ class AppInstaller:
             Using adb shows that the app is installed well before PlayStore UI
                 says its ready to open.
         '''
-        max_wait = 420  # 7 mins, Large gaming apps may take a while to download.
+        #max_wait = 420  # 7 mins, Large gaming apps may take a while to download.
+        max_wait = 50
         content_desc = 'Uninstall'
         ready = False
         t = time()
@@ -286,6 +287,7 @@ class AppInstaller:
             f'''new UiSelector().descriptionMatches(\".*(?i){title_first}.*\");''', # Pixel 2
             f'''new UiSelector().descriptionMatches(\"App: (?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");''',  # Chromebooks
             f'''new UiSelector().descriptionMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");''',
+            f'''new UiSelector().textMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");'''
         ]
         for content_desc in descs:
             self.__dprint("Searhing for app_icon with content desc: ", content_desc)
@@ -293,6 +295,11 @@ class AppInstaller:
                 app_icon = self.__driver.find_elements(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
                 for icon in app_icon:
                     cont_desc = icon.get_attribute('content-desc')
+                    if cont_desc == '':
+                        self.__dprint("Icons:", icon.location, icon.id, cont_desc)
+                        icon.click()
+                        return
+
                     self.__dprint("Icons:", icon.location, icon.id, cont_desc)
                     if "Image" in cont_desc or title_first in cont_desc:
                         self.__dprint("Clicked: ", icon.id, cont_desc)

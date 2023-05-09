@@ -15,6 +15,7 @@ def get_root_path():
     ''' Returns root path /home/user/pathto/appium/src '''
     root_path = os.path.realpath(__main__.__file__).split("/")[1:-1]
     root_path = '/'.join(root_path)
+    #root_path = 'Users/ethancox/Documents/appium/src'
     return f"/{root_path}"
 
 def create_dir_if_not_exists(directory):

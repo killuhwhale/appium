@@ -49,8 +49,6 @@ if __name__ == "__main__":
     logger.print_log(f"CLI input: {args.parallel=}")
     logger.print_log(f"CLI input: {ips=}")
 
-
-
     if (args.parallel):
         # Multiprocessing Runs
         if len(ips) == 0:
@@ -77,7 +75,7 @@ if __name__ == "__main__":
         # package_names = TESTING_APPS[start_idx: ]
 
         # Dev, choose startin package by index.
-        package_names = TESTING_APPS[:1]
+        package_names = TESTING_APPS
 
         runner = MultiprocessTaskRunner(ips, package_names)
         runner.run()
