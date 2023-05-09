@@ -36,7 +36,6 @@ class AppLauncher:
             If invalid, returns True
             If valid, returns False
         '''
-
         url = f'https://play.google.com/store/apps/details?id={package_name}'
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
@@ -80,16 +79,33 @@ class AppLauncher:
         reason = ''
         NEW_APP_NAME = ''
         INVALID_APP = False
-        if self.__check_playstore_invalid(package_name):
-            reason = "Package is invalid and was removed from the list."
-            INVALID_APP = True
-            self.__app_list_queue.put(('invalid', package_name, app_title))
-        elif not app_title == self.__check_playstore_name(package_name, app_title):
-            reason = f"[{app_title} !=  {self.__name_span_text}] {self.__misnamed_reason_text}"
-            NEW_APP_NAME = self.__name_span_text
-            self.__app_list_queue.put(('misnamed', package_name, NEW_APP_NAME))
+        invalid_checks = 2
+        name_checks = 2
+        while invalid_checks > 0:
+            try:
+                if self.__check_playstore_invalid(package_name):
+                    reason = "Package is invalid and was removed from the list."
+                    INVALID_APP = True
+                    self.__app_list_queue.put(('invalid', package_name, app_title))
+                    return NEW_APP_NAME, INVALID_APP, reason
+            except Exception as e:
+                print(e)
+                invalid_checks -= 1
+                sleep(0.5)
 
-        elif not is_installed(package_name, self.__device.transport_id):
+        while name_checks > 0:
+            try:
+                if not app_title == self.__check_playstore_name(package_name, app_title):
+                    reason = f"[{app_title} !=  {self.__name_span_text}] {self.__misnamed_reason_text}"
+                    NEW_APP_NAME = self.__name_span_text
+                    self.__app_list_queue.put(('misnamed', package_name, NEW_APP_NAME))
+                    return NEW_APP_NAME, INVALID_APP, reason
+            except Exception as e:
+                print(e)
+                name_checks -= 1
+                sleep(0.5)
+
+        if not is_installed(package_name, self.__device.transport_id):
             reason = f"Not installed - {msg}"
         else:
             reason = msg

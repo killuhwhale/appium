@@ -436,6 +436,7 @@ class AppInstaller:
 
         except PlaystoreCrashException as e:
             raise PlaystoreCrashException()
+
         except PlaystoreANRException as e:
             raise PlaystoreANRException()
         except NeedsPurchaseException as price:
