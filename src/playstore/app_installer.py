@@ -284,10 +284,10 @@ class AppInstaller:
         '''
         title_first = title
         descs = [
-            f'''new UiSelector().descriptionMatches(\".*(?i){title_first}.*\");''', # Pixel 2
+            #f'''new UiSelector().className("android.view.View").descriptionMatches(\".*(?i){title_first}.*\");''', # Pixel 2
             f'''new UiSelector().descriptionMatches(\"App: (?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");''',  # Chromebooks
             f'''new UiSelector().descriptionMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");''',
-            f'''new UiSelector().textMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");'''
+            f'''new UiSelector().className("android.widget.TextView").textMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");'''
         ]
         for content_desc in descs:
             self.__dprint("Searhing for app_icon with content desc: ", content_desc)

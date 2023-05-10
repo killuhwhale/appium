@@ -108,8 +108,7 @@ if __name__ == "__main__":
         tsv = AppListTSV()  # Create Globally
         TESTING_APPS = tsv.get_apps()
 
-        package_names = TESTING_APPS[:1]
-
+        package_names = TESTING_APPS
 
         print("Creating driver...")
         driver = webdriver.Remote(
