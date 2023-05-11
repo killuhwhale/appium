@@ -40,6 +40,9 @@ class PlaystoreCrashException(Exception):
 class PlaystoreANRException(Exception):
     pass
 
+class PlaystoreInstallFailedException(Exception):
+    pass
+
 @dataclass
 class AppInstallerResult:
     installed: bool
@@ -117,13 +120,14 @@ class AppInstaller:
     def __check_playstore_anr(self):
 
         try:
-            content_desc = f'''new UiSelector().className("android.widget.Button").text("Wait")'''
+            content_desc = f'''new UiSelector().text("Wait")'''
             wait_button = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
             wait_button.click()
             self.__dprint("PlayStore stopped responding")
             raise PlaystoreANRException()
+            return True
         except Exception as e:
-            return
+            print(e)
         return False
 
     def __is_installed_UI(self):
@@ -134,8 +138,7 @@ class AppInstaller:
             Using adb shows that the app is installed well before PlayStore UI
                 says its ready to open.
         '''
-        #max_wait = 420  # 7 mins, Large gaming apps may take a while to download.
-        max_wait = 50
+        max_wait = 420  # 7 mins, Large gaming apps may take a while to download.
         content_desc = 'Uninstall'
         ready = False
         t = time()
@@ -162,6 +165,7 @@ class AppInstaller:
                 if t > max_wait * 0.25:
                     self.__check_playstore_crash()
                     self.__check_playstore_anr()
+                    self.__check_playstore_install_fail()
                 sleep(0.5)
             self.__driver.orientation = 'PORTRAIT'
         return ready
@@ -244,13 +248,28 @@ class AppInstaller:
     def __check_playstore_anr(self):
 
         try:
-            content_desc = f'''new UiSelector().className("android.widget.Button").text("Wait")'''
+            content_desc = f'''new UiSelector().text("Wait")'''
             wait_button = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
             wait_button.click()
             self.__dprint("PlayStore stopped responding")
             raise PlaystoreANRException()
         except Exception as e:
-            return
+            print(e)
+        return False
+
+    def __check_playstore_install_fail(self):
+
+        try:
+            feedback_desc = f'''new UiSelector().className("android.widget.Button").text("Send feedback")'''
+            got_it_desc = f'''new UiSelector().className("android.widget.Button").text("Got it")'''
+            feedback_button = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=feedback_desc)
+            got_it_button = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=got_it_desc)
+            if feedback_button and got_it_button:
+                got_it_button.click()
+            self.__dprint("PlayStore couldn't install application")
+            raise PlaystoreInstallFailedException()
+        except Exception as e:
+            print(e)
         return False
 
 
@@ -423,29 +442,30 @@ class AppInstaller:
             self.__click_playstore_search()
             self.__check_playstore_crash()
             self.__check_playstore_anr()
+            self.__check_playstore_install_fail()
 
             last_step = 1
             self.__search_playstore(title)
             self.__check_playstore_crash()
             self.__check_playstore_anr()
+            self.__check_playstore_install_fail()
 
             last_step = 2
             self.__click_app_icon(title, install_package_name)
             self.__check_playstore_crash()
             self.__check_playstore_anr()
+            self.__check_playstore_install_fail()
 
             last_step = 3
             self.__install_app_UI(install_package_name)
             self.__check_playstore_crash()
             self.__check_playstore_anr()
+            self.__check_playstore_install_fail()
             self.__driver.back()  # back to seach results
             self.__driver.back()  # back to home page
 
         except PlaystoreCrashException as e:
             raise PlaystoreCrashException()
-
-        except PlaystoreANRException as e:
-            raise PlaystoreANRException()
         except NeedsPurchaseException as price:
             error = self.__return_error(last_step, "Needs purchase.")
             error.price = float(price.message)
@@ -460,6 +480,8 @@ class AppInstaller:
             return self.__return_error(last_step, 'Failed to click app icon.')
         except PlaystoreANRException as e:
             raise PlaystoreANRException()
+        except PlaystoreInstallFailedException as e:
+            raise PlaystoreInstallFailedException()
         except Exception as error:
             print("General failure in installer: ", error)
             traceback.print_exc()
