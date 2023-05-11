@@ -9,7 +9,8 @@ Arguments:
     ips: (Required) ip addresses of the DUT.
 
 Example:
-    python3 main.py 192.168.1.125 192.168.1.113
+    python3 main.py -i 192.168.1.125 192.168.1.113     # Single run
+    python3 main.py -p -i 192.168.1.125 192.168.1.113  # Parallel Run
 """
 import argparse
 from multiprocessing import Queue
@@ -42,6 +43,10 @@ if __name__ == "__main__":
                         help="Ip address of DUTs.",
                         nargs="*",
                         default=[], type=str)
+    parser.add_argument("-n", "--num",
+                        help="Num of apps to runs.",
+                        default=-1, type=int)
+
 
     args = parser.parse_args()
     ips = args.ips
@@ -77,7 +82,8 @@ if __name__ == "__main__":
         # package_names = TESTING_APPS[start_idx: ]
 
         # Dev, choose startin package by index.
-        package_names = TESTING_APPS[:1]
+        num_apps = args.num if args.num > 0 else len(TESTING_APPS)
+        package_names = TESTING_APPS[:num_apps]
 
         runner = MultiprocessTaskRunner(ips, package_names)
         runner.run()
@@ -110,7 +116,8 @@ if __name__ == "__main__":
         tsv = AppListTSV()  # Create Globally
         TESTING_APPS = tsv.get_apps()
 
-        package_names = TESTING_APPS[:1]
+        num_apps = args.num if args.num > 0 else len(TESTING_APPS)
+        package_names = TESTING_APPS[:num_apps]
 
 
         print("Creating driver...")

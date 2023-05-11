@@ -76,11 +76,15 @@ class AppValidator:
             'logs', ''
         '''
         #  Log results to tsv File
+        # When updating this, AppLogger.headers must also be updated.
+
+        device_info = f"{self.__device.info.arc_build},{self.__device.info.channel},{self.__device.info.arc_version}"
         self.__app_logger.log(
             status_obj['status'],
             status_obj['package_name'],
             status_obj['name'],
             status_obj['report_title'],
+            device_info,
             datetime.now().strftime("%A, %B %d, %Y %I:%M:%S %p"),
             status_obj['reason'],
             status_obj['new_name'],
