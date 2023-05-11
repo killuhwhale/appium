@@ -36,6 +36,7 @@ class AppLauncher:
             If invalid, returns True
             If valid, returns False
         '''
+
         url = f'https://play.google.com/store/apps/details?id={package_name}'
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
@@ -45,7 +46,6 @@ class AppLauncher:
                 return True
             else:
                 return False
-
         else:
             return True
 
@@ -88,8 +88,6 @@ class AppLauncher:
                     INVALID_APP = True
                     self.__app_list_queue.put(('invalid', package_name, app_title))
                     return NEW_APP_NAME, INVALID_APP, reason
-                else:
-                    break
             except Exception as e:
                 print(e)
                 invalid_checks -= 1
@@ -102,8 +100,6 @@ class AppLauncher:
                     NEW_APP_NAME = self.__name_span_text
                     self.__app_list_queue.put(('misnamed', package_name, NEW_APP_NAME))
                     return NEW_APP_NAME, INVALID_APP, reason
-                else:
-                    break
             except Exception as e:
                 print(e)
                 name_checks -= 1

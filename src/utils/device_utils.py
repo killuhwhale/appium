@@ -100,6 +100,10 @@ class Device:
             'product_name': self.__get_product_name(),
         })
 
+    @property
+    def info(self) -> DeviceData:
+        return self.__device_info
+
     def __str__(self):
         return f"{self.__device_info.device_name}({self.__device_info.arc_version}): {self.__device_info.channel} - {self.__device_info.arc_build} - {self.__device_info.product_name}"
 
@@ -267,6 +271,4 @@ class Device:
             print("Cannot find __get_product_name", err)
         return None
 
-    @property
-    def info(self) -> DeviceData:
-        return self.__device_info
+

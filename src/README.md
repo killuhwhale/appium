@@ -88,6 +88,14 @@ Prep work for Chromebook:
     - Focus on #4, 5 that is essentially our data source whereas 1 and 2 keep our testing list updated while still trakcing invalid apps.
 
 
+# Django webserver - runs local on host machine
+    ## websocketapp
+    - Establish wss connection to GCP server
+
+
+
+
+
 
 # TODOs
 

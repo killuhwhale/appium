@@ -117,18 +117,6 @@ class AppInstaller:
             return AppInstallerResult(False, f"Failed: {self.__steps[3]} :: {error}")
 
     ## PlayStore install discovery
-    def __check_playstore_anr(self):
-
-        try:
-            content_desc = f'''new UiSelector().text("Wait")'''
-            wait_button = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
-            wait_button.click()
-            self.__dprint("PlayStore stopped responding")
-            raise PlaystoreANRException()
-            return True
-        except Exception as e:
-            print(e)
-        return False
 
     def __is_installed_UI(self):
         '''
@@ -149,7 +137,7 @@ class AppInstaller:
                 '''
                 self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
                 # # Pixel 2
-                self.__dprint("Searching for uninstall button....")
+                self.__dprint("Found first uninstall button....")
                 self.__dprint("Setting Ready to TRUE")
                 ready = True
                 break
@@ -159,6 +147,7 @@ class AppInstaller:
 
             try:
                 self.__driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value="Uninstall")
+                self.__dprint("Found second uninstall button....")
                 ready = True
             except Exception as e:
                 self.__dprint("App not ready to open, retrying...")
@@ -246,7 +235,6 @@ class AppInstaller:
         return False
 
     def __check_playstore_anr(self):
-
         try:
             content_desc = f'''new UiSelector().text("Wait")'''
             wait_button = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
@@ -254,11 +242,11 @@ class AppInstaller:
             self.__dprint("PlayStore stopped responding")
             raise PlaystoreANRException()
         except Exception as e:
-            print(e)
+            pass
+            # self.__dprint("Playstore ANR error: ", e) # Failed to find ANR, no need to report error.
         return False
 
     def __check_playstore_install_fail(self):
-
         try:
             feedback_desc = f'''new UiSelector().className("android.widget.Button").text("Send feedback")'''
             got_it_desc = f'''new UiSelector().className("android.widget.Button").text("Got it")'''
@@ -269,9 +257,8 @@ class AppInstaller:
             self.__dprint("PlayStore couldn't install application")
             raise PlaystoreInstallFailedException()
         except Exception as e:
-            print(e)
+            pass
         return False
-
 
     def __search_playstore(self, title: str, submit=True):
         content_desc = f'''
@@ -303,10 +290,10 @@ class AppInstaller:
         '''
         title_first = title
         descs = [
-            #f'''new UiSelector().className("android.view.View").descriptionMatches(\".*(?i){title_first}.*\");''', # Pixel 2
+            f'''new UiSelector().descriptionMatches(\".*(?i){title_first}.*\");''', # Pixel 2
             f'''new UiSelector().descriptionMatches(\"App: (?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");''',  # Chromebooks
             f'''new UiSelector().descriptionMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");''',
-            f'''new UiSelector().className("android.widget.TextView").textMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");'''
+            f'''new UiSelector().textMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");'''
         ]
         for content_desc in descs:
             self.__dprint("Searhing for app_icon with content desc: ", content_desc)
@@ -314,13 +301,9 @@ class AppInstaller:
                 app_icon = self.__driver.find_elements(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
                 for icon in app_icon:
                     cont_desc = icon.get_attribute('content-desc')
-                    if cont_desc == '':
-                        self.__dprint("Icons:", icon.location, icon.id, cont_desc)
-                        icon.click()
-                        return
-
                     self.__dprint("Icons:", icon.location, icon.id, cont_desc)
-                    if "Image" in cont_desc or title_first in cont_desc:
+                    input("Icon click check")
+                    if "Image" in cont_desc or title_first in cont_desc and not "Play trailer" in cont_desc:
                         self.__dprint("Clicked: ", icon.id, cont_desc)
                         bounds = icon.get_attribute("bounds")
                         # icon.click()  # NOTE bug on Eve, Caroline it wont click the app icon to get into the detail view.
@@ -384,6 +367,8 @@ class AppInstaller:
                     by=AppiumBy.ACCESSIBILITY_ID, value="Install")
                 install_BTN.click()
                 first_method_clicked = True
+                self.__dprint("Clicked first install")
+
             except Exception as error:
                 self.__dprint("First install method failed.")
 
@@ -391,18 +376,19 @@ class AppInstaller:
                 content_desc = f'''
                     new UiSelector().className("android.widget.Button").text("Install")
                 '''
-                self.__dprint(f"Looking at {content_desc=}")
+                self.__dprint(f"First failed, now Looking at {content_desc=}")
                 install_BTN = self.__driver.find_element(
                     by=AppiumBy.ANDROID_UIAUTOMATOR,
                     value=content_desc)
                 install_BTN.click()
+                self.__dprint("Clicked second install")
 
         except Exception as e:  # Install btn not found
             err = True
             self.__dprint("Failed to find install button on transport id: ", self.__transport_id, e)
             already_installed = is_installed(install_package_name, self.__transport_id)
 
-        # Error finding/Clicking Install button  amd app is not installed still...
+        # Error finding/Clicking Install button and app is not installed still...
         if err and not already_installed:
             self.__dprint("Verifying UI for Needs to Purchase...")
             price = self.__needs_purchase()
@@ -463,7 +449,6 @@ class AppInstaller:
             self.__check_playstore_install_fail()
             self.__driver.back()  # back to seach results
             self.__driver.back()  # back to home page
-
         except PlaystoreCrashException as e:
             raise PlaystoreCrashException()
         except NeedsPurchaseException as price:
@@ -478,10 +463,10 @@ class AppInstaller:
             return self.__return_error(last_step, "Wrong package found in playstore.")
         except FailedClickIconException:
             return self.__return_error(last_step, 'Failed to click app icon.')
-        except PlaystoreANRException as e:
-            raise PlaystoreANRException()
-        except PlaystoreInstallFailedException as e:
-            raise PlaystoreInstallFailedException()
+        except PlaystoreANRException as error:
+            return self.__return_error(last_step, error)
+        except PlaystoreInstallFailedException as error:
+            return self.__return_error(last_step, error)
         except Exception as error:
             print("General failure in installer: ", error)
             traceback.print_exc()
