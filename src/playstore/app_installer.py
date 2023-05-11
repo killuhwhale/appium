@@ -301,15 +301,20 @@ class AppInstaller:
                 app_icon = self.__driver.find_elements(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
                 for icon in app_icon:
                     cont_desc = icon.get_attribute('content-desc')
+                    if cont_desc == '':
+                        icon.click()
+                        sleep(1)
+                        return
+
                     self.__dprint("Icons:", icon.location, icon.id, cont_desc)
-                    input("Icon click check")
+                    #input("Icon click check")
                     if "Image" in cont_desc or title_first in cont_desc and not "Play trailer" in cont_desc:
                         self.__dprint("Clicked: ", icon.id, cont_desc)
                         bounds = icon.get_attribute("bounds")
                         # icon.click()  # NOTE bug on Eve, Caroline it wont click the app icon to get into the detail view.
                         # Trial and error: this has been working without issues...
                         self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds)))
-                        self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds)))
+                        #self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds)))
                         sleep(1)
                         return
             except Exception as e:

@@ -47,16 +47,13 @@ if __name__ == "__main__":
                         help="Num of apps to runs.",
                         default=-1, type=int)
 
-
     args = parser.parse_args()
     ips = args.ips
     logger.print_log(f"{CONFIG=}")
     logger.print_log(f"CLI input: {args.parallel=}")
     logger.print_log(f"CLI input: {ips=}")
 
-
-
-    if (args.parallel):
+    if args.parallel:
         # Multiprocessing Runs
         if len(ips) == 0:
             ips = [
@@ -118,7 +115,6 @@ if __name__ == "__main__":
 
         num_apps = args.num if args.num > 0 else len(TESTING_APPS)
         package_names = TESTING_APPS[:num_apps]
-
 
         print("Creating driver...")
         driver = webdriver.Remote(
