@@ -101,7 +101,7 @@ if __name__ == "__main__":
         # ip = "192.168.1.125:5555"
         # ip = "192.168.1.238:5555"
         # ip = "192.168.1.149:5555"
-
+        ips = ['10.0.0.174:5555']
         ip = ips[0] if not args.clean else ""
         service_manager = AppiumServiceManager([ip])
         if args.clean:
@@ -114,7 +114,7 @@ if __name__ == "__main__":
         TESTING_APPS = tsv.get_apps()
 
         num_apps = args.num if args.num > 0 else len(TESTING_APPS)
-        package_names = TESTING_APPS[:num_apps]
+        package_names = TESTING_APPS[1:2]#num_apps]
 
         print("Creating driver...")
         driver = webdriver.Remote(
