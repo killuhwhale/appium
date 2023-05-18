@@ -30,7 +30,7 @@ class __AccountsAPI:
         res = requests.get(f"{self.__base_url}", headers={'X-Access-Key': self.__api_key})
         if res.status_code == 200:
             self.__accounts = dict(json.loads(res.text)['record'])
-            print(f"{self.__accounts=}")
+            print(f"{self.__accounts=}\n")
         else:
             p_alert("Failed to load account information from jsonbin.io")
             sys.exit(1)

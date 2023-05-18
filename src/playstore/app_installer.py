@@ -209,6 +209,7 @@ class AppInstaller:
             '''
             search_icon = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
             search_icon.click()
+            self.__dprint("Search icon clicked.")
         except Exception as error:
             # Playstore version Eve (4-13-2023): version 35.2.19-21 [0] [PR] 522404461
             content_desc = f'''
@@ -216,6 +217,7 @@ class AppInstaller:
             '''
             search_icon = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
             search_icon.click()
+            self.__dprint("Second search icon clicked.")
 
     def __check_playstore_crash(self):
         # 01-05 22:08:57.546   129   820 I WindowManager: WIN DEATH: Window{afca274 u0 com.android.vending/com.google.android.finsky.activities.MainActivity}
@@ -302,8 +304,8 @@ class AppInstaller:
                 for icon in app_icon:
                     cont_desc = icon.get_attribute('content-desc')
                     self.__dprint("Icons:", icon.location, icon.id, cont_desc)
-                    input("Icon click check")
-                    if "Image" in cont_desc or title_first in cont_desc and not "Play trailer" in cont_desc:
+                    # input("Icon click check")
+                    if ("Image" in cont_desc or title_first in cont_desc or not cont_desc) and not "Play trailer" in cont_desc:
                         self.__dprint("Clicked: ", icon.id, cont_desc)
                         bounds = icon.get_attribute("bounds")
                         # icon.click()  # NOTE bug on Eve, Caroline it wont click the app icon to get into the detail view.
@@ -385,7 +387,7 @@ class AppInstaller:
 
         except Exception as e:  # Install btn not found
             err = True
-            self.__dprint("Failed to find install button on transport id: ", self.__transport_id, e)
+            self.__dprint("Failed to find any install button on transport id: ", self.__transport_id, e)
             already_installed = is_installed(install_package_name, self.__transport_id)
 
         # Error finding/Clicking Install button and app is not installed still...

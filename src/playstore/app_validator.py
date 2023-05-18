@@ -32,7 +32,11 @@ class AppValidator:
             app_logger: AppLogger,
             stats_queue: Queue,
             price_queue: Queue,
+            run_id: str,
+            ts: int,
         ):
+        self.__run_id = run_id
+        self.__ts = ts
         self.__driver = driver
         self.__device = device
         self.__transport_id = device.info.transport_id
@@ -78,13 +82,15 @@ class AppValidator:
         #  Log results to tsv File
         # When updating this, AppLogger.headers must also be updated.
 
-        device_info = f"{self.__device.info.arc_build},{self.__device.info.channel},{self.__device.info.arc_version}"
+        device_build_info = f"{self.__device.info.arc_build},{self.__device.info.channel},{self.__device.info.arc_version}"
         self.__app_logger.log(
             status_obj['status'],
             status_obj['package_name'],
             status_obj['name'],
             status_obj['report_title'],
-            device_info,
+            self.__run_id,
+            self.__ts,
+            device_build_info,
             datetime.now().strftime("%A, %B %d, %Y %I:%M:%S %p"),
             status_obj['reason'],
             status_obj['new_name'],

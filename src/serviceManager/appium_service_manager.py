@@ -51,11 +51,11 @@ class AppiumServiceManager:
             sys.exit(1)
 
     def start_services(self):
-        print(f"starting services for {self.__ips=}")
+        print(f"starting services for {self.__ips=} \n")
         for i, ip in enumerate(self.__ips):
             try:
                 port = self.__base_port + i
-                print(f"Starting service: {port=} for device at {ip=}")
+                print(f"Starting service: {port=} for device at {ip=} \n")
                 service = AppiumService()
                 process = service.start(args=['--address', '0.0.0.0', '-p', str(port), '--base-path', '/wd/hub'])
                 while not service.is_listening or not service.is_running:
