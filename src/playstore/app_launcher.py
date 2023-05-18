@@ -32,7 +32,9 @@ class AppLauncher:
         self.__dprint = dprinter
 
     def __check_playstore_invalid(self, package_name) -> bool:
-        ''' Checks if an app's package_name is invalid via Google playstore URL
+        ''' Checks if an app's package_name is invalid via Google playstore URL.
+            This will only return True if the expected string on the website is found.
+
             If invalid, returns True
             If valid, returns False
         '''
@@ -47,7 +49,7 @@ class AppLauncher:
             else:
                 return False
         else:
-            return True
+            return False
 
     def __check_playstore_name(self, package_name, app_title) -> str:
         ''' Checks an app's name via Google playstore URL
@@ -88,6 +90,8 @@ class AppLauncher:
                     INVALID_APP = True
                     self.__app_list_queue.put(('invalid', package_name, app_title))
                     return NEW_APP_NAME, INVALID_APP, reason
+                else:
+                    break
             except Exception as e:
                 print(e)
                 invalid_checks -= 1
@@ -100,6 +104,8 @@ class AppLauncher:
                     NEW_APP_NAME = self.__name_span_text
                     self.__app_list_queue.put(('misnamed', package_name, NEW_APP_NAME))
                     return NEW_APP_NAME, INVALID_APP, reason
+                else:
+                    break
             except Exception as e:
                 print(e)
                 name_checks -= 1
