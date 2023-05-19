@@ -99,6 +99,10 @@ Prep work for Chromebook:
 
 # TODOs
 
+
+    - Add Playstore checks from app_launcher to App_validator to also check when we fail to click app_icon in app_installer....
+
+
     - Free Fire failed to detect Facebook (most likely download took to long)
         - Try to detect Free Fire download via adb
     - Messenger Kids - Failed to click/recognize 'Authorize device" as continue btn to finish logging in.

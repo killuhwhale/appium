@@ -1,4 +1,5 @@
 import collections
+from enum import Enum
 from appium.webdriver import Remote
 from copy import deepcopy
 from typing import Dict, List
@@ -8,6 +9,7 @@ from utils.app_utils import AppData, create_dir_if_not_exists, get_root_path
 from utils.device_utils import Device
 from utils.logging_utils import ( p_blue, p_cyan, p_green,
                          p_purple, p_red, p_yellow)
+
 
 
 class ValidationReport:
@@ -42,8 +44,19 @@ class ValidationReport:
             }
         }
     '''
+    LOGGED_IN_FACEBOOK = -3
+    LOGGED_IN_GOOLE = -2
+    LOGGED_IN_EMAIL = -1
     PASS = 0
     FAIL = 1
+    CRASH_WIN_DEATH = 2
+    CRASH_FORCE_RM_ACT_RECORD = 3
+    CRASH_ANR = 4
+    CRASH_FDEBUG_CRASH = 5
+    CRASH_FATAL_EXCEPTION = 6
+    NEEDS_PRICE = 7
+    INVALID = 8
+    DID_NOT_OPEN = 9
 
     @staticmethod
     def default_dict():
