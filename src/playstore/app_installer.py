@@ -293,7 +293,7 @@ class AppInstaller:
                 Image of app or game icon for Roblox
         '''
 
-        title_first = title.replace("|", "\|")
+        title_first = title
         self.__dprint(f"Searching for clickable element: {title_first}")
         descs = [
             f'''new UiSelector().className("android.widget.TextView").text("{title_first}");''',
@@ -307,14 +307,12 @@ class AppInstaller:
         ]
         for content_desc in descs:
             self.__dprint("Searhing for app_icon with content desc: ", content_desc)
-            input("Icon click check")
             try:
                 app_icon = self.__driver.find_elements(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
                 for icon in app_icon:
-                    self.__dprint("Icons:", icon.location, icon.id, cont_desc)
-                    input("Icons icon click check")
 
                     cont_desc = icon.get_attribute('content-desc')
+                    self.__dprint("Icons:", icon.location, icon.id, cont_desc)
                     if ("Image" in cont_desc or title_first in cont_desc or not cont_desc) and not "Play trailer" in cont_desc:
                         self.__dprint("Clicked: ", icon.id, cont_desc)
                         bounds = icon.get_attribute("bounds")

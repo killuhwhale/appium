@@ -2,7 +2,7 @@ from datetime import datetime
 from pympler import asizeof
 from multiprocessing import Queue
 from time import sleep
-from typing import List
+from typing import Dict, List
 import __main__
 from appium.webdriver import Remote
 from appium.webdriver.common.appiumby import AppiumBy
@@ -64,6 +64,20 @@ class AppValidator:
             uninstall_app(package_name, self.__transport_id)
 
 
+    def __upload_images_to_firebase_storage(self, history: List[Dict[str, str]]):
+        '''Takes an apps full history and uploads each image to Firebase storage.
+
+        '''
+
+        i  = 0
+        while i < len(history):
+            hist = history[i]
+            # while not upload_img() and attemps > 0:
+            print("Upload hist img function here", hist['img'])
+            history[i]['img'] = "New uploaded url for img here | Failed to upload message: or fallback URL..."
+            i += 1
+
+
 
     def __cleanup_run(self, app_package_name: str):
         self.__dprint(f"Cleaning up {app_package_name}")
@@ -81,6 +95,9 @@ class AppValidator:
         '''
         #  Log results to tsv File
         # When updating this, AppLogger.headers must also be updated.
+
+        self.__upload_images_to_firebase_storage(status_obj['history'])
+        print(f"\n\n\n\n\n\n\n     {status_obj['history']}     \n\n\n\\n\n\n\n")
 
         device_build_info = f"{self.__device.info.arc_build},{self.__device.info.channel},{self.__device.info.arc_version}"
         self.__app_logger.log(
