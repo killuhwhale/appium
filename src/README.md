@@ -4,6 +4,15 @@ Example Output
 <video src="https://drive.google.com/open?id=1kztEqXsqcLiEa24NN3vr3_ddeH0D0re4&authuser=0&usp=drive_link" />
 
 
+
+
+# Login with AppVal002 to provide ADC to device that is running tests in order to upload to GCPBuckets
+gcloud auth application-default login
+
+
+
+
+
 Prep work for Chromebook:
 - DUT
     - Install Accounts for testing.

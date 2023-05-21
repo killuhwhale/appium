@@ -1,22 +1,33 @@
 from datetime import datetime
-from pympler import asizeof
 from multiprocessing import Queue
 from time import sleep
 from typing import Dict, List
+
 import __main__
+import requests
 from appium.webdriver import Remote
 from appium.webdriver.common.appiumby import AppiumBy
+from google.cloud import storage
+from pympler import asizeof
+import json
 
 from playstore.app_installer import AppInstaller, AppInstallerResult
-from playstore.app_login import AppLogin
 from playstore.app_launcher import AppLauncher
+from playstore.app_login import AppLogin
 from playstore.app_login_results import AppLoginResults
 from playstore.validation_report import ValidationReport
-from utils.app_utils import AppInfo, close_app, close_save_password_dialog, get_cur_activty, get_views, open_app, uninstall_app
+from utils.app_utils import (AppInfo, close_app, close_save_password_dialog,
+                             get_cur_activty, get_views, open_app,
+                             uninstall_app)
 from utils.device_utils import Device
 from utils.error_utils import CrashTypes, ErrorDetector
 from utils.logging_utils import AppLogger, get_color_printer
+from utils.post_to_firebase import post_to_firebase
 from utils.utils import CONFIG, PLAYSTORE_PACKAGE_NAME
+
+# Instantiates a client
+storage_client = storage.Client()
+
 
 class AppValidator:
     ''' Main class to validate a broken app. Discovers, installs, opens and
@@ -64,17 +75,42 @@ class AppValidator:
             uninstall_app(package_name, self.__transport_id)
 
 
-    def __upload_images_to_firebase_storage(self, history: List[Dict[str, str]]):
-        '''Takes an apps full history and uploads each image to Firebase storage.
+    def __upload_img(self, source_file_name: str, package_name: str, hist_step: int):
+        # The ID of your GCS bucket
+        bucket_name = "appval-387223.appspot.com"
+        # The path to your file to upload
+        # source_file_name = "local/path/to/file"
+        # The ID of your GCS object
+        # destination_blob_name = "storage-object-name"
+        destination_blob_name = f"appRuns/{self.__run_id}/{self.__report.report_title}/{package_name}/{hist_step}"
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(destination_blob_name)
 
-        '''
+        # Optional: set a generation-match precondition to avoid potential race conditions
+        # and data corruptions. The request to upload is aborted if the object's
+        # generation number does not match your precondition. For a destination
+        # object that does not yet exist, set the if_generation_match precondition to 0.
+        # If the destination object already exists in your bucket, set instead a
+        # generation-match precondition using its generation number.
+        generation_match_precondition = 0
+
+        blob.upload_from_filename(source_file_name, if_generation_match=generation_match_precondition)
+        return destination_blob_name
+
+    def __upload_images_to_firebase_storage(self, history: List[Dict[str, str]], package_name: str):
+        '''Takes an apps full history and uploads each image to Firebase storage.'''
 
         i  = 0
         while i < len(history):
             hist = history[i]
             # while not upload_img() and attemps > 0:
             print("Upload hist img function here", hist['img'])
-            history[i]['img'] = "New uploaded url for img here | Failed to upload message: or fallback URL..."
+            destination_blob_name = self.__upload_img(hist['img'], package_name, i)
+            if not destination_blob_name:
+                destination_blob_name = self.__upload_img(hist['img'], package_name, i)
+
+            history[i]['img'] = destination_blob_name
             i += 1
 
 
@@ -95,11 +131,32 @@ class AppValidator:
         '''
         #  Log results to tsv File
         # When updating this, AppLogger.headers must also be updated.
-
-        self.__upload_images_to_firebase_storage(status_obj['history'])
-        print(f"\n\n\n\n\n\n\n     {status_obj['history']}     \n\n\n\\n\n\n\n")
-
         device_build_info = f"{self.__device.info.arc_build},{self.__device.info.channel},{self.__device.info.arc_version}"
+        app_run_time = datetime.now()
+        app_run_ts = int(app_run_time.timestamp()*1000) # Firebase needs a date
+        self.__upload_images_to_firebase_storage(status_obj['history'], status_obj['package_name'])
+
+        post_to_firebase({
+            'status': status_obj['status'],
+            'package_name': status_obj['package_name'],
+            'name': status_obj['name'],
+            'report_title': status_obj['report_title'],
+            'run_id': str(self.__run_id),
+            'run_ts': self.__ts,
+            'build': device_build_info,
+            'timestamp': app_run_ts,  # Log string instead of ts
+            'reason': status_obj['reason'],
+            'new_name': status_obj['new_name'],
+            'invalid': status_obj['invalid'],
+            'history': str(status_obj['history']),
+            'logs': status_obj['logs'],
+        })
+
+        # q = ""
+        # while not q == "q":
+        #     q = input("Send another request")
+
+
         self.__app_logger.log(
             status_obj['status'],
             status_obj['package_name'],
@@ -108,7 +165,7 @@ class AppValidator:
             self.__run_id,
             self.__ts,
             device_build_info,
-            datetime.now().strftime("%A, %B %d, %Y %I:%M:%S %p"),
+            app_run_time.strftime("%A, %B %d, %Y %I:%M:%S %p"),  # Log string instead of ts
             status_obj['reason'],
             status_obj['new_name'],
             status_obj['invalid'],

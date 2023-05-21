@@ -131,7 +131,7 @@ class ValidationReport:
             print("Error grabbing screenshot to update history.")
             pass
 
-        self.__report[self.__report_title][package_name]['history'].append({'msg': history_msg, 'img': full_path })
+        self.__report[self.__report_title][package_name]['history'].append({"msg": history_msg, "img": full_path })
 
 
     def add_logs(self, package_name: str, logs: str):
