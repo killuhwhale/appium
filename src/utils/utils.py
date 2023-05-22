@@ -30,15 +30,22 @@ def create_file_if_not_exists(path):
 
 @dataclass(frozen=True)
 class _CONFIG:
-    save_yolov8_predicts = True
-    debug_print = True # Playstore.py, debug color printing by device.
-    multi_split_packages = False  # MultiprocessTaskRunner, splits apps across devices or not
-    login_facebook =  False  # Discover, install and sign into Facebook before running AppValidator.
-    skip_pre_multi_uninstall = False  # Skips pre process uninstalltion of all apps to be tested.
-    skip_install = False # App_validator allow to skip this step
-    skip_launch = False # App_validator allow to skip this step
-    skip_login = True # App_validator allow to skip this step
-    skip_post_uninstall = False  #Skips post process uninstalltion of the app just tested.
+    save_yolov8_predicts: bool = True
+    debug_print: bool = True # Playstore.py, debug color printing by device.
+    multi_split_packages: bool = False  # MultiprocessTaskRunner, splits apps across devices or not
+    login_facebook: bool = False  # Discover, install and sign into Facebook before running AppValidator.
+    skip_pre_multi_uninstall: bool = False  # Skips pre process uninstallation of all apps to be tested.
+    skip_install: bool = False # App_validator allow to skip this step
+    skip_launch: bool = True # App_validator allow to skip this step
+    skip_login: bool = True # App_validator allow to skip this step
+    skip_post_uninstall: bool = False  #Skips post process uninstallation of the app just tested.
+
+    def __str__(self):
+        return ' '.join([f'{item[0]}:{item[1]}' for item in self.__dict__.items()])
+
+# Create an instance of the _CONFIG class
+config = _CONFIG()
+# Print the values of the class using the __str__ method
 
 CONFIG = _CONFIG()
 BASE_PORT = 4723

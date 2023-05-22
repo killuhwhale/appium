@@ -9,14 +9,14 @@ Arguments:
     ips: (Required) ip addresses of the DUT.
 
 Example:
-    python3 main.py -i 192.168.1.125 192.168.1.113     # Single run
-    python3 main.py -p -i 192.168.1.125 192.168.1.113  # Parallel Run
+    python3 main.py -i 192.168.1.125:5555 192.168.1.113:5555       # Single run
+    python3 main.py -i 192.168.1.125:5555 192.168.1.238:5555 -n 1  # Single run w/ 1 app (starting from beginning of list)
+    python3 main.py -p -i 192.168.1.125:5555 192.168.1.113:5555    # Parallel Run
 """
 import argparse
+from datetime import datetime
 from multiprocessing import Queue
-import sys
 from appium import webdriver
-from objdetector.yolov8 import YoloV8
 
 from playstore.app_validator import AppValidator
 from playstore.facebook_app import  FacebookApp
@@ -26,10 +26,9 @@ from serviceManager.appium_service_manager import AppiumServiceManager
 from utils.device_utils import Device
 from utils.logging_utils import AppListTSV, AppLogger, logger
 from utils.parallel import MultiprocessTaskRunner
-from utils.utils import BASE_PORT, CONFIG, PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME, V8_WEIGHTS, WEIGHTS, android_des_caps, dev_scrape_start_at_app
-
+from utils.utils import BASE_PORT, CONFIG, PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE_NAME, android_des_caps, dev_scrape_start_at_app
 from pympler import asizeof
-
+from uuid import uuid1
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="App validation.")
@@ -47,13 +46,19 @@ if __name__ == "__main__":
                         help="Num of apps to runs.",
                         default=-1, type=int)
 
+
     args = parser.parse_args()
     ips = args.ips
-    logger.print_log(f"{CONFIG=}")
-    logger.print_log(f"CLI input: {args.parallel=}")
-    logger.print_log(f"CLI input: {ips=}")
+    logger.print_log(f"Config", CONFIG, '\n')
+    logger.print_log(f"CLI input: {args.parallel=}\n")
+    logger.print_log(f"CLI input: {ips=}\n")
 
-    if args.parallel:
+    run_id = uuid1(1337, 42)
+    ts = int(datetime.now().timestamp())
+    logger.print_log(f"{run_id=}\n")
+    logger.print_log(f"Start time {ts=}\n")
+
+    if (args.parallel):
         # Multiprocessing Runs
         if len(ips) == 0:
             ips = [
@@ -67,7 +72,7 @@ if __name__ == "__main__":
                 # '192.168.1.113:5555', # CoachZ   snapdragon ARC-P ARM   Green,
                 # '192.168.1.149:5555', # Careena  AMD        ARC-P x86   Green,
             ]
-        logger.print_log("ips: ", ips)
+        logger.print_log("ips: ", ips, '\n')
 
         tsv = AppListTSV()  # Create Globally
         TESTING_APPS = tsv.get_apps()
@@ -82,7 +87,7 @@ if __name__ == "__main__":
         num_apps = args.num if args.num > 0 else len(TESTING_APPS)
         package_names = TESTING_APPS[:num_apps]
 
-        runner = MultiprocessTaskRunner(ips, package_names)
+        runner = MultiprocessTaskRunner(run_id, ts, ips, package_names)
         runner.run()
         runner.print_devices()
 
@@ -101,7 +106,7 @@ if __name__ == "__main__":
         # ip = "192.168.1.125:5555"
         # ip = "192.168.1.238:5555"
         # ip = "192.168.1.149:5555"
-        ips = ['10.0.0.174:5555']
+
         ip = ips[0] if not args.clean else ""
         service_manager = AppiumServiceManager([ip])
         if args.clean:
@@ -114,7 +119,8 @@ if __name__ == "__main__":
         TESTING_APPS = tsv.get_apps()
 
         num_apps = args.num if args.num > 0 else len(TESTING_APPS)
-        package_names = TESTING_APPS[1:2]#num_apps]
+        package_names = TESTING_APPS[:num_apps]
+
 
         print("Creating driver...")
         driver = webdriver.Remote(
@@ -137,8 +143,9 @@ if __name__ == "__main__":
             # content_desc = f'''new UiSelector().className("android.widget.Button").text("{text}")'''
             # driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
 
-        fb_handle = FacebookApp(driver, app_logger,  device, BASE_PORT, Queue(),)
+        fb_handle = FacebookApp(driver, app_logger,  device, BASE_PORT, Queue(), run_id, ts)
         fb_handle.install_and_login()
+
 
         validator = AppValidator(
             driver,
@@ -149,6 +156,8 @@ if __name__ == "__main__":
             app_logger,
             Queue(),  # Stats
             Queue(),  # Prices
+            run_id,
+            ts
         )
         if not CONFIG.skip_pre_multi_uninstall:
             validator.uninstall_multiple()

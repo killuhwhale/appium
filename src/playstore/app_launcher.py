@@ -32,7 +32,9 @@ class AppLauncher:
         self.__dprint = dprinter
 
     def __check_playstore_invalid(self, package_name) -> bool:
-        ''' Checks if an app's package_name is invalid via Google playstore URL
+        ''' Checks if an app's package_name is invalid via Google playstore URL.
+            This will only return True if the expected string on the website is found.
+
             If invalid, returns True
             If valid, returns False
         '''
@@ -47,7 +49,7 @@ class AppLauncher:
             else:
                 return False
         else:
-            return True
+            return False
 
     def __check_playstore_name(self, package_name, app_title) -> str:
         ''' Checks an app's name via Google playstore URL

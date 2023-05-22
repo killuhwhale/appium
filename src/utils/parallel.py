@@ -41,7 +41,7 @@ def update_app_list(queue: Queue ):
                 p_alert("Breaking from")
                 break
 
-def validate_task(queue: Queue, app_list_queue: Queue, app_logger: AppLogger, stats_queue: Queue, price_queue: Queue, packages: List[List[str]], ip: str, device: Device, port: int):
+def validate_task(run_id: str, ts: int, queue: Queue, app_list_queue: Queue, app_logger: AppLogger, stats_queue: Queue, price_queue: Queue, packages: List[List[str]], ip: str, device: Device, port: int):
     '''
         A single task to validate apps on a given device.
     '''
@@ -68,7 +68,7 @@ def validate_task(queue: Queue, app_list_queue: Queue, app_logger: AppLogger, st
     driver.implicitly_wait(5)
     driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
 
-    fb_handle = FacebookApp(driver, app_logger,  device, port, stats_queue,)
+    fb_handle = FacebookApp(driver, app_logger,  device, port, stats_queue, run_id, ts)
     fb_handle.install_and_login()
 
     validator = AppValidator(
@@ -80,6 +80,8 @@ def validate_task(queue: Queue, app_list_queue: Queue, app_logger: AppLogger, st
         app_logger,
         stats_queue,
         price_queue,
+        run_id,
+        ts
     )
     if not CONFIG.skip_pre_multi_uninstall:
         validator.uninstall_multiple()
@@ -94,7 +96,9 @@ class MultiprocessTaskRunner:
     '''
         Starts running valdiate_task on each device/ ip.
     '''
-    def __init__(self, ips: List[str], packages: List[List[str]] ):
+    def __init__(self, run_id: str, ts: int, ips: List[str], packages: List[List[str]] ):
+        self.__run_id = run_id
+        self.__ts = ts
         self.__queue = Queue()
         self.__app_list_queue = Queue()
         self.__app_list_process = None
@@ -211,7 +215,7 @@ class MultiprocessTaskRunner:
             device = Device(ip)
             dev_info = device.info
             self.__devices.append(device)
-            process = Process(target=validate_task, args=(self.__queue, self.__app_list_queue, self.__app_logger, self.__stats_queue, self.__price_queue, apps, ip, device, port_number))
+            process = Process(target=validate_task, args=(self.__run_id,  self.__ts, self.__queue, self.__app_list_queue, self.__app_logger, self.__stats_queue, self.__price_queue, apps, ip, device, port_number))
             process.start()
             self.__processes.append(process)
             logger.print_log(f"Started run on device: {dev_info=}", end="\n")

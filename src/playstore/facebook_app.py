@@ -15,7 +15,8 @@ class FacebookApp:
 
         This will be ran before the main valdiation process.
     '''
-    def __init__(self, driver: webdriver.Remote, app_logger: AppLogger,  device: Device, instance_num: int, stats_queue: Queue):
+    def __init__(self, driver: webdriver.Remote, app_logger: AppLogger,  device: Device, instance_num: int, stats_queue: Queue, run_id: str,
+            ts: int):
         self.__app_name = FACEBOOK_APP_NAME
         self.__package_name = FACEBOOK_PACKAGE_NAME
         self.__device = device
@@ -27,7 +28,9 @@ class FacebookApp:
             Queue(),
             app_logger,
             stats_queue,
-            Queue()  # Price queue not need when checking facebook.
+            Queue(),  # Price queue not need when checking facebook.
+            run_id,
+            ts
         )
 
     @property

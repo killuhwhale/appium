@@ -209,6 +209,7 @@ class AppInstaller:
             '''
             search_icon = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
             search_icon.click()
+            self.__dprint("Search icon clicked.")
         except Exception as error:
             # Playstore version Eve (4-13-2023): version 35.2.19-21 [0] [PR] 522404461
             content_desc = f'''
@@ -216,6 +217,7 @@ class AppInstaller:
             '''
             search_icon = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
             search_icon.click()
+            self.__dprint("Second search icon clicked.")
 
     def __check_playstore_crash(self):
         # 01-05 22:08:57.546   129   820 I WindowManager: WIN DEATH: Window{afca274 u0 com.android.vending/com.google.android.finsky.activities.MainActivity}
@@ -236,18 +238,20 @@ class AppInstaller:
 
     def __check_playstore_anr(self):
         try:
+            self.__dprint("Checking playtore ANR")
             content_desc = f'''new UiSelector().text("Wait")'''
             wait_button = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
             wait_button.click()
             self.__dprint("PlayStore stopped responding")
             raise PlaystoreANRException()
         except Exception as e:
-            pass
+            self.__dprint("No ANR found")
             # self.__dprint("Playstore ANR error: ", e) # Failed to find ANR, no need to report error.
         return False
 
     def __check_playstore_install_fail(self):
         try:
+            self.__dprint("Check playstore install fail")
             feedback_desc = f'''new UiSelector().className("android.widget.Button").text("Send feedback")'''
             got_it_desc = f'''new UiSelector().className("android.widget.Button").text("Got it")'''
             feedback_button = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=feedback_desc)
@@ -257,7 +261,7 @@ class AppInstaller:
             self.__dprint("PlayStore couldn't install application")
             raise PlaystoreInstallFailedException()
         except Exception as e:
-            pass
+            self.__dprint("No app install fail found.")
         return False
 
     def __search_playstore(self, title: str, submit=True):
@@ -288,37 +292,40 @@ class AppInstaller:
             Emulator:
                 Image of app or game icon for Roblox
         '''
-        title_first = title
+
+        title_first = title.replace("|", "\|")
+        self.__dprint(f"Searching for clickable element: {title_first}")
         descs = [
+            f'''new UiSelector().className("android.widget.TextView").text("{title_first}");''',
+            f'''new UiSelector().textMatches(\"(?i){title_first}.*\");'''
             f'''new UiSelector().descriptionMatches(\".*(?i){title_first}.*\");''', # Pixel 2
-            f'''new UiSelector().descriptionMatches(\"App: (?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");''',  # Chromebooks
-            f'''new UiSelector().descriptionMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");''',
-            f'''new UiSelector().textMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \\n]*\");'''
+            f'''new UiSelector().descriptionMatches(\"App: (?i){title_first}.*\");''',  # Chromebooks
+            f'''new UiSelector().descriptionMatches(\"(?i){title_first}.*\");''',
+            # f'''new UiSelector().descriptionMatches(\"App: (?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \| \\n]*\");''',  # Chromebooks
+            # f'''new UiSelector().descriptionMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \| \\n]*\");''',
+            # f'''new UiSelector().textMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \| \\n]*\");'''
         ]
         for content_desc in descs:
             self.__dprint("Searhing for app_icon with content desc: ", content_desc)
+            input("Icon click check")
             try:
                 app_icon = self.__driver.find_elements(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
                 for icon in app_icon:
-                    cont_desc = icon.get_attribute('content-desc')
-                    if cont_desc == '':
-                        icon.click()
-                        sleep(1)
-                        return
-
                     self.__dprint("Icons:", icon.location, icon.id, cont_desc)
-                    #input("Icon click check")
-                    if "Image" in cont_desc or title_first in cont_desc and not "Play trailer" in cont_desc:
+                    input("Icons icon click check")
+
+                    cont_desc = icon.get_attribute('content-desc')
+                    if ("Image" in cont_desc or title_first in cont_desc or not cont_desc) and not "Play trailer" in cont_desc:
                         self.__dprint("Clicked: ", icon.id, cont_desc)
                         bounds = icon.get_attribute("bounds")
                         # icon.click()  # NOTE bug on Eve, Caroline it wont click the app icon to get into the detail view.
                         # Trial and error: this has been working without issues...
                         self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds)))
-                        #self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds)))
+                        self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds)))
                         sleep(1)
                         return
             except Exception as e:
-                self.__dprint("Icon failed click ", e)
+                self.__dprint("❌ Icon failed click ", e)
         raise FailedClickIconException()
 
     def __extract_bounds(self, bounds: str):
@@ -390,7 +397,7 @@ class AppInstaller:
 
         except Exception as e:  # Install btn not found
             err = True
-            self.__dprint("Failed to find install button on transport id: ", self.__transport_id, e)
+            self.__dprint("Failed to find any install button on transport id: ", self.__transport_id, e)
             already_installed = is_installed(install_package_name, self.__transport_id)
 
         # Error finding/Clicking Install button and app is not installed still...

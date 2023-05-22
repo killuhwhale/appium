@@ -32,7 +32,11 @@ class AppValidator:
             app_logger: AppLogger,
             stats_queue: Queue,
             price_queue: Queue,
+            run_id: str,
+            ts: int,
         ):
+        self.__run_id = run_id
+        self.__ts = ts
         self.__driver = driver
         self.__device = device
         self.__transport_id = device.info.transport_id
@@ -78,13 +82,15 @@ class AppValidator:
         #  Log results to tsv File
         # When updating this, AppLogger.headers must also be updated.
 
-        device_info = f"{self.__device.info.arc_build},{self.__device.info.channel},{self.__device.info.arc_version}"
+        device_build_info = f"{self.__device.info.arc_build},{self.__device.info.channel},{self.__device.info.arc_version}"
         self.__app_logger.log(
             status_obj['status'],
             status_obj['package_name'],
             status_obj['name'],
             status_obj['report_title'],
-            device_info,
+            self.__run_id,
+            self.__ts,
+            device_build_info,
             datetime.now().strftime("%A, %B %d, %Y %I:%M:%S %p"),
             status_obj['reason'],
             status_obj['new_name'],
@@ -103,6 +109,23 @@ class AppValidator:
         open_app(PLAYSTORE_PACKAGE_NAME, self.__transport_id, self.__driver, self.__device.info.arc_version)
         self.__driver.orientation = 'PORTRAIT'
 
+    def __switch_crash_type(self, crashType: CrashTypes):
+        ''' Switch control to map CrashTypes to ValidationReport status
+
+        '''
+        if(crashType == CrashTypes.WIN_DEATH):
+            return ValidationReport.CRASH_WIN_DEATH
+        elif(crashType == CrashTypes.FORCE_RM_ACT_RECORD):
+            return ValidationReport.CRASH_FORCE_RM_ACT_RECORD
+        elif(crashType == CrashTypes.ANR):
+            return ValidationReport.CRASH_ANR
+        elif(crashType == CrashTypes.FDEBUG_CRASH):
+            return ValidationReport.CRASH_FDEBUG_CRASH
+        elif(crashType == CrashTypes.FATAL_EXCEPTION):
+            return ValidationReport.CRASH_FATAL_EXCEPTION
+        else:
+            ValidationReport.FAIL
+
     def __check_crash(self, package_name: str) -> bool:
         ''' Updates report if crash is detected.
 
@@ -111,9 +134,6 @@ class AppValidator:
 
             Returns:
                 - True if a crash was detected.
-
-
-
         '''
         print("checkinbg for crash in app_val")
         errors = self.__err_detector.check_crash()
@@ -121,11 +141,20 @@ class AppValidator:
         if(not CrashTypes.SUCCESS in errors):
             self.__report.add_logs(package_name, self.__err_detector.logs.replace('\t', '').replace('\n', ''))
             all_errors_msg = []
+            report_status_crash_type = None  # Used to catch mutiple errors and only report highest precedence
             for key, val in errors.items():
                 crash_type, crashed_act, msg = val
+                if not report_status_crash_type:
+                    report_status_crash_type = crash_type
+                elif report_status_crash_type == CrashTypes.WIN_DEATH and crash_type == CrashTypes.FDEBUG_CRASH:
+                    report_status_crash_type = crash_type
+                elif report_status_crash_type == CrashTypes.WIN_DEATH and crash_type == CrashTypes.FATAL_EXCEPTION:
+                    report_status_crash_type = crash_type
+
                 all_errors_msg.append(crash_type.value)
                 self.__report.add_history(package_name, f"{crash_type.value}: {crashed_act} - {msg}", self.__driver)
-            self.__report.update_status(package_name, ValidationReport.FAIL, ' '.join(all_errors_msg))
+
+            self.__report.update_status(package_name, self.__switch_crash_type(report_status_crash_type), ' '.join(all_errors_msg))
             print("\n\n Found error returning True")
             return True
         return False
@@ -172,7 +201,7 @@ class AppValidator:
             self.__report.add_history(app_package_name, install_result.message or "App install successfull.", self.__driver)
             if install_result.price:
                 self.__price_queue.put((app_title, app_package_name, install_result.price,))
-                return self.__report.update_status(app_package_name, ValidationReport.FAIL, f"{install_result.message} - {install_result.price}")
+                return self.__report.update_status(app_package_name, ValidationReport.NEEDS_PRICE, f"{install_result.message} - {install_result.price}")
 
             if self.__check_crash(app_package_name):
                 return
@@ -187,11 +216,11 @@ class AppValidator:
                 return self.__process_app(new_app_name, app_package_name)
             elif invalid_app:
                 self.__report.add_history(app_package_name, reason, self.__driver)
-                return self.__report.update_status(app_package_name, ValidationReport.FAIL, reason, '', invalid_app)
+                return self.__report.update_status(app_package_name, ValidationReport.INVALID, reason, '', invalid_app)
             elif not app_did_open:
                 self.__check_crash(app_package_name)
                 self.__report.add_history(app_package_name, reason, self.__driver)
-                return self.__report.update_status(app_package_name, ValidationReport.FAIL, reason, '', invalid_app)
+                return self.__report.update_status(app_package_name, ValidationReport.DID_NOT_OPEN, reason, '', invalid_app)
 
 
             sleep(5)
