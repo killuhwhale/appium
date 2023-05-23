@@ -10,7 +10,7 @@ Arguments:
 
 Example:
     python3 main.py -i 192.168.1.125:5555 192.168.1.113:5555       # Single run
-    python3 main.py -i 192.168.1.125:5555 192.168.1.238:5555 -n 1  # Single run w/ 1 app (starting from beginning of list)
+    python3 main.py -i 192.168.1.238:5555 -n 1  # Single run w/ 1 app (starting from beginning of list)
     python3 main.py -p -i 192.168.1.125:5555 192.168.1.113:5555    # Parallel Run
 """
 import argparse
@@ -45,16 +45,21 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--num",
                         help="Num of apps to runs.",
                         default=-1, type=int)
+    parser.add_argument("-l", "--local",
+                        help="Use localhost as base url when sending requests, defaults to GCP.",
+                        action='store_true', default=False)
 
-
-    args = parser.parse_args()
-    ips = args.ips
-    logger.print_log(f"Config", CONFIG, '\n')
-    logger.print_log(f"CLI input: {args.parallel=}\n")
-    logger.print_log(f"CLI input: {ips=}\n")
 
     run_id = uuid1(1337, 42)
-    ts = int(datetime.now().timestamp())
+    ts = int(datetime.now().timestamp()*1000)
+    args = parser.parse_args()
+    ips = args.ips
+    if args.local:
+        CONFIG.base_url = "http://localhost:3000"
+    logger.print_log(f"CLI input: {args.parallel=}\n")
+    logger.print_log(f"CLI input: {args.local=}\n")
+    logger.print_log(f"CLI input: {ips=}\n")
+    logger.print_log(f"Config", CONFIG, '\n')
     logger.print_log(f"{run_id=}\n")
     logger.print_log(f"Start time {ts=}\n")
 
@@ -134,15 +139,6 @@ if __name__ == "__main__":
         driver.implicitly_wait(5)
         driver.wait_activity(PLAYSTORE_MAIN_ACT, 5)
 
-        # from appium.webdriver.common.appiumby import AppiumBy
-        # q = ""
-        # while q != "q":
-        #     q = input("Get a session")
-        #     print(f"{driver.current_activity=}")
-            # text = "NONE OF THE ABOVE"
-            # content_desc = f'''new UiSelector().className("android.widget.Button").text("{text}")'''
-            # driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
-
         fb_handle = FacebookApp(driver, app_logger,  device, BASE_PORT, Queue(), run_id, ts)
         fb_handle.install_and_login()
 
@@ -163,7 +159,7 @@ if __name__ == "__main__":
             validator.uninstall_multiple()
         validator.run()
 
-        print(f"Sie of validation report dict: {(asizeof.asizeof(validator.report.report) / 1000.0):.2f} KB")
+        print(f"Site of validation report dict: {(asizeof.asizeof(validator.report.report) / 1000.0):.2f} KB")
         validator.report.merge(fb_handle.validator.report)
         validator.report.print()
 

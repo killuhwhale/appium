@@ -28,7 +28,7 @@ def create_file_if_not_exists(path):
             pass
 
 
-@dataclass(frozen=True)
+@dataclass()
 class _CONFIG:
     save_yolov8_predicts: bool = True
     debug_print: bool = True # Playstore.py, debug color printing by device.
@@ -39,6 +39,7 @@ class _CONFIG:
     skip_launch: bool = True # App_validator allow to skip this step
     skip_login: bool = True # App_validator allow to skip this step
     skip_post_uninstall: bool = False  #Skips post process uninstallation of the app just tested.
+    base_url: str = "https://appval-387223.wl.r.appspot.com"  #Skips post process uninstallation of the app just tested.
 
     def __str__(self):
         return ' '.join([f'{item[0]}:{item[1]}' for item in self.__dict__.items()])

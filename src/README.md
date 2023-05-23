@@ -4,6 +4,13 @@ Example Output
 <video src="https://drive.google.com/open?id=1kztEqXsqcLiEa24NN3vr3_ddeH0D0re4&authuser=0&usp=drive_link" />
 
 
+
+# Deployment
+## Login with AppVal002 to provide ADC to device that is running tests in order to upload to GCPBuckets
+    gcloud auth application-default login
+
+
+
 Prep work for Chromebook:
 - DUT
     - Install Accounts for testing.
@@ -14,8 +21,12 @@ Prep work for Chromebook:
     - Setup environment
         - bash ins_and_stu.sh
         - bash setup.sh (run twice if npm is not already installed.)
-    - python3 main.py [ips]
-    - python3 main.py 192.168.1.113:5555 192.168.1.238:5555 192.168.1.248:5555
+    - Add Files to Home Dir
+        - app_list.txt place in home dir of host machine that contains apps to test.
+    - Add Files to project
+        - .env file in src/ w/ FIREBASE_HOST_POST_ENDPOINT_SECRET
+    - Run Program
+        python3 main.py -i 192.168.1.125:5555 192.168.1.113:5555       # Single run
 
 
 # What we can do
