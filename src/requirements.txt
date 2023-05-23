@@ -89,10 +89,6 @@ nest-asyncio==1.5.6
 notebook==6.5.2
 notebook-shim==0.2.2
 numpy==1.23.5
-nvidia-cublas-cu11==11.10.3.66
-nvidia-cuda-nvrtc-cu11==11.7.99
-nvidia-cuda-runtime-cu11==11.7.99
-nvidia-cudnn-cu11==8.5.0.96
 oauthlib==3.2.2
 opencv-python==4.6.0.66
 outcome==1.2.0
@@ -143,7 +139,6 @@ sortedcontainers==2.4.0
 soupsieve==2.3.2.post1
 sqlparse==0.4.4
 stack-data==0.6.2
-tensorboard==2.11.0
 tensorboard-data-server==0.6.1
 tensorboard-plugin-wit==1.8.1
 terminado==0.17.1
@@ -161,7 +156,6 @@ trio-websocket==0.9.2
 Twisted==22.10.0
 txaio==23.1.1
 typing-extensions==4.4.0
--e git+https://github.com/killuhwhale/appium.git@2d6fb2f71249c0d6e3da80e51c9c179e40b36240#egg=ultralytics
 uritemplate==4.1.1
 urllib3==1.26.12
 wcwidth==0.2.5
