@@ -296,25 +296,28 @@ class AppInstaller:
         title_first = title.replace("|", "\|")
         self.__dprint(f"Searching for clickable element: {title_first}")
         descs = [
+            f'''new UiSelector().descriptionMatches(\"(?i){title_first}.*\");''',
             f'''new UiSelector().className("android.widget.TextView").text("{title_first}");''',
-            f'''new UiSelector().textMatches(\"(?i){title_first}.*\");'''
+            #f'''new UiSelector().textMatches(\"(?i){title_first}.*\");''',
             f'''new UiSelector().descriptionMatches(\".*(?i){title_first}.*\");''', # Pixel 2
             f'''new UiSelector().descriptionMatches(\"App: (?i){title_first}.*\");''',  # Chromebooks
-            f'''new UiSelector().descriptionMatches(\"(?i){title_first}.*\");''',
             # f'''new UiSelector().descriptionMatches(\"App: (?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \| \\n]*\");''',  # Chromebooks
             # f'''new UiSelector().descriptionMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \| \\n]*\");''',
             # f'''new UiSelector().textMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \| \\n]*\");'''
         ]
         for content_desc in descs:
             self.__dprint("Searhing for app_icon with content desc: ", content_desc)
-            input("Icon click check")
+            #input("Icon click check")
             try:
                 app_icon = self.__driver.find_elements(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
-                for icon in app_icon:
-                    self.__dprint("Icons:", icon.location, icon.id, cont_desc)
-                    input("Icons icon click check")
+                if 'text' in content_desc and len(app_icon) == 1:
+                    raise FailedClickIconException
 
+                for icon in app_icon:
                     cont_desc = icon.get_attribute('content-desc')
+                    self.__dprint("Icons:", icon.location, icon.id, cont_desc)
+                    #input("Icons icon click check")
+
                     if ("Image" in cont_desc or title_first in cont_desc or not cont_desc) and not "Play trailer" in cont_desc:
                         self.__dprint("Clicked: ", icon.id, cont_desc)
                         bounds = icon.get_attribute("bounds")
@@ -440,19 +443,16 @@ class AppInstaller:
             self.__click_playstore_search()
             self.__check_playstore_crash()
             self.__check_playstore_anr()
-            self.__check_playstore_install_fail()
 
             last_step = 1
             self.__search_playstore(title)
             self.__check_playstore_crash()
             self.__check_playstore_anr()
-            self.__check_playstore_install_fail()
 
             last_step = 2
             self.__click_app_icon(title, install_package_name)
             self.__check_playstore_crash()
             self.__check_playstore_anr()
-            self.__check_playstore_install_fail()
 
             last_step = 3
             self.__install_app_UI(install_package_name)
