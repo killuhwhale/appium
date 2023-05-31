@@ -301,7 +301,11 @@ class AppValidator:
             if self.__check_crash(app_package_name):
                 return
 
-        # input("Check app for age slider")
+        q = ""
+        while not q == "q":
+            q = input("Check app for age slider")
+            print(f"{self.__driver.current_activity=}")
+
         # self.__dev_SS_loop(app_package_name)
 
         # Now app is installed and launched...
@@ -317,8 +321,6 @@ class AppValidator:
             print(f"{as_byte_num=}")
             new_result_obj = AppLoginResults.from_byte(as_byte_num)
             print(f"{new_result_obj.__dict__=}")
-
-
 
             print(f"{login_results=}")
             logged_in_msg = "Logged in." if any(list(login_results.__dict__.values())[::2]) else "Not logged in."

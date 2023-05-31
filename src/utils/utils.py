@@ -34,11 +34,11 @@ class _CONFIG:
     debug_print: bool = True # Playstore.py, debug color printing by device.
     multi_split_packages: bool = False  # MultiprocessTaskRunner, splits apps across devices or not
     login_facebook: bool = False  # Discover, install and sign into Facebook before running AppValidator.
-    skip_pre_multi_uninstall: bool = False  # Skips pre process uninstallation of all apps to be tested.
-    skip_install: bool = False # App_validator allow to skip this step
-    skip_launch: bool = True # App_validator allow to skip this step
+    skip_pre_multi_uninstall: bool = True  # Skips pre process uninstallation of all apps to be tested.
+    skip_install: bool = True # App_validator allow to skip this step
+    skip_launch: bool = False # App_validator allow to skip this step
     skip_login: bool = True # App_validator allow to skip this step
-    skip_post_uninstall: bool = False  #Skips post process uninstallation of the app just tested.
+    skip_post_uninstall: bool = True  #Skips post process uninstallation of the app just tested.
     base_url: str = "https://appval-387223.wl.r.appspot.com"  #Skips post process uninstallation of the app just tested.
 
     def __str__(self):
