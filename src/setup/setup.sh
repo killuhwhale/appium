@@ -90,4 +90,4 @@ echo -e "\n\n $Cyan Also don't forget to activate venv:: \n\t $RESET $Red source
 
 echo -e "\n\n $Cyan To run: cd appium/src \n\t $RESET $Red python3 main.py 192.168.0.123:5555 192.168.0.235:5555 $RESET \n\n"
 
-echo -e "\n\n $Cyan Don't forget to login to Gcloud CLI \n\t $RESET $Red gcloud login $RESET \n\n"
+echo -e "\n\n $Cyan Don't forget to login to Gcloud CLI \n\t $RESET $Red gcloud auth login $RESET \n\n"
