@@ -129,7 +129,6 @@ def main():
         num_apps = args.num if args.num > 0 else len(TESTING_APPS)
         package_names = TESTING_APPS[:num_apps]
 
-
         print("Creating driver...")
         driver = webdriver.Remote(
             f"http://localhost:{BASE_PORT}/wd/hub",
@@ -169,7 +168,7 @@ def main():
 
 if __name__ == "__main__":
     try:
-        logging.basicConfig(filename='crash.log', filemode='w', level=logging.DEBUG)
+        logging.basicConfig(filename='crash.log', filemode='w', level=logging.ERROR)
         main()
     except Exception as e:
         logging.critical("main crashed")
