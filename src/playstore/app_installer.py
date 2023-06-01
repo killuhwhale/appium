@@ -296,11 +296,12 @@ class AppInstaller:
         title_first = title
         self.__dprint(f"Searching for clickable element: {title_first}")
         descs = [
+            f'''new UiSelector().descriptionContains("{title_first}");''',
             f'''new UiSelector().descriptionMatches(\"(?i){title_first}.*\");''',
-            f'''new UiSelector().className("android.widget.TextView").text("{title_first}");''',
-            #f'''new UiSelector().textMatches(\"(?i){title_first}.*\");''',
-            f'''new UiSelector().descriptionMatches(\".*(?i){title_first}.*\");''', # Pixel 2
-            f'''new UiSelector().descriptionMatches(\"App: (?i){title_first}.*\");''',  # Chromebooks
+            #f'''new UiSelector().className("android.widget.TextView").text("{title_first}");''',
+            f'''new UiSelector().textMatches(\"(?i){title_first}.*\");''',
+            #f'''new UiSelector().descriptionMatches(\".*(?i){title_first}.*\");''', # Pixel 2
+            #f'''new UiSelector().descriptionMatches(\"App: (?i){title_first}.*\");''',  # Chromebooks
             # f'''new UiSelector().descriptionMatches(\"App: (?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \| \\n]*\");''',  # Chromebooks
             # f'''new UiSelector().descriptionMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \| \\n]*\");''',
             # f'''new UiSelector().textMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \| \\n]*\");'''
@@ -310,7 +311,7 @@ class AppInstaller:
             try:
                 app_icon = self.__driver.find_elements(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
                 if 'text' in content_desc and len(app_icon) == 1:
-                    raise FailedClickIconException
+                    raise FailedClickIconException()
 
                 for icon in app_icon:
 
@@ -322,7 +323,7 @@ class AppInstaller:
                         # icon.click()  # NOTE bug on Eve, Caroline it wont click the app icon to get into the detail view.
                         # Trial and error: this has been working without issues...
                         self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds)))
-                        self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds)))
+                        #self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds)))
                         sleep(1)
                         return
             except Exception as e:

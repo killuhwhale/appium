@@ -36,7 +36,7 @@ class _CONFIG:
     login_facebook: bool = False  # Discover, install and sign into Facebook before running AppValidator.
     skip_pre_multi_uninstall: bool = False  # Skips pre process uninstallation of all apps to be tested.
     skip_install: bool = False # App_validator allow to skip this step
-    skip_launch: bool = True # App_validator allow to skip this step
+    skip_launch: bool = False # App_validator allow to skip this step
     skip_login: bool = True # App_validator allow to skip this step
     skip_post_uninstall: bool = False  #Skips post process uninstallation of the app just tested.
     base_url: str = "https://appval-387223.wl.r.appspot.com"  #Skips post process uninstallation of the app just tested.

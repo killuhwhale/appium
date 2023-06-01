@@ -17,6 +17,8 @@ import argparse
 from datetime import datetime
 from multiprocessing import Queue
 from appium import webdriver
+import logging
+import sys
 
 from playstore.app_validator import AppValidator
 from playstore.facebook_app import  FacebookApp
@@ -30,7 +32,8 @@ from utils.utils import BASE_PORT, CONFIG, PLAYSTORE_MAIN_ACT, PLAYSTORE_PACKAGE
 from pympler import asizeof
 from uuid import uuid1
 
-if __name__ == "__main__":
+
+def main():
     parser = argparse.ArgumentParser(description="App validation.")
     parser.add_argument("-p", "--parallel",
                         help="Run on multiple devices",
@@ -163,4 +166,11 @@ if __name__ == "__main__":
         validator.report.merge(fb_handle.validator.report)
         validator.report.print()
 
+
+if __name__ == "__main__":
+    try:
+        logging.basicConfig(filename='crash.log', filemode='w', level=logging.DEBUG)
+        main()
+    except Exception as e:
+        logging.critical("main crashed")
 
