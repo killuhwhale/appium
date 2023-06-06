@@ -303,7 +303,7 @@ class AppValidator:
 
         q = ""
         while not q == "q":
-            q = input("Check app for age slider")
+            q = input("Check app for Softare Agreement")
             print(f"{self.__driver.current_activity=}")
 
         # self.__dev_SS_loop(app_package_name)

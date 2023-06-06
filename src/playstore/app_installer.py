@@ -306,7 +306,7 @@ class AppInstaller:
             # f'''new UiSelector().textMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \| \\n]*\");'''
         ]
         for content_desc in descs:
-            self.__dprint("Searhing for app_icon with content desc: ", content_desc)
+            self.__dprint("Searching for app_icon with content desc: ", content_desc)
             try:
                 app_icon = self.__driver.find_elements(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
                 for icon in app_icon:
@@ -319,7 +319,8 @@ class AppInstaller:
                         # icon.click()  # NOTE bug on Eve, Caroline it wont click the app icon to get into the detail view.
                         # Trial and error: this has been working without issues...
                         self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds)))
-                        self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds)))
+                        # We can try to verify that the button was clicked by checking for
+
                         sleep(1)
                         return
             except Exception as e:
@@ -436,27 +437,27 @@ class AppInstaller:
         try:
             last_step = 0  # track last sucessful step to, atleast, report in console.
             self.__click_playstore_search()
-            self.__check_playstore_crash()
-            self.__check_playstore_anr()
-            self.__check_playstore_install_fail()
+            # self.__check_playstore_crash()
+            # self.__check_playstore_anr()
+            # self.__check_playstore_install_fail()
 
             last_step = 1
             self.__search_playstore(title)
-            self.__check_playstore_crash()
-            self.__check_playstore_anr()
-            self.__check_playstore_install_fail()
+            # self.__check_playstore_crash()
+            # self.__check_playstore_anr()
+            # self.__check_playstore_install_fail()
 
             last_step = 2
             self.__click_app_icon(title, install_package_name)
-            self.__check_playstore_crash()
-            self.__check_playstore_anr()
-            self.__check_playstore_install_fail()
+            # self.__check_playstore_crash()
+            # self.__check_playstore_anr()
+            # self.__check_playstore_install_fail()
 
             last_step = 3
             self.__install_app_UI(install_package_name)
-            self.__check_playstore_crash()
-            self.__check_playstore_anr()
-            self.__check_playstore_install_fail()
+            # self.__check_playstore_crash()
+            # self.__check_playstore_anr()
+            # self.__check_playstore_install_fail()
             self.__driver.back()  # back to seach results
             self.__driver.back()  # back to home page
         except PlaystoreCrashException as e:

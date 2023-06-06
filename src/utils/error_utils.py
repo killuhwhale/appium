@@ -21,6 +21,7 @@ class CrashTypes(Enum):
     ANR = "App not responding"
     FDEBUG_CRASH = "F DEBUG crash"
     FATAL_EXCEPTION = "Fatal Exception"
+    PROC_DIED = "Process Died"
 
 class ErrorDetector:
     ''' Detects crashes from Logcat and ANRs from Dumpsys activity.
@@ -184,6 +185,30 @@ class ErrorDetector:
             return failed_activity, failed_msg
         return "", ""
 
+    def __check_proc_died(self):
+        ''' Searches logs for Process has died.
+
+            06-05 22:14:31.896   419  3177 I ActivityManager: Process com.supercell.hayday (pid 24668) has died: fg  TOP
+
+
+            Returns:
+                True if found.
+        '''
+        ts_pattern = rf"^\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*"  # com.supercell.hayday
+        proc_died =  rf"^\d+-\d+\s\d+\:\d+\:\d+\.\d+\s*\d+\s*\d+\s*I ActivityManager: Process {self.__package_name} .*pid .* has died: fg  TOP.*$"
+        print("Checking for proc died: ", proc_died)
+        proc_died_pattern = re.compile(proc_died, re.MULTILINE)
+        match = proc_died_pattern.search(self.__logs)
+
+        if match:
+            self.__add_clean_logs(match)
+            no_timestamp_string = re.sub(ts_pattern, "", match.group(0), flags=re.MULTILINE)
+            print(f"Match/no_timestamp_string: ", match, no_timestamp_string)
+
+            return True, no_timestamp_string
+        print("No proc died match")
+        return False, ""
+
     def check_crash(self)-> Dict[CrashTypes, Tuple[CrashTypes, str, str]]:
         ''' Grabs logcat logs starting at a specified time and check for crash logs.
 
@@ -201,6 +226,9 @@ class ErrorDetector:
             '''
                 Need to check ea error and not break early.
                 Win death can come befre a F debug crash but we would be more interested in F debug
+
+                Need to Add a check for this crash log - Suercell hay Day
+                     - 06-05 22:14:31.896   419  3177 I ActivityManager: Process com.supercell.hayday (pid 24668) has died: fg  TOP
             '''
             errors = dict()
             failed_act, match = self.__check_fatal_exception()
@@ -218,6 +246,10 @@ class ErrorDetector:
             failed_act, match = self.__check_f_debug_crash()
             if match:
                 errors[CrashTypes.FDEBUG_CRASH] = (CrashTypes.FDEBUG_CRASH, failed_act, match, )
+
+            failed, match = self.__check_proc_died()
+            if failed:
+                errors[CrashTypes.PROC_DIED] = (CrashTypes.PROC_DIED, self.__package_name, match, )
 
             if self.__check_for_ANR():
                 errors[CrashTypes.ANR] = (CrashTypes.ANR, "unknown activity", "ANR detected.", )

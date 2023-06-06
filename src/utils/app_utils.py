@@ -151,7 +151,10 @@ def get_cur_activty(transport_id: str, ArcVersion: ArcVersions, package_name: st
 
         if result is None:
             is_ANR_thrown = is_ANR(text, package_name)
-            print("Cant find current activity.", f"{is_ANR_thrown=}", text)
+            if "Software Agreement" in text:
+                print("Software agreement is showing.", text)
+            else:
+                print("Cant find current activity.", f"{is_ANR_thrown=}", text)
             return {
                 "package_name": '',
                 "act_name": '',
