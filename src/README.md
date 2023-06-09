@@ -3,7 +3,7 @@ Example Output
 <img src="https://raw.githubusercontent.com/killuhwhale/appium/main/src/images/readme/demo_output.png?sanitize=true&raw=true" />
 <video src="https://drive.google.com/open?id=1kztEqXsqcLiEa24NN3vr3_ddeH0D0re4&authuser=0&usp=drive_link" />
 
-
+python3 main.py -i 192.168.1.125:5555      # Single run
 
 # Deployment
 ## Login with AppVal002 to provide ADC to device that is running tests in order to upload to GCPBuckets
@@ -26,7 +26,7 @@ Prep work for Chromebook:
     - Add Files to project
         - .env file in src/ w/ FIREBASE_HOST_POST_ENDPOINT_SECRET
     - Run Program
-        python3 main.py -i 192.168.1.125:5555 192.168.1.113:5555       # Single run
+        python3 main.py -i 192.168.1.125:5555   # Single run
 
 
 # What we can do
@@ -62,9 +62,19 @@ Prep work for Chromebook:
 11. Summary report of all apps from each device.
 12. Detects 3 types of login methods and attempts to login to each: Google, Facebook, Email
 
-# What we need to do but cant yet
-1. Detect if an app is O4C
+# Tools
+ ## get_app_names.py  [Useful to update AMACE automation app list.] [Appium automation reads from /home/$USER/app_list.tsv]
 
+    - Problem statement: Our automations need files that are tab separated: App name    Package Name
+        ~ This tool creates the needed file from a list of package names only.
+    - Overview: Takes a list of package names, fetches app name from Google Play, creates new file with appName \t packageName inside file: ~/new_app_list.tsv
+    - Process:
+        - Open get_app_names.py and place app list into file
+        - Run python3 get_app_names.py
+        - Results are place into: ~/new_app_list.tsv
+        - Run from home dir: ./openAmaceAppList.tsv  (opens file in VSCode)
+        - Copy paste from new_app_list.tsv to AMACE_app_list.tsv that was just opened into VSCode via ./openAmaceAppList.tsv
+        - AMACE_app_list.tsv is the data file that AMACE.go reads from.
 
 # Reporting
 
@@ -99,14 +109,6 @@ Prep work for Chromebook:
     - Focus on #4, 5 that is essentially our data source whereas 1 and 2 keep our testing list updated while still trakcing invalid apps.
 
 
-# Django webserver - runs local on host machine
-    ## websocketapp
-    - Establish wss connection to GCP server
-
-
-
-
-
 
 # TODOs
 
@@ -118,13 +120,8 @@ Prep work for Chromebook:
         - Try to detect Free Fire download via adb
     - Messenger Kids - Failed to click/recognize 'Authorize device" as continue btn to finish logging in.
         - Scraped, need to add to dataset.
-
     - Facebook takes like 43 seconds to open when trying to login with email/password which made the login attempts run out while wainting for FB....
         - Check to see if we can see any loading activity from ADB.
-
-     - Explore  OCR on bounding boxes for continue to see what button we have.
-        - We can then decided which order or what not to click based on the text of the button.
-
 
 
     Raw Image sizes from device SS:
@@ -153,28 +150,6 @@ Prep work for Chromebook:
         Size of validation report dict (7): 32.03 KB
 
 
- Make Money: Play & Earn Cash   us.current.android   PASSED   - [eve_192.168.1.125:5555]
- AppData(name='us.current.android', versionCode='647', versionName='1.177.1', compileSdkVersion='33', compileSdkVersionCodename='13', platformBuildVersionName='', is_pwa=False, is_game=False)
-         Final status:   Logged in.
-         Logged in with: Google, Email
-         Detected log in methods: Google, Email
-         App install successfull.
-                 Img: /home/killuh/ws_p38/appium/src/images/history/192.168.1.125:5555/us.current.android/0.png
-         Google Auth sign-in
-                 Img: /home/killuh/ws_p38/appium/src/images/history/192.168.1.125:5555/us.current.android/1.png
-         Email/ password sign-in
-                 Img: /home/killuh/ws_p38/appium/src/images/history/192.168.1.125:5555/us.current.android/2.png
-
-
-
-
-
-
-
-
-
-
-
 
     Future TODOs:
 
@@ -193,10 +168,6 @@ Prep work for Chromebook:
         - Able to create an app that reproduces an ANR...
             - Minimally helpful.
 
-
-    - Detect AMAC-e (determine if app is O4C) -> impossible feat so far unless building test image.
-        - AMAC-E overlays will not actually interfere with our process.
-        - When sending comands via ADB, it essentially ignores those windows/ overlays.
 
 # NOTES
 

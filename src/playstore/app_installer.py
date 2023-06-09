@@ -296,23 +296,19 @@ class AppInstaller:
         title_first = title
         self.__dprint(f"Searching for clickable element: {title_first}")
         descs = [
-            f'''new UiSelector().descriptionContains("{title_first}");''',
+            f'''new UiSelector().className("android.widget.TextView").text("{title_first}");''',
+            f'''new UiSelector().textMatches(\"(?i){title_first}.*\");'''
+            f'''new UiSelector().descriptionMatches(\".*(?i){title_first}.*\");''', # Pixel 2
+            f'''new UiSelector().descriptionMatches(\"App: (?i){title_first}.*\");''',  # Chromebooks
             f'''new UiSelector().descriptionMatches(\"(?i){title_first}.*\");''',
-            #f'''new UiSelector().className("android.widget.TextView").text("{title_first}");''',
-            f'''new UiSelector().textMatches(\"(?i){title_first}.*\");''',
-            #f'''new UiSelector().descriptionMatches(\".*(?i){title_first}.*\");''', # Pixel 2
-            #f'''new UiSelector().descriptionMatches(\"App: (?i){title_first}.*\");''',  # Chromebooks
             # f'''new UiSelector().descriptionMatches(\"App: (?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \| \\n]*\");''',  # Chromebooks
             # f'''new UiSelector().descriptionMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \| \\n]*\");''',
             # f'''new UiSelector().textMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \| \\n]*\");'''
         ]
         for content_desc in descs:
-            self.__dprint("Searhing for app_icon with content desc: ", content_desc)
+            self.__dprint("Searching for app_icon with content desc: ", content_desc)
             try:
                 app_icon = self.__driver.find_elements(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
-                if 'text' in content_desc and len(app_icon) == 1:
-                    raise FailedClickIconException()
-
                 for icon in app_icon:
 
                     cont_desc = icon.get_attribute('content-desc')
@@ -323,7 +319,8 @@ class AppInstaller:
                         # icon.click()  # NOTE bug on Eve, Caroline it wont click the app icon to get into the detail view.
                         # Trial and error: this has been working without issues...
                         self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds)))
-                        #self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds)))
+                        # We can try to verify that the button was clicked by checking for
+
                         sleep(1)
                         return
             except Exception as e:
@@ -438,26 +435,30 @@ class AppInstaller:
          A method to search Google Playstore for an app and install via the Playstore UI.
         '''
         try:
-            last_step = 0  # track last sucessful step to, atleast, report in console.
-            self.__click_playstore_search()
-            self.__check_playstore_crash()
-            self.__check_playstore_anr()
+            # last_step = 0  # track last sucessful step to, atleast, report in console.
+            # self.__click_playstore_search()
+            # # self.__check_playstore_crash()
+            # # self.__check_playstore_anr()
+            # # self.__check_playstore_install_fail()
 
-            last_step = 1
-            self.__search_playstore(title)
-            self.__check_playstore_crash()
-            self.__check_playstore_anr()
+            # last_step = 1
+            # self.__search_playstore(title)
+            # # self.__check_playstore_crash()
+            # # self.__check_playstore_anr()
+            # # self.__check_playstore_install_fail()
 
             last_step = 2
-            self.__click_app_icon(title, install_package_name)
-            self.__check_playstore_crash()
-            self.__check_playstore_anr()
+            # self.__click_app_icon(title, install_package_name)
+            self.__open_app_page(install_package_name)
+            # # self.__check_playstore_crash()
+            # # self.__check_playstore_anr()
+            # # self.__check_playstore_install_fail()
 
             last_step = 3
             self.__install_app_UI(install_package_name)
-            self.__check_playstore_crash()
-            self.__check_playstore_anr()
-            self.__check_playstore_install_fail()
+            # self.__check_playstore_crash()
+            # self.__check_playstore_anr()
+            # self.__check_playstore_install_fail()
             self.__driver.back()  # back to seach results
             self.__driver.back()  # back to home page
         except PlaystoreCrashException as e:
@@ -483,6 +484,23 @@ class AppInstaller:
             traceback.print_exc()
             return self.__return_error(last_step, error)
         return AppInstallerResult(True, "")
+
+    def __open_app_page(self, app_package_name: str):
+        '''Opens the playstore to the app page.
+
+            // am start a.SendIntentCommand(ctx, intentActionView, playStoreAppPageURI+pkgName)
+
+        '''
+        intentActionView = "android.intent.action.VIEW"
+        playStoreAppPageURI = "market://details?id="
+        target = f"{playStoreAppPageURI}{app_package_name}"
+
+        cmd = ('adb','-t', self.__transport_id, 'shell', 'am', 'start', "-d", target, "-a", intentActionView)
+        outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+                                capture_output=True).stdout.strip()
+        self.__dprint("open app page res: ", outstr)
+
+
 
     def discover_and_install(self, app_title: str, app_package_name: str) -> List:
         try:

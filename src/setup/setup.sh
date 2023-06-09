@@ -12,7 +12,17 @@ RESET="\033[0m"
 
 echo "Chromebook users: press enter to submit sudo password"
 sudo apt -y install default-jre
+
+sudo apt -y install git
 sudo apt -y install libnss3-dev libgdk-pixbuf2.0-dev libgtk-3-dev libxss-dev
+
+# Setup Gcloud
+sudo apt-get -y install apt-transport-https ca-certificates gnupg
+echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+sudo apt-get -y update && sudo apt-get -y install google-cloud-cli
+
+
 
 # Setup Node environment
 
@@ -79,3 +89,5 @@ echo -e "\n\n $Yellow Run the following and then rerun this script. \n\t $RESET 
 echo -e "\n\n $Cyan Also don't forget to activate venv:: \n\t $RESET $Red source appium/bin/activate $RESET \n\n"
 
 echo -e "\n\n $Cyan To run: cd appium/src \n\t $RESET $Red python3 main.py 192.168.0.123:5555 192.168.0.235:5555 $RESET \n\n"
+
+echo -e "\n\n $Cyan Don't forget to login to Gcloud CLI \n\t $RESET $Red gcloud auth login $RESET \n\n"
