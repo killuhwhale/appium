@@ -9,6 +9,7 @@ from utils.app_utils import AppData, create_dir_if_not_exists, get_root_path
 from utils.device_utils import Device
 from utils.logging_utils import ( p_blue, p_cyan, p_green,
                          p_purple, p_red, p_yellow)
+from utils.utils import AppStatus
 
 
 
@@ -19,9 +20,6 @@ class ValidationReport:
             report_title: {
                 package_name: {
                     'status': -1,
-                    'new_name': "",
-                    'invalid:': False,
-                    'reason': "",
                     'name': "",
                     'report_title': "",
                     'history': [],
@@ -32,9 +30,6 @@ class ValidationReport:
             report_title2: {
                 package_name: {
                     'status': -1,
-                    'new_name': "",
-                    'invalid:': False,
-                    'reason': "",
                     'name': "",
                     'report_title': "",
                     'history': [],
@@ -44,19 +39,20 @@ class ValidationReport:
             }
         }
     '''
-    LOGGED_IN_FACEBOOK = -3
-    LOGGED_IN_GOOLE = -2
-    LOGGED_IN_EMAIL = -1
-    PASS = 0
-    FAIL = 1
-    CRASH_WIN_DEATH = 2
-    CRASH_FORCE_RM_ACT_RECORD = 3
-    CRASH_ANR = 4
-    CRASH_FDEBUG_CRASH = 5
-    CRASH_FATAL_EXCEPTION = 6
-    NEEDS_PRICE = 7
-    INVALID = 8
-    DID_NOT_OPEN = 9
+    # LOGGED_IN_FACEBOOK = -3
+    # LOGGED_IN_GOOLE = -2
+    # LOGGED_IN_EMAIL = -1
+    # PASS = 0
+    # FAIL = 1
+    # CRASH_WIN_DEATH = 2
+    # CRASH_FORCE_RM_ACT_RECORD = 3
+    # CRASH_ANR = 4
+    # CRASH_FDEBUG_CRASH = 5
+    # CRASH_FATAL_EXCEPTION = 6
+    # NEEDS_PRICE = 7
+    # INVALID = 8
+    # DID_NOT_OPEN = 9
+
 
     @staticmethod
     def default_dict():
@@ -64,10 +60,7 @@ class ValidationReport:
             Default value for a report key.
         '''
         return  {
-            'status': -1,
-            'new_name': "",
-            'invalid': False,
-            'reason': "",
+            'status': 1337,
             'name': "",
             'package_name': "",
             'report_title': "",
@@ -98,20 +91,18 @@ class ValidationReport:
 
     def add_app(self, package_name: str, app_name: str):
         ''' Adds an app to the report. '''
-        if self.__report[self.__report_title][package_name]['status'] == -1:
+        if self.__report[self.__report_title][package_name]['status'] == 1337:
             self.__report[self.__report_title][package_name]['package_name'] = package_name
             self.__report[self.__report_title][package_name]['name'] = app_name
             self.__report[self.__report_title][package_name]['report_title'] = self.__report_title
-            self.__report[self.__report_title][package_name]['status'] = 0
+            self.__report[self.__report_title][package_name]['status'] = AppStatus.INIT.value
 
     def update_app_info(self, package_name: str, info: AppData):
         self.__report[self.__report_title][package_name]['app_info'] = info
 
-    def update_status(self, package_name: str, status: int, reason: str, new_name='', invalid=False):
-        self.__report[self.__report_title][package_name]['status'] = status
-        self.__report[self.__report_title][package_name]['reason'] = reason
-        self.__report[self.__report_title][package_name]['new_name'] = new_name
-        self.__report[self.__report_title][package_name]['invalid'] = invalid
+    def update_status(self, package_name: str, status: AppStatus):
+        self.__report[self.__report_title][package_name]['status'] = status.value
+
 
     def update_status_login(self, package_name: str, login_results: AppLoginResults):
         ''' Updates app status to indicate if the app used a specificed login method or has a specific method. '''
@@ -215,24 +206,21 @@ class ValidationReport:
 
     @staticmethod
     def print_app_report(package_name: str, status_obj: Dict):
-        if status_obj['status'] == -1:
+        if status_obj['status'] == 1337:
             return
-        is_good = status_obj['status'] == ValidationReport.PASS
+        is_good = status_obj['status'] >= AppStatus.PASS.value
         p_blue(f"{status_obj['name']} ", end="")
         p_cyan(f"{package_name} ", end="")
         if is_good:
             p_green("PASSED", end="")
         else:
             p_red(f"FAILED", end="")
-            p_red(f"New  name: {status_obj['new_name']}", end="") if status_obj['new_name'] else print('', end='')
-            p_red(f"Playstore N/A", end="") if status_obj['invalid'] else print('', end='')
+
         p_purple(f" - [{status_obj['report_title']}]", end="\n")
 
         p_blue(status_obj['app_info'], end='\n')
 
-        if len(status_obj['reason']) > 0:
-            p_blue("\t", "Final status: ", end="")
-            p_green( status_obj['reason']) if is_good else p_red( status_obj['reason'])
+
 
         # Print Logged in status
         logged_in_msg = [

@@ -112,7 +112,7 @@ class AppLogger:
         logger_passed = logging.getLogger('passed_apps_live')
         logger_failed.setLevel(logging.DEBUG)
         logger_passed.setLevel(logging.DEBUG)
-        header = f"Package\tName\tReport title\tRun Id\tRun ts\tBuild\tDate\tReason\tNew name\tInvalid\tHistory\tLogs\n"
+        header = f"Package\tName\tStatus\tReport title\tRun Id\tRun ts\tBuild\tDate\tHistory\tLogs\n"
         # Create a file handler for the logger
         with open(filename_failed, 'w') as f:
             f.write(header)
@@ -149,9 +149,9 @@ class AppLogger:
         if not args[1] in self.__packages_logged:
             message = '\t'.join(map(str, args[1:])).strip()
 
-            if args[0] == 0:
+            if args[0] > 0:
                 self.logger_passed.info(message)
-            elif args[0] == 1:
+            elif args[0] <= 0:
                 self.logger_failed.info(message)
             self.__packages_logged[args[1]] = True  # track logged package_device
 

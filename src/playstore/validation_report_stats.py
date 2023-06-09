@@ -3,7 +3,7 @@ from multiprocessing import Process, Queue
 from typing import Any, Dict
 from playstore.validation_report import ValidationReport
 from utils.logging_utils import StatsLogger, p_alert, p_blue, p_cyan, p_purple
-from utils.utils import nested_default_dict
+from utils.utils import AppStatus, nested_default_dict
 
 
 class ValidationReportStats:
@@ -22,7 +22,6 @@ class ValidationReportStats:
     def default_item():
         return {
             'total_apps': 0,
-            'total_misnamed': 0,
             'total_invalid': 0,
             'total_failed': 0,
             'total_passed': 0,
@@ -60,8 +59,6 @@ class ValidationReportStats:
              - all_reports: Is a nested default dictionary
         '''
         total_apps = 0
-        all_misnamed = defaultdict(str)
-        total_misnamed = 0
         all_invalid = defaultdict(str)
         total_invalid = 0
         total_failed = 0
@@ -73,15 +70,13 @@ class ValidationReportStats:
                 total_apps += 1
                 devices[report_title]['total_apps'] += 1
 
-                if len(status_obj['new_name']):
-                    all_misnamed[package_name] = status_obj['new_name']
-                    devices[report_title]['total_misnamed'] += 1
 
-                elif status_obj["invalid"]:
+
+                if status_obj["status"] == AppStatus.INVALID:
                     all_invalid[package_name] = status_obj['name']
                     devices[report_title]['total_invalid'] += 1
 
-                if status_obj['status'] == ValidationReport.FAIL:
+                if status_obj['status'] == AppStatus.FAIL:
                     total_failed += 1
                     devices[report_title]['total_failed'] += 1
 
@@ -89,13 +84,12 @@ class ValidationReportStats:
 
 
 
-        total_misnamed = len(all_misnamed.keys())
+
         total_invalid = len(all_invalid.keys())
 
         # self.stats_by_device = devices
         stats = ValidationReportStats.default_item()
         stats['total_apps'] =  total_apps
-        stats['total_misnamed'] =  total_misnamed
         stats['total_invalid'] =  total_invalid
         stats['total_failed'] =  total_failed
         stats['total_passed'] =  total_apps - total_failed
@@ -107,24 +101,21 @@ class ValidationReportStats:
         '''
         self.stats_by_device=defaultdict({
             'helios_192.168.1.238:5555': {
-                'total_apps': 3, 'total_misnamed': 1, 'total_invalid': 1, 'total_failed': 2
+                'total_apps': 3, 'total_invalid': 1, 'total_failed': 2
             },
             'coachz_192.168.1.113:5555': {
-                'total_apps': 3, 'total_misnamed': 1, 'total_invalid': 1, 'total_failed': 2
+                'total_apps': 3, 'total_invalid': 1, 'total_failed': 2
             },
             'eve_192.168.1.125:5555': {
-                'total_apps': 3, 'total_misnamed': 1, 'total_invalid': 1, 'total_failed': 2
+                'total_apps': 3, 'total_invalid': 1, 'total_failed': 2
             }
         })
 
         self.stats={
             'total_apps': 9,
-            'total_misnamed': 1,
             'total_invalid': 1,
             'total_failed': 6,
-            'all_misnamed': defaultdict({
-                'com.facebook.orca': 'Messenger'
-            }),
+
             'all_invalid': defaultdict({
                 'com.softinit.iquitos.whatswebscan': 'Whats Web Scan'
             })
@@ -139,8 +130,7 @@ class ValidationReportStats:
             if isinstance(val, int):
                 # name = key.replace("_", " ").title()
                 # Absoulte, if app failed due to these reasons, it failed on all devices
-                # Reporting the count this way shows how many apps are misnamed, and the total count of apps misnamed of those tested.
-                if key in ['total_misnamed', 'total_invalid']:
+                if key in ['total_invalid']:
                     S.append(f"\t{val * len(stats_by_device.items())} ({val})")
                 else:
                     S.append(f"\t{val}")
@@ -162,24 +152,20 @@ class ValidationReportStats:
         '''
         self.stats_by_device=defaultdict({
             'helios_192.168.1.238:5555': {
-                'total_apps': 3, 'total_misnamed': 1, 'total_invalid': 1, 'total_failed': 2
+                'total_apps': 3, 'total_invalid': 1, 'total_failed': 2
             },
             'coachz_192.168.1.113:5555': {
-                'total_apps': 3, 'total_misnamed': 1, 'total_invalid': 1, 'total_failed': 2
+                'total_apps': 3, 'total_invalid': 1, 'total_failed': 2
             },
             'eve_192.168.1.125:5555': {
-                'total_apps': 3, 'total_misnamed': 1, 'total_invalid': 1, 'total_failed': 2
+                'total_apps': 3, 'total_invalid': 1, 'total_failed': 2
             }
         })
 
         self.stats={
             'total_apps': 9,
-            'total_misnamed': 1,
             'total_invalid': 1,
             'total_failed': 6,
-            'all_misnamed': defaultdict({
-                'com.facebook.orca': 'Messenger'
-            }),
             'all_invalid': defaultdict({
                 'com.softinit.iquitos.whatswebscan': 'Whats Web Scan'
             })
@@ -199,7 +185,7 @@ class ValidationReportStats:
             if isinstance(val, int):
                 name = key.replace("_", " ").title()
                 # Absoulte, if app failed, it failed on all devices
-                if key in ['total_misnamed', 'total_invalid']:
+                if key in ['total_invalid']:
                     p_cyan(f"\t{name}: {val * len(stats_by_device.items())} ({val})")
                 else:
                     p_cyan(f"\t{name}: {val}")

@@ -23,7 +23,7 @@ from utils.device_utils import Device
 from utils.error_utils import CrashTypes, ErrorDetector
 from utils.logging_utils import AppLogger, get_color_printer
 from utils.post_to_firebase import post_to_firebase
-from utils.utils import CONFIG, PLAYSTORE_PACKAGE_NAME
+from utils.utils import CONFIG, PLAYSTORE_PACKAGE_NAME, AppStatus
 
 # Instantiates a client
 storage_client = storage.Client()
@@ -118,17 +118,6 @@ class AppValidator:
     def __cleanup_run(self, app_package_name: str):
         self.__dprint(f"Cleaning up {app_package_name}")
         status_obj = self.__report.get_status_obj_by_app(app_package_name)
-        '''
-            'status': -1,
-            'package_name': '',
-            'new_name': "",
-            'invalid': False,
-            'reason': "",
-            'name': "",
-            'report_title': "",
-            'history': [],
-            'logs', ''
-        '''
         #  Log results to tsv File
         # When updating this, AppLogger.headers must also be updated.
         device_build_info = f"{self.__device.info.arc_build},{self.__device.info.channel},{self.__device.info.arc_version}"
@@ -145,30 +134,21 @@ class AppValidator:
             'run_ts': self.__ts,
             'build': device_build_info,
             'timestamp': app_run_ts,  # Log string instead of ts
-            'reason': status_obj['reason'],
-            'new_name': status_obj['new_name'],
-            'invalid': status_obj['invalid'],
             'history': str(status_obj['history']),
             'logs': status_obj['logs'],
         })
-
-        # q = ""
-        # while not q == "q":
-        #     q = input("Send another request")
 
 
         self.__app_logger.log(
             status_obj['status'],
             status_obj['package_name'],
             status_obj['name'],
+            status_obj['status'],
             status_obj['report_title'],
             self.__run_id,
             self.__ts,
             device_build_info,
             app_run_time.strftime("%A, %B %d, %Y %I:%M:%S %p"),  # Log string instead of ts
-            status_obj['reason'],
-            status_obj['new_name'],
-            status_obj['invalid'],
             status_obj['history'],
             status_obj['logs'],
         )
@@ -188,17 +168,17 @@ class AppValidator:
 
         '''
         if(crashType == CrashTypes.WIN_DEATH):
-            return ValidationReport.CRASH_WIN_DEATH
+            return AppStatus.CRASH_WIN_DEATH
         elif(crashType == CrashTypes.FORCE_RM_ACT_RECORD):
-            return ValidationReport.CRASH_FORCE_RM_ACT_RECORD
+            return AppStatus.CRASH_FORCE_RM_ACT_RECORD
         elif(crashType == CrashTypes.ANR):
-            return ValidationReport.CRASH_ANR
+            return AppStatus.CRASH_ANR
         elif(crashType == CrashTypes.FDEBUG_CRASH):
-            return ValidationReport.CRASH_FDEBUG_CRASH
+            return AppStatus.CRASH_FDEBUG_CRASH
         elif(crashType == CrashTypes.FATAL_EXCEPTION):
-            return ValidationReport.CRASH_FATAL_EXCEPTION
+            return AppStatus.CRASH_FATAL_EXCEPTION
         else:
-            ValidationReport.FAIL
+            AppStatus.FAIL
 
     def __check_crash(self, package_name: str) -> bool:
         ''' Updates report if crash is detected.
@@ -228,7 +208,7 @@ class AppValidator:
                 all_errors_msg.append(crash_type.value)
                 self.__report.add_history(package_name, f"{crash_type.value}: {crashed_act} - {msg}", self.__driver)
 
-            self.__report.update_status(package_name, self.__switch_crash_type(report_status_crash_type), ' '.join(all_errors_msg))
+            self.__report.update_status(package_name, self.__switch_crash_type(report_status_crash_type))
             print("\n\n Found error returning True")
             return True
         return False
@@ -282,42 +262,37 @@ class AppValidator:
         if not CONFIG.skip_install:
             installer = AppInstaller(self.__driver, self.__device, self.__dprinter)
             install_result: AppInstallerResult = installer.discover_and_install(app_title, app_package_name)
-            self.__report.add_history(app_package_name, install_result.message or "App install successfull.", self.__driver)
+            self.__report.add_history(app_package_name, "App install successfull." if install_result.status.value > 0 else "Failed to install.", self.__driver)
             if install_result.price:
                 self.__price_queue.put((app_title, app_package_name, install_result.price,))
-                return self.__report.update_status(app_package_name, ValidationReport.NEEDS_PRICE, f"{install_result.message} - {install_result.price}")
+                return self.__report.update_status(app_package_name, AppStatus.NEEDS_PRICE)
+            elif not install_result.installed:
+                return self.__report.update_status(app_package_name, install_result.status)
 
-            if self.__check_crash(app_package_name):
-                return
+            # Package wouldnt be open at this point, no need to check crash here....
+            # if self.__check_crash(app_package_name):
+            #     return
+
 
         # Lauch App
         if not CONFIG.skip_launch:
             launcher = AppLauncher(self.__device, self.__driver, self.__app_list_queue, self.__dprinter)
             app_did_open  = launcher.check_open_app(app_title, app_package_name)
-            # print(f"{app_did_open=} {new_app_name=} {invalid_app=} {reason=}")
-            # if new_app_name:
-            #     self.__report.add_history(app_package_name, reason, self.__driver)
-            #     return self.__process_app(new_app_name, app_package_name)
-            # if invalid_app:
-            #     self.__report.add_history(app_package_name, reason, self.__driver)
-            #     return self.__report.update_status(app_package_name, ValidationReport.INVALID, reason, '', invalid_app)
             if not app_did_open:
-                reason = "failed to open"
+                hist_msg = "failed to open"
                 self.__check_crash(app_package_name)
-                self.__report.add_history(app_package_name, reason, self.__driver)
-                return self.__report.update_status(app_package_name, ValidationReport.DID_NOT_OPEN, reason, '', False)
+                self.__report.add_history(app_package_name, hist_msg, self.__driver)
+                return self.__report.update_status(app_package_name, AppStatus.FAILED_TO_LAUNCH)
 
 
             sleep(5)
             if self.__check_crash(app_package_name):
                 return
+            self.__report.update_status(app_package_name, AppStatus.PASS)
 
+        # Proceed to Login.
         self.__check_pop_ups(app_package_name)
 
-        # q = ""
-        # while not q == "q":
-        #     q = input("Check app for Softare Agreement")
-        #     print(f"{self.__driver.current_activity=}")
 
         # self.__dev_SS_loop(app_package_name)
 
@@ -336,8 +311,8 @@ class AppValidator:
             print(f"{new_result_obj.__dict__=}")
 
             print(f"{login_results=}")
-            logged_in_msg = "Logged in." if any(list(login_results.__dict__.values())[::2]) else "Not logged in."
-            self.__report.update_status(app_package_name, ValidationReport.PASS, logged_in_msg)
+            # logged_in_msg = "Logged in." if any(list(login_results.__dict__.values())[::2]) else "Not logged in."
+            self.__report.update_status(app_package_name, AppStatus.PASS)
             self.__update_report_logged_in_status(app_package_name, login_results)
 
             if self.__check_crash(app_package_name):

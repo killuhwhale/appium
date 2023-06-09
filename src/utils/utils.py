@@ -1,18 +1,20 @@
-from collections import defaultdict
-from dataclasses import dataclass
+from enum import Enum
 import json
 import logging
-from appium.webdriver.appium_service import AppiumService
-import __main__
-from datetime import datetime
 import os
 import re
 import subprocess
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from time import time
 from typing import AnyStr, Dict, List, Tuple, Union
+
+import __main__
 import cv2
 import numpy as np
+from appium.webdriver.appium_service import AppiumService
 
 
 def users_home_dir():
@@ -26,6 +28,32 @@ def create_file_if_not_exists(path):
     if path and not file_exists(path):
         with open(path, 'w'):
             pass
+
+
+
+class AppStatus(Enum):
+    '''Encompasses all statuses that an app may have at the end of a test run on a single app.'''
+
+    NEEDS_UPDATE = -14                # Playstore crashed
+    PLAYSTORE_FAIL = -13                # Playstore crashed
+    CRASH_WIN_DEATH = -12               # App crashed on launch
+    CRASH_FORCE_RM_ACT_RECORD = -11     # App crashed on launch
+    CRASH_ANR = -10                     # App crashed on launch
+    CRASH_FDEBUG_CRASH = -9             # App crashed on launch
+    CRASH_FATAL_EXCEPTION = -8          # App crashed on launch
+    FAILED_TO_LAUNCH = -7               # Fail to launch - should also capture logs for this.
+    FAILED_TO_INSTALL = -6              # Genral install error
+    NEEDS_PRICE = -5                    # App needs to be purchased
+    DEVICE_NONCOMPAT = -4               # Device missing feature
+    INVALID = -3                        # App not on playstore anymore
+    APP_OLD = -2                        # App targets old SDK
+    COUNTRY_NA = -1                     # Country NA
+    FAIL = 0                            # General failure with testing
+    PASS = 1                            # App launched w/out errors detected.
+    LOGGED_IN_GOOGLE = 2                # Logged in via google account
+    LOGGED_IN_FB = 3                    # Logged in via facebook account
+    LOGGED_IN_EMAIL = 4                 # Logged in via email/password
+    INIT = 1337                 # Logged in via email/password
 
 
 @dataclass()
