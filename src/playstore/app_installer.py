@@ -349,6 +349,10 @@ class AppInstaller:
             3. Cancel / Play[Open]
             4. Uninstall / Play[Open]
 
+            TODO() Check for County NA, App old, Device not compat here.
+            Also need to check an invalid app and see the behavior.
+
+
         '''
         already_installed = False  # Potentailly already isntalled
         err = False
@@ -453,6 +457,8 @@ class AppInstaller:
             # # self.__check_playstore_crash()
             # # self.__check_playstore_anr()
             # # self.__check_playstore_install_fail()
+
+
 
             last_step = 3
             self.__install_app_UI(install_package_name)

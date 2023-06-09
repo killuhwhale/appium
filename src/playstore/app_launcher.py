@@ -78,6 +78,11 @@ class AppLauncher:
             return app_title  # returning app title essentially means there was no change found.
 
     def __handle_failed_open_app(self, package_name: str, app_title: str, msg: str) -> str:
+        '''
+            Most likely do not need this anymore since we openn the app directly in the playstore, we will not need to worry about app name anymore
+            And we will detect invalid apps in isntallation instead.
+        '''
+
         reason = ''
         NEW_APP_NAME = ''
         INVALID_APP = False
@@ -119,10 +124,10 @@ class AppLauncher:
 
     def check_open_app(self, app_title: str, package_name: str):
         if not open_app(package_name, self.__transport_id, self.__driver, self.__arc_version):
-            new_app_name, invalid_app, reason = self.__handle_failed_open_app(package_name, app_title, "Failed to open")
-            return [False, new_app_name, invalid_app, reason]
+            # new_app_name, invalid_app, reason = self.__handle_failed_open_app(package_name, app_title, "Failed to open")
+            return False
         sleep(5)
-        return [True, "", False, "" ]
+        return True
 
 
 if __name__ == "__main__":
