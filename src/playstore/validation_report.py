@@ -65,7 +65,7 @@ class ValidationReport:
             'package_name': "",
             'report_title': "",
             'history': [],
-            'app_info': {},
+            'app_info': AppData(),
             'logs': '',
             'google_logged_in': '',  # Logged into app w/...
             'facebook_logged_in': '',  # Logged into app w/...
@@ -99,6 +99,9 @@ class ValidationReport:
 
     def update_app_info(self, package_name: str, info: AppData):
         self.__report[self.__report_title][package_name]['app_info'] = info
+
+    def get_app_info(self, package_name: str) -> AppData:
+        return self.__report[self.__report_title][package_name]['app_info']
 
     def update_status(self, package_name: str, status: AppStatus):
         self.__report[self.__report_title][package_name]['status'] = status.value

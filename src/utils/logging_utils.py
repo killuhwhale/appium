@@ -112,7 +112,7 @@ class AppLogger:
         logger_passed = logging.getLogger('passed_apps_live')
         logger_failed.setLevel(logging.DEBUG)
         logger_passed.setLevel(logging.DEBUG)
-        header = f"Package\tName\tStatus\tReport title\tRun Id\tRun ts\tBuild\tDate\tHistory\tLogs\n"
+        header = f"Package\tName\tStatus\tType\tApp version\tReport title\tRun Id\tRun ts\tBuild\tDate\tHistory\tLogs\n"
         # Create a file handler for the logger
         with open(filename_failed, 'w') as f:
             f.write(header)

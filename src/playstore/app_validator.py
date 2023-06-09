@@ -16,7 +16,7 @@ from playstore.app_launcher import AppLauncher
 from playstore.app_login import AppLogin
 from playstore.app_login_results import AppLoginResults
 from playstore.validation_report import ValidationReport
-from utils.app_utils import (AppInfo, close_app, close_save_password_dialog,
+from utils.app_utils import (AppData, AppInfo, close_app, close_save_password_dialog,
                              get_cur_activty, get_views, open_app,
                              uninstall_app)
 from utils.device_utils import Device
@@ -123,12 +123,17 @@ class AppValidator:
         device_build_info = f"{self.__device.info.arc_build},{self.__device.info.channel},{self.__device.info.arc_version}"
         app_run_time = datetime.now()
         app_run_ts = int(app_run_time.timestamp()*1000) # Firebase needs a date
+        app_info: AppData = self.__report.get_app_info(app_package_name)
+        print("App info post: ", type(app_info), app_info )
         self.__upload_images_to_firebase_storage(status_obj['history'], status_obj['package_name'])
+
 
         post_to_firebase({
             'status': status_obj['status'],
             'package_name': status_obj['package_name'],
             'name': status_obj['name'],
+            'app_type': app_info.app_type.value,
+            'app_version': f"{app_info.versionName} - {app_info.versionCode}",
             'report_title': status_obj['report_title'],
             'run_id': str(self.__run_id),
             'run_ts': self.__ts,
@@ -144,6 +149,8 @@ class AppValidator:
             status_obj['package_name'],
             status_obj['name'],
             status_obj['status'],
+            app_info.app_type,
+            f"{app_info.versionName} - {app_info.versionCode}",
             status_obj['report_title'],
             self.__run_id,
             self.__ts,
@@ -269,9 +276,6 @@ class AppValidator:
             elif not install_result.installed:
                 return self.__report.update_status(app_package_name, install_result.status)
 
-            # Package wouldnt be open at this point, no need to check crash here....
-            # if self.__check_crash(app_package_name):
-            #     return
 
 
         # Lauch App
@@ -289,19 +293,19 @@ class AppValidator:
             if self.__check_crash(app_package_name):
                 return
             self.__report.update_status(app_package_name, AppStatus.PASS)
+            # App is needs to be gathered after app is open since it looks for a surface to check if an app is a game.
+            info: AppData = AppInfo(self.__transport_id, app_package_name, self.__dprinter).info()
+            print(f"{info=}")
+            self.__report.update_app_info(app_package_name, info)
 
-        # Proceed to Login.
-        self.__check_pop_ups(app_package_name)
+            # Close any pop ups after opening app
+            self.__check_pop_ups(app_package_name)
 
 
         # self.__dev_SS_loop(app_package_name)
 
         # Now app is installed and launched...
         if not CONFIG.skip_login:
-            info = AppInfo(self.__transport_id, app_package_name, self.__dprinter).info()
-            print(f"{info=}")
-            self.__report.update_app_info(app_package_name, info)
-
             login_module = AppLogin(self.__driver, self.__device, self.__report, self.__err_detector, self.__dprinter)
             login_results: AppLoginResults = login_module.login(app_title, app_package_name, info)
             print(f"{login_results.__dict__=}")
