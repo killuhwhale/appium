@@ -26,7 +26,7 @@ from utils.post_to_firebase import post_to_firebase
 from utils.utils import CONFIG, PLAYSTORE_PACKAGE_NAME
 
 # Instantiates a client
-#storage_client = storage.Client()
+storage_client = storage.Client()
 
 
 class AppValidator:
@@ -134,7 +134,7 @@ class AppValidator:
         device_build_info = f"{self.__device.info.arc_build},{self.__device.info.channel},{self.__device.info.arc_version}"
         app_run_time = datetime.now()
         app_run_ts = int(app_run_time.timestamp()*1000) # Firebase needs a date
-        '''self.__upload_images_to_firebase_storage(status_obj['history'], status_obj['package_name'])
+        self.__upload_images_to_firebase_storage(status_obj['history'], status_obj['package_name'])
 
         post_to_firebase({
             'status': status_obj['status'],
@@ -150,7 +150,7 @@ class AppValidator:
             'invalid': status_obj['invalid'],
             'history': str(status_obj['history']),
             'logs': status_obj['logs'],
-        })'''
+        })
 
         # q = ""
         # while not q == "q":
