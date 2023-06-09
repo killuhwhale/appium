@@ -435,23 +435,24 @@ class AppInstaller:
          A method to search Google Playstore for an app and install via the Playstore UI.
         '''
         try:
-            last_step = 0  # track last sucessful step to, atleast, report in console.
-            self.__click_playstore_search()
-            # self.__check_playstore_crash()
-            # self.__check_playstore_anr()
-            # self.__check_playstore_install_fail()
+            # last_step = 0  # track last sucessful step to, atleast, report in console.
+            # self.__click_playstore_search()
+            # # self.__check_playstore_crash()
+            # # self.__check_playstore_anr()
+            # # self.__check_playstore_install_fail()
 
-            last_step = 1
-            self.__search_playstore(title)
-            # self.__check_playstore_crash()
-            # self.__check_playstore_anr()
-            # self.__check_playstore_install_fail()
+            # last_step = 1
+            # self.__search_playstore(title)
+            # # self.__check_playstore_crash()
+            # # self.__check_playstore_anr()
+            # # self.__check_playstore_install_fail()
 
             last_step = 2
-            self.__click_app_icon(title, install_package_name)
-            # self.__check_playstore_crash()
-            # self.__check_playstore_anr()
-            # self.__check_playstore_install_fail()
+            # self.__click_app_icon(title, install_package_name)
+            self.__open_app_page(install_package_name)
+            # # self.__check_playstore_crash()
+            # # self.__check_playstore_anr()
+            # # self.__check_playstore_install_fail()
 
             last_step = 3
             self.__install_app_UI(install_package_name)
@@ -483,6 +484,23 @@ class AppInstaller:
             traceback.print_exc()
             return self.__return_error(last_step, error)
         return AppInstallerResult(True, "")
+
+    def __open_app_page(self, app_package_name: str):
+        '''Opens the playstore to the app page.
+
+            // am start a.SendIntentCommand(ctx, intentActionView, playStoreAppPageURI+pkgName)
+
+        '''
+        intentActionView = "android.intent.action.VIEW"
+        playStoreAppPageURI = "market://details?id="
+        target = f"{playStoreAppPageURI}{app_package_name}"
+
+        cmd = ('adb','-t', self.__transport_id, 'shell', 'am', 'start', "-d", target, "-a", intentActionView)
+        outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+                                capture_output=True).stdout.strip()
+        self.__dprint("open app page res: ", outstr)
+
+
 
     def discover_and_install(self, app_title: str, app_package_name: str) -> List:
         try:

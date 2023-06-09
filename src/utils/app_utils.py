@@ -189,8 +189,26 @@ def check_and_close_smartlock(driver: Remote):
         except Exception as error:
             print("Failed to click NONE OF THE ABOVE on Google Smart Lock.")
 
+
+
+
+# Propsal:
+'''
+Instead of waiting for app to open by checking current activity which only checks the focused activity, we can poll and check another source to see if app is launched.
+
+This will help since any number of permission activities can show in front of an app.
+We can deal with them when we go to login and use CpuVision/ Yolo.
+
+
+
+adb shell dumpsys activity processes | grep -i com.adsk.sketchbook
+Returns something when the app is open....
+Returns nothing when closed...
+
+
+'''
 def open_app(package_name: str, transport_id: int, driver: Remote, ArcVersion: ArcVersions = ArcVersions.ARC_R):
-    ''' Opens an app using ADB monkey.
+    ''' Opens an app using ADB monkey and waits until the app is open.
 
         Params:
             package_name: The name of the package to check crash logs for.
@@ -233,6 +251,9 @@ def open_app(package_name: str, transport_id: int, driver: Remote, ArcVersion: A
     check_and_close_smartlock(driver)
 
     return cur_package in packages
+
+def is_app_open(package_name: str, transport_id: int, driver: Remote, ArcVersion: ArcVersions = ArcVersions.ARC_R):
+    pass
 
 def close_app(package_name: str, transport_id: int):
     '''
