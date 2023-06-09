@@ -262,6 +262,16 @@ class AppValidator:
             else:
                 self.__dprint("Quit from SS")
 
+    def __check_pop_ups(self, app_package_name: str):
+        '''Checks for pop ups after opening an app.'''
+        try:
+            content_desc = f'''
+                    new UiSelector().className("android.widget.Button").text("I ACCEPT")
+                '''
+            self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
+
+        except Exception as err:
+            print("Didnt find pop up")
 
 
     def __process_app(self, app_title:str, app_package_name: str):
@@ -283,28 +293,31 @@ class AppValidator:
         # Lauch App
         if not CONFIG.skip_launch:
             launcher = AppLauncher(self.__device, self.__driver, self.__app_list_queue, self.__dprinter)
-            app_did_open, new_app_name, invalid_app, reason  = launcher.check_open_app(app_title, app_package_name)
-            print(f"{app_did_open=} {new_app_name=} {invalid_app=} {reason=}")
-            if new_app_name:
-                self.__report.add_history(app_package_name, reason, self.__driver)
-                return self.__process_app(new_app_name, app_package_name)
-            elif invalid_app:
-                self.__report.add_history(app_package_name, reason, self.__driver)
-                return self.__report.update_status(app_package_name, ValidationReport.INVALID, reason, '', invalid_app)
-            elif not app_did_open:
+            app_did_open  = launcher.check_open_app(app_title, app_package_name)
+            # print(f"{app_did_open=} {new_app_name=} {invalid_app=} {reason=}")
+            # if new_app_name:
+            #     self.__report.add_history(app_package_name, reason, self.__driver)
+            #     return self.__process_app(new_app_name, app_package_name)
+            # if invalid_app:
+            #     self.__report.add_history(app_package_name, reason, self.__driver)
+            #     return self.__report.update_status(app_package_name, ValidationReport.INVALID, reason, '', invalid_app)
+            if not app_did_open:
+                reason = "failed to open"
                 self.__check_crash(app_package_name)
                 self.__report.add_history(app_package_name, reason, self.__driver)
-                return self.__report.update_status(app_package_name, ValidationReport.DID_NOT_OPEN, reason, '', invalid_app)
+                return self.__report.update_status(app_package_name, ValidationReport.DID_NOT_OPEN, reason, '', False)
 
 
             sleep(5)
             if self.__check_crash(app_package_name):
                 return
 
-        q = ""
-        while not q == "q":
-            q = input("Check app for Softare Agreement")
-            print(f"{self.__driver.current_activity=}")
+        self.__check_pop_ups(app_package_name)
+
+        # q = ""
+        # while not q == "q":
+        #     q = input("Check app for Softare Agreement")
+        #     print(f"{self.__driver.current_activity=}")
 
         # self.__dev_SS_loop(app_package_name)
 

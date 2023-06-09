@@ -191,22 +191,6 @@ def check_and_close_smartlock(driver: Remote):
 
 
 
-
-# Propsal:
-'''
-Instead of waiting for app to open by checking current activity which only checks the focused activity, we can poll and check another source to see if app is launched.
-
-This will help since any number of permission activities can show in front of an app.
-We can deal with them when we go to login and use CpuVision/ Yolo.
-
-
-
-adb shell dumpsys activity processes | grep -i com.adsk.sketchbook
-Returns something when the app is open....
-Returns nothing when closed...
-
-
-'''
 def open_app(package_name: str, transport_id: int, driver: Remote, ArcVersion: ArcVersions = ArcVersions.ARC_R):
     ''' Opens an app using ADB monkey and waits until the app is open.
 
@@ -228,17 +212,16 @@ def open_app(package_name: str, transport_id: int, driver: Remote, ArcVersion: A
         MAX_WAIT_FOR_OPEN_APP = 25
         t = time()
         # org.chromium.arc.applauncher will be the package if a PWA is launched...
-        while (not cur_package in packages and
+        # while (not cur_package in packages and
+        while (not is_app_open(package_name, transport_id) and
             int(time() - t) < MAX_WAIT_FOR_OPEN_APP):
             try:
-
-                res = get_cur_activty(transport_id, ArcVersion, package_name)
-                cur_package = res['package_name']
+                # res = get_cur_activty(transport_id, ArcVersion, package_name)
+                # cur_package = res['package_name']
                 # Typical flow -> Open app, com.facebook.messenger.splashscreen.MessengerSplashScreenActivity -> CredentialPickerActivity
                 # Theres a race condition where  sometimes we miss the splash screen and get stuck with CredentialPickerActivity
                 # OR we hit splash screen and are still left with getting stuck with CredentialPickerActivity since we missed it here.
                 check_and_close_smartlock(driver)
-
             except Exception as err:
                 print("Err getting cur act", err)
                 return False
@@ -250,10 +233,19 @@ def open_app(package_name: str, transport_id: int, driver: Remote, ArcVersion: A
     sleep(2)
     check_and_close_smartlock(driver)
 
-    return cur_package in packages
+    return True
 
-def is_app_open(package_name: str, transport_id: int, driver: Remote, ArcVersion: ArcVersions = ArcVersions.ARC_R):
-    pass
+def is_app_open(package_name: str, transport_id: int):
+    '''Open app looks for an act. But if something opens in fotn that is not associated with the package, likeSoftw3are Agreement or permissions, we wont detect properly
+        instead of checking current package to see if app is open, we should check another command:
+          - adb shell dumpsys activity processes | grep -i com.adsk.sketchbook
+
+        If this returns anything, there the package is open.
+    '''
+    cmd = ['adb', '-t', transport_id, 'shell', 'dumpsys', 'activity', 'processes', "|", "grep", "-i", package_name]
+    outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+                                capture_output=True).stdout.strip()
+    return len(outstr) > 0
 
 def close_app(package_name: str, transport_id: int):
     '''
