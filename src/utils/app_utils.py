@@ -244,7 +244,7 @@ def is_app_open(package_name: str, transport_id: int):
         If this returns anything, there the package is open.
     '''
     cmd = ['adb', '-t', transport_id, 'shell', 'dumpsys', 'activity', 'processes', "|", "grep", "-i", package_name]
-    outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+    outstr = subprocess.run(cmd, check=False, encoding='utf-8',
                                 capture_output=True).stdout.strip()
     return len(outstr) > 0
 
