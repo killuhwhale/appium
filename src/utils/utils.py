@@ -29,7 +29,11 @@ def create_file_if_not_exists(path):
         with open(path, 'w'):
             pass
 
-
+def get_ip() -> str:
+    cmd = ['curl', '-s', "ipinfo.io/ip"]
+    outstr = subprocess.run(cmd, check=False, encoding='utf-8',
+                                capture_output=True).stdout.strip()
+    return outstr
 
 class AppStatus(Enum):
     '''Encompasses all statuses that an app may have at the end of a test run on a single app.'''

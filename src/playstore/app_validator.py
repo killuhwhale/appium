@@ -23,7 +23,7 @@ from utils.device_utils import Device
 from utils.error_utils import CrashTypes, ErrorDetector
 from utils.logging_utils import AppLogger, get_color_printer
 from utils.post_to_firebase import post_to_firebase
-from utils.utils import CONFIG, PLAYSTORE_PACKAGE_NAME, AppStatus
+from utils.utils import CONFIG, PLAYSTORE_PACKAGE_NAME, AppStatus, get_ip
 
 # Instantiates a client
 storage_client = storage.Client()
@@ -128,7 +128,7 @@ class AppValidator:
         self.__upload_images_to_firebase_storage(status_obj['history'], status_obj['package_name'])
 
 
-        post_to_firebase({
+        res: requests.Response = post_to_firebase({
             'status': status_obj['status'],
             'package_name': status_obj['package_name'],
             'name': status_obj['name'],
@@ -141,7 +141,10 @@ class AppValidator:
             'timestamp': app_run_ts,  # Log string instead of ts
             'history': str(status_obj['history']),
             'logs': status_obj['logs'],
+            'addr': get_ip()
         })
+
+        self.__dprint("Post res: ", res.content)
 
 
         self.__app_logger.log(
