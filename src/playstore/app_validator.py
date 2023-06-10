@@ -17,7 +17,7 @@ from playstore.app_login import AppLogin
 from playstore.app_login_results import AppLoginResults
 from playstore.validation_report import ValidationReport
 from utils.app_utils import (AppData, AppInfo, close_app, close_save_password_dialog,
-                             get_cur_activty, get_views, open_app,
+                             get_cur_activty, get_views, is_app_open, open_app,
                              uninstall_app)
 from utils.device_utils import Device
 from utils.error_utils import CrashTypes, ErrorDetector
@@ -290,8 +290,9 @@ class AppValidator:
 
 
             sleep(5)
-            if self.__check_crash(app_package_name):
+            if not is_app_open(app_package_name, self.__transport_id) and self.__check_crash(app_package_name):
                 return
+
             self.__report.update_status(app_package_name, AppStatus.PASS)
             # App is needs to be gathered after app is open since it looks for a surface to check if an app is a game.
             info: AppData = AppInfo(self.__transport_id, app_package_name, self.__dprinter).info()
@@ -300,6 +301,10 @@ class AppValidator:
 
             # Close any pop ups after opening app
             self.__check_pop_ups(app_package_name)
+
+            # If app closed, check errors.
+            if not is_app_open(app_package_name, self.__transport_id) and self.__check_crash(app_package_name):
+                return
 
 
         # self.__dev_SS_loop(app_package_name)
