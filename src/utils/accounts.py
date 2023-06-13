@@ -4,13 +4,15 @@ import requests
 from utils.logging_utils import p_alert
 
 from utils.utils import users_home_dir
+from dotenv import dotenv_values
 
+env = dotenv_values('.env')
 
 
 class __AccountsAPI:
     def __init__(self):
         self.__filename = "apikey.txt"
-        self.__api_key = self.__get_key()
+        self.__api_key = env['JSON_BIN_API_KEY']
         self.__base_url = "https://api.jsonbin.io/v3/b/6424ab5dc0e7653a05991f64"
         self.__accounts = dict()
         self.__fetch_accounts()
