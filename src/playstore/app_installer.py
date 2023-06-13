@@ -11,7 +11,7 @@ from utils.app_utils import is_installed, uninstall_app
 from utils.device_utils import Device
 from utils.error_utils import CrashTypes, ErrorDetector
 from utils.logging_utils import get_color_printer, p_alert
-from utils.utils import (ADB_KEYCODE_ENTER, PLAYSTORE_PACKAGE_NAME)
+from utils.utils import (ADB_KEYCODE_ENTER, PLAYSTORE_PACKAGE_NAME, AppStatus)
 
 
 class NeedsPurchaseException(Exception):
@@ -23,6 +23,16 @@ class NeedsPurchaseException(Exception):
         return self.message
 
 class NeedsUpdateException(Exception):
+    pass
+
+
+class CountryNAException(Exception):
+    pass
+class AppOldException(Exception):
+    pass
+class DeviceNonCompatException(Exception):
+    pass
+class InvalidAppCompatException(Exception):
     pass
 
 class NotInstalledException(Exception):
@@ -46,7 +56,7 @@ class PlaystoreInstallFailedException(Exception):
 @dataclass
 class AppInstallerResult:
     installed: bool
-    message: str
+    status: AppStatus
     price: float = 0.0
 
 
@@ -94,27 +104,22 @@ class AppInstaller:
             return False
         return True
 
-
-
-    def __return_error(self, last_step: int, error: str):
+    def __return_error(self, last_step: int, error: str, status: AppStatus) :
         if last_step == 0:
             self.__driver.back()
-            # return [False, f"Failed: {self.__steps[0]}"]
-            return AppInstallerResult(False, f"Failed: {self.__steps[0]}")
+            return AppInstallerResult(False, status) # Generic error, we are not using this step anymore...
         elif last_step == 1:
             self.__driver.back()
-            # return [False, f"Failed: {self.__steps[1]}"]
-            return AppInstallerResult(False, f"Failed: {self.__steps[1]}")
+            return AppInstallerResult(False, status)  # Generic error, we are not using this step anymore...
         elif last_step == 2:
             self.__driver.back()
-            # return [False, f"Failed: {self.__steps[2]}"]
-            return AppInstallerResult(False, f"Failed: {self.__steps[2]}")
+            self.__dprint(f"Failed: {self.__steps[2]} :: {error}")
+            return AppInstallerResult(False, status)  # Most likely, if there is an error here its an invalid app...
         elif last_step == 3:
             self.__driver.back()
             self.__driver.back()
             self.__dprint(f"Failed: {self.__steps[3]} :: {error}")
-            # return [False, f"Failed: {self.__steps[3]} :: {error}"]
-            return AppInstallerResult(False, f"Failed: {self.__steps[3]} :: {error}")
+            return AppInstallerResult(False, status) # Generic error, we attempt to return a status reflecting the status, so if an error happens we failed to report or install the app correctly.
 
     ## PlayStore install discovery
 
@@ -164,13 +169,11 @@ class AppInstaller:
             content_desc = f'''
                 new UiSelector().className("android.widget.Button").textMatches(\"\$\d+\.\d+\")
             '''
-            self.__dprint("Searching for Button with Price...", content_desc)
             btn = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
             price = btn.text
-            print(f"A {price=}")
             return float(price.replace("$", ''))
         except Exception as e:
-            print("failed ", e)
+            pass
         try:
             content_desc = f'''new UiSelector().descriptionMatches(\"\$\d+\.\d+\");'''
             self.__dprint("Searching for Button with Price...", content_desc)
@@ -178,18 +181,40 @@ class AppInstaller:
             price = btn.get_attribute('content-desc')
             return float(price.replace("$", ''))
         except Exception as e:
-            print("failed ", e)
+            pass
         return 0.0
 
     def __needs_update(self) -> bool:
-        '''
-            Checks if apps needs an update via the UI on the playstore app details page.
-        '''
+        '''Checks if apps needs an update via the UI on the playstore app details page.'''
         try:
-            # Pixel 2
-            # self.__driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value="Update")
+            # self.__driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value="Update")  # Pixel 2
             content_desc = f'''new UiSelector().className("android.widget.Button").text("Update")'''
             self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+            return True
+        except Exception as e:
+            return False
+
+
+    def __check_old_app(self) -> bool:
+        '''Checks if apps is too old for device is on screen.'''
+        try:
+            self.__driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value="This app isn't available for your device because it was made for an older version of Android.")
+            return True
+        except Exception as e:
+            return False
+
+    def __check_device_noncompat(self) -> bool:
+        '''Checks if device is not compatible is on screen.'''
+        try:
+            self.__driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value="Your device isn't compatible with this version.")
+            return True
+        except Exception as e:
+            return False
+
+    def __check_country_NA(self) -> bool:
+        '''Checks if app is not available in your country is on screen.'''
+        try:
+            self.__driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value="This item isn't available in your country.")
             return True
         except Exception as e:
             return False
@@ -307,7 +332,7 @@ class AppInstaller:
             # f'''new UiSelector().textMatches(\"(?i){title_first}[a-z A-Z 0-9 \. \$ \, \+ \: \! \- \- \| \\n]*\");'''
         ]
         for content_desc in descs:
-            self.__dprint("Searhing for app_icon with content desc: ", content_desc)
+            self.__dprint("Searching for app_icon with content desc: ", content_desc)
             try:
                 app_icon = self.__driver.find_elements(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
                 if 'text' in content_desc and len(app_icon) == 1:
@@ -323,7 +348,8 @@ class AppInstaller:
                         # icon.click()  # NOTE bug on Eve, Caroline it wont click the app icon to get into the detail view.
                         # Trial and error: this has been working without issues...
                         self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds)))
-                        #self.__tap_screen(*self.__find_coords(self.__extract_bounds(bounds)))
+                        # We can try to verify that the button was clicked by checking for
+
                         sleep(1)
                         return
             except Exception as e:
@@ -351,7 +377,6 @@ class AppInstaller:
             2. Price
             3. Cancel / Play[Open]
             4. Uninstall / Play[Open]
-
         '''
         already_installed = False  # Potentailly already isntalled
         err = False
@@ -414,6 +439,15 @@ class AppInstaller:
             if self.__needs_update():
                 self.__dprint("raising needs update")
                 raise NeedsUpdateException()
+            if self.__check_old_app():
+                self.__dprint("raising old app")
+                raise AppOldException()
+            if self.__check_device_noncompat():
+                self.__dprint("raising device noncompat")
+                raise DeviceNonCompatException()
+            if self.__check_country_NA():
+                self.__dprint("raising country NA")
+                raise CountryNAException()
 
             # Now, Install and Price, Update are not present,
             # To get here, we must be looking for a package
@@ -438,65 +472,96 @@ class AppInstaller:
          A method to search Google Playstore for an app and install via the Playstore UI.
         '''
         try:
-            last_step = 0  # track last sucessful step to, atleast, report in console.
-            self.__click_playstore_search()
-            self.__check_playstore_crash()
-            self.__check_playstore_anr()
-            self.__check_playstore_install_fail()
+            # last_step = 0  # track last sucessful step to, atleast, report in console.
+            # self.__click_playstore_search()
+            # # self.__check_playstore_crash()
+            # # self.__check_playstore_anr()
+            # # self.__check_playstore_install_fail()
 
-            last_step = 1
-            self.__search_playstore(title)
-            self.__check_playstore_crash()
-            self.__check_playstore_anr()
-            self.__check_playstore_install_fail()
+            # last_step = 1
+            # self.__search_playstore(title)
+            # # self.__check_playstore_crash()
+            # # self.__check_playstore_anr()
+            # # self.__check_playstore_install_fail()
 
             last_step = 2
-            self.__click_app_icon(title, install_package_name)
-            self.__check_playstore_crash()
-            self.__check_playstore_anr()
-            self.__check_playstore_install_fail()
+            # self.__click_app_icon(title, install_package_name)
+            self.__open_app_page(install_package_name)
+            # # self.__check_playstore_crash()
+            # # self.__check_playstore_anr()
+            # # self.__check_playstore_install_fail()
+
+            # q = ""
+            # while not q == "q":
+            #     q = input("Check app for Softare Agreement")
+            #     print(f"{self.__driver.current_activity=}")
 
             last_step = 3
             self.__install_app_UI(install_package_name)
-            self.__check_playstore_crash()
-            self.__check_playstore_anr()
-            self.__check_playstore_install_fail()
+            # self.__check_playstore_crash()
+            # self.__check_playstore_anr()
+            # self.__check_playstore_install_fail()
             self.__driver.back()  # back to seach results
             self.__driver.back()  # back to home page
         except PlaystoreCrashException as e:
             raise PlaystoreCrashException()
         except NeedsPurchaseException as price:
-            error = self.__return_error(last_step, "Needs purchase.")
+            error = self.__return_error(last_step, AppStatus.NEEDS_PRICE)
             error.price = float(price.message)
             return error
         except NeedsUpdateException:
-            return self.__return_error(last_step, "Needs update.")
+            return self.__return_error(last_step, "Needs update.", AppStatus.NEEDS_UPDATE)
+        except AppOldException:
+            return self.__return_error(last_step, "Needs update.", AppStatus.APP_OLD)
+        except DeviceNonCompatException:
+            return self.__return_error(last_step, "Needs update.", AppStatus.DEVICE_NONCOMPAT)
+        except CountryNAException:
+            return self.__return_error(last_step, "Needs update.", AppStatus.COUNTRY_NA)
         except NotInstalledException:
-            return self.__return_error(last_step, "Not installed.")
+            return self.__return_error(last_step, "Not installed.", AppStatus.FAILED_TO_INSTALL)
         except FoundWrongPackageException:
-            return self.__return_error(last_step, "Wrong package found in playstore.")
+            return self.__return_error(last_step, "Wrong package found in playstore.", AppStatus.FAILED_TO_INSTALL)
         except FailedClickIconException:
-            return self.__return_error(last_step, 'Failed to click app icon.')
+            return self.__return_error(last_step, 'Failed to click app icon.', AppStatus.FAILED_TO_INSTALL)
         except PlaystoreANRException as error:
-            return self.__return_error(last_step, error)
+            return self.__return_error(last_step, error, AppStatus.PLAYSTORE_FAIL)
         except PlaystoreInstallFailedException as error:
-            return self.__return_error(last_step, error)
+            return self.__return_error(last_step, error, AppStatus.PLAYSTORE_FAIL)
         except Exception as error:
             print("General failure in installer: ", error)
             traceback.print_exc()
-            return self.__return_error(last_step, error)
-        return AppInstallerResult(True, "")
+            return self.__return_error(last_step, error, AppStatus.FAILED_TO_INSTALL)
+        return AppInstallerResult(True, status=AppStatus.PASS)
+
+    def __open_app_page(self, app_package_name: str):
+        '''Opens the playstore to the app page.
+
+            // am start a.SendIntentCommand(ctx, intentActionView, playStoreAppPageURI+pkgName)
+
+        '''
+        intentActionView = "android.intent.action.VIEW"
+        playStoreAppPageURI = "market://details?id="
+        target = f"{playStoreAppPageURI}{app_package_name}"
+
+        cmd = ('adb','-t', self.__transport_id, 'shell', 'am', 'start', "-d", target, "-a", intentActionView)
+        outstr = subprocess.run(cmd, check=True, encoding='utf-8',
+                                capture_output=True).stdout.strip()
+        self.__dprint("open app page res: ", outstr)
+
+        # TODO() Figure out what happens when opening an invalid app.... and how to detect...
+
+
 
     def discover_and_install(self, app_title: str, app_package_name: str) -> List:
         try:
             return self.__discover_and_install(app_title, app_package_name)
         except PlaystoreCrashException:
             self.__dprint("Playstore crashed!")  # Havent encountered this in a long time.
-            return AppInstallerResult(False, f"Failed: Playstore crashed")
+            return AppInstallerResult(False, status=AppStatus.PLAYSTORE_FAIL)
         except Exception as error:
-            p_alert(f"{self.__ip} - ", f"Error in isntaller RUN: {app_title} - {app_package_name}", error)
+            p_alert(f"{self.__ip} - ", f"Error in installer RUN: {app_title} - {app_package_name}", error)
             traceback.print_exc()
-            return AppInstallerResult(False, f"Failed: {error=}")
+            return AppInstallerResult(False, status=AppStatus.FAILED_TO_INSTALL)
 
 if __name__ == "__main__":
     pass

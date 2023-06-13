@@ -1,3 +1,4 @@
+from enum import Enum
 from appium.webdriver import Remote
 from dataclasses import dataclass
 import os
@@ -151,7 +152,10 @@ def get_cur_activty(transport_id: str, ArcVersion: ArcVersions, package_name: st
 
         if result is None:
             is_ANR_thrown = is_ANR(text, package_name)
-            print("Cant find current activity.", f"{is_ANR_thrown=}", text)
+            if "Software Agreement" in text:
+                print("Software agreement is showing.", text)
+            else:
+                print("Cant find current activity.", f"{is_ANR_thrown=}", text)
             return {
                 "package_name": '',
                 "act_name": '',
@@ -186,8 +190,10 @@ def check_and_close_smartlock(driver: Remote):
         except Exception as error:
             print("Failed to click NONE OF THE ABOVE on Google Smart Lock.")
 
+
+
 def open_app(package_name: str, transport_id: int, driver: Remote, ArcVersion: ArcVersions = ArcVersions.ARC_R):
-    ''' Opens an app using ADB monkey.
+    ''' Opens an app using ADB monkey and waits until the app is open.
 
         Params:
             package_name: The name of the package to check crash logs for.
@@ -207,17 +213,16 @@ def open_app(package_name: str, transport_id: int, driver: Remote, ArcVersion: A
         MAX_WAIT_FOR_OPEN_APP = 25
         t = time()
         # org.chromium.arc.applauncher will be the package if a PWA is launched...
-        while (not cur_package in packages and
+        # while (not cur_package in packages and
+        while (not is_app_open(package_name, transport_id) and
             int(time() - t) < MAX_WAIT_FOR_OPEN_APP):
             try:
-
-                res = get_cur_activty(transport_id, ArcVersion, package_name)
-                cur_package = res['package_name']
+                # res = get_cur_activty(transport_id, ArcVersion, package_name)
+                # cur_package = res['package_name']
                 # Typical flow -> Open app, com.facebook.messenger.splashscreen.MessengerSplashScreenActivity -> CredentialPickerActivity
                 # Theres a race condition where  sometimes we miss the splash screen and get stuck with CredentialPickerActivity
                 # OR we hit splash screen and are still left with getting stuck with CredentialPickerActivity since we missed it here.
                 check_and_close_smartlock(driver)
-
             except Exception as err:
                 print("Err getting cur act", err)
                 return False
@@ -229,7 +234,19 @@ def open_app(package_name: str, transport_id: int, driver: Remote, ArcVersion: A
     sleep(2)
     check_and_close_smartlock(driver)
 
-    return cur_package in packages
+    return True
+
+def is_app_open(package_name: str, transport_id: int):
+    '''Open app looks for an act. But if something opens in fotn that is not associated with the package, likeSoftw3are Agreement or permissions, we wont detect properly
+        instead of checking current package to see if app is open, we should check another command:
+          - adb shell dumpsys activity processes | grep -i com.adsk.sketchbook
+
+        If this returns anything, there the package is open.
+    '''
+    cmd = ['adb', '-t', transport_id, 'shell', 'dumpsys', 'activity', 'processes', "|", "grep", "-i", package_name]
+    outstr = subprocess.run(cmd, check=False, encoding='utf-8',
+                                capture_output=True).stdout.strip()
+    return len(outstr) > 0
 
 def close_app(package_name: str, transport_id: int):
     '''
@@ -340,17 +357,22 @@ def get_views(transport_id: str):
 # app_info_pattern = r".*(?:name='[0-9a-zA-Z.]*')?.*(?:versionCode='[0-9a-zA-Z.]*')?.*(?:versionName='[0-9a-zA-Z.]*')?.*(?:compileSdkVersion='[0-9a-zA-Z.]*')?.*(?:compileSdkVersionCodename='[0-9a-zA-Z.]*')?.*(?:platformBuildVersionName='[0-9a-zA-Z.]*')?"
 
 
+class AppType(Enum):
+    app = "App"
+    game = "Game"
+    pwa = "PWA"
+
 @dataclass(frozen=True)
 class AppData:
     ''' Represents app information that may be found in the Manifest file. '''
-    name: str
-    versionCode: str
-    versionName: str
-    compileSdkVersion: str
-    compileSdkVersionCodename: str
-    platformBuildVersionName: str
-    is_pwa: bool
-    is_game: bool
+    name: str = ""
+    versionCode: str = ""
+    versionName: str = ""
+    compileSdkVersion: str = ""
+    compileSdkVersionCodename: str = ""
+    platformBuildVersionName: str = ""
+    app_type: AppType = AppType.app
+
 
 class AppInfo:
     '''
@@ -373,8 +395,7 @@ class AppInfo:
                 'compileSdkVersion': '',
                 'compileSdkVersionCodename': '',
                 'platformBuildVersionName' : '',
-                'is_pwa': False,
-                'is_game': False
+                'app_type': "",
             }
         self.__process_app()
 
@@ -550,12 +571,16 @@ class AppInfo:
         for matchNum, match in enumerate(matches, start=1):
             if match.end() - match.start() == 0:
                 continue
-            print ("Match {matchNum} was found at {start}-{end}: {match}".format(matchNum = matchNum, start = match.start(), end = match.end(), match = match.group()))
+            # print ("Match {matchNum} was found at {start}-{end}: {match}".format(matchNum = matchNum, start = match.start(), end = match.end(), match = match.group()))
             pieces = match.group().replace("'", "").split("=")
             self.__info[pieces[0]] = pieces[1]
 
-        self.__info['is_pwa'] = self.__check_chromium_webapk(manifest_text)
-        self.__info['is_game'] = self.__has_surface_name()
+        if self.__check_chromium_webapk(manifest_text):
+            self.__info['app_type'] = AppType.pwa
+        elif self.__has_surface_name():
+            self.__info['app_type'] = AppType.game
+        else:
+            self.__info['app_type'] = AppType.app
 
     def __process_app(self) -> Union[AppData, None]:
         ''' Downloads APK & manifest from App and extracts information from Manifest.
