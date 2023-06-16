@@ -32,7 +32,7 @@ class AppListTSV:
 
     def __read_file(self):
         with open(f"{self.__home_dir}/{self.__filename}", 'r' ) as f:
-            [self.__app_list.append([w.strip() for w in line.split("\t")]) for line in f.readlines()]
+            [self.__app_list.append([w.strip() for w in line.split("\t")]) for line in f.readlines() if [w.strip() for w in line.split("\t")] not in self.__app_list]
 
     def __read_bad_apps(self):
         create_file_if_not_exists(f"{self.__home_dir}/{self.__badfilename}")
