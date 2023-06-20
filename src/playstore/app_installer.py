@@ -159,7 +159,10 @@ class AppInstaller:
                 if t > max_wait * 0.25:
                     self.__check_playstore_crash()
                     self.__check_playstore_anr()
-                    self.__check_playstore_install_fail()
+                    if self.__check_playstore_install_fail():
+                        return ready
+                    self.__check_playstore_remove_apps()
+                    self.__check_playstore_account_setup()
                 sleep(0.5)
             self.__driver.orientation = 'PORTRAIT'
         return ready
@@ -223,7 +226,7 @@ class AppInstaller:
         ''' Clicks Search Icon
 
             There is an animation when first opening app and the label is visible at first.
-            This is a possible race conditoon between the driver.implicit_wait && the time it takes for the text to appear.
+            This is a possible race condition between the driver.implicit_wait && the time it takes for the text to appear.
 
          '''
         self.__dprint("Clicking search icon...")
@@ -287,6 +290,60 @@ class AppInstaller:
             raise PlaystoreInstallFailedException()
         except Exception as e:
             self.__dprint("No app install fail found.")
+        return False
+
+    def __check_playstore_remove_apps(self):
+        try:
+            self.__dprint("Check playstore remove apps dialog")
+            free_space_text = f'''new UiSelector().text("Free up space")'''
+            continue_btn_desc = f'''new UiSelector().className("android.widget.Button").text("CONTINUE")'''
+            free_space_view = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=free_space_text)
+            continue_btn = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=continue_btn_desc)
+            if free_space_view and continue_btn:
+                continue_btn.click()
+                if self.__confirm_playstore_remove_apps():
+                    return True
+        except Exception as e:
+            self.__dprint("No remove apps dialog found.")
+        return False
+
+    def __confirm_playstore_remove_apps(self):
+        try:
+            self.__dprint("Confirming playstore remove apps to free space.")
+            remove_btn_desc = f'''new UiSelector().className("android.widget.Button").text("REMOVE")'''
+            remove_btn = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=remove_btn_desc)
+            if remove_btn:
+                remove_btn.click()
+                return True
+        except Exception as e:
+            self.__dprint("No remove apps confirm dialog found.")
+        return False
+
+    def __check_playstore_account_setup(self):
+        try:
+            self.__dprint("Checking if account needs to be fully setup")
+            setup_desc = f'''new UiSelector().text("Complete account setup")'''
+            continue_desc = f'''new UiSelector().className("android.widget.Button").text("Continue")'''
+            setup_view = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=setup_desc)
+            continue_btn = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=continue_desc)
+            if setup_view and continue_btn:
+                continue_btn.click()
+                if self.__confirm_skip_account_setup():
+                    return True
+        except Exception as e:
+            self.__dprint("No account setup needed.")
+        return False
+
+    def __confirm_skip_account_setup(self):
+        try:
+            self.__dprint("Skipping account setup")
+            skip_desc = f'''new UiSelector().className("android.widget.Button").text("Skip")'''
+            skip_btn = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=skip_desc)
+            if skip_btn:
+                skip_btn.click()
+                return True
+        except Exception as e:
+            self.__dprint("No account setup needed.")
         return False
 
     def __search_playstore(self, title: str, submit=True):
@@ -461,7 +518,7 @@ class AppInstaller:
             #  Exception(f"{install_package_name} was not installed.")
             raise NotInstalledException()
 
-        # We have successfully clicked an install buttin
+        # We have successfully clicked an install button
         # We wait for it to download. We will catch if its the correct package or not after installation.
         if not self.__is_installed_UI():  # Waits up to 7mins to find install button.
             # raise Exception("Failed to install app!!")
