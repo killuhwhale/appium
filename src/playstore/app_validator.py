@@ -26,7 +26,7 @@ from utils.post_to_firebase import post_to_firebase
 from utils.utils import CONFIG, PLAYSTORE_PACKAGE_NAME, AppStatus, get_ip
 
 # Instantiates a client
-#storage_client = storage.Client()
+storage_client = storage.Client()
 
 
 class AppValidator:
@@ -145,7 +145,6 @@ class AppValidator:
         })
 
         self.__dprint("Post res: ", res.content)
-
 
         self.__app_logger.log(
             status_obj['status'],

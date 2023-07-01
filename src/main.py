@@ -125,6 +125,7 @@ def main():
         app_logger = AppLogger()
         tsv = AppListTSV()  # Create Globally
         TESTING_APPS = tsv.get_apps()
+        print(TESTING_APPS)
 
         num_apps = args.num if args.num > 0 else len(TESTING_APPS)
         package_names = TESTING_APPS[:num_apps]
