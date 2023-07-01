@@ -146,7 +146,6 @@ class AppValidator:
 
         self.__dprint("Post res: ", res.content)
 
-
         self.__app_logger.log(
             status_obj['status'],
             status_obj['package_name'],

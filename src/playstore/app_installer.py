@@ -123,7 +123,7 @@ class AppInstaller:
 
     ## PlayStore install discovery
 
-    def __is_installed_UI(self):
+    def __is_installed_UI(self, package_name):
         '''
             Checks for the presence of the Uninstall button indicating that the
                 app has completely finished installing.
@@ -132,37 +132,105 @@ class AppInstaller:
                 says its ready to open.
         '''
         max_wait = 420  # 7 mins, Large gaming apps may take a while to download.
+        max_pending = 150  # 2 min 30 seconds, clear cache and retry if still pending
         content_desc = 'Uninstall'
         ready = False
         t = time()
+        num_tries = 3
         while not ready and (time() - t) < max_wait:
-            try:
-                content_desc = f'''
-                    new UiSelector().className("android.widget.Button").text("Uninstall")
-                '''
-                self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
-                # # Pixel 2
-                self.__dprint("Found first uninstall button....")
-                self.__dprint("Setting Ready to TRUE")
+
+            if self.__check_for_uninstall():
                 ready = True
                 break
-            except Exception as e:
+            else:
                 self.__dprint("App not ready to open, retrying...")
-                sleep(0.5)
+                if (time() - t) > max_pending and self.__check_playstore_pending():
+                    self.__clear_playstore_cache()
+                    sleep(5)
+                    self.__open_app_page(package_name)
+                    print("Retrying app install")
+                    sleep(15)
+                    self.__check_for_install()
 
-            try:
-                self.__driver.find_element(by=AppiumBy.ACCESSIBILITY_ID, value="Uninstall")
-                self.__dprint("Found second uninstall button....")
-                ready = True
-            except Exception as e:
-                self.__dprint("App not ready to open, retrying...")
-                if t > max_wait * 0.25:
+                if (time() - t) > max_wait * 0.1:
                     self.__check_playstore_crash()
                     self.__check_playstore_anr()
-                    self.__check_playstore_install_fail()
+                    self.__check_for_update()
+                    self.__check_playstore_remove_apps()
+                    self.__check_playstore_account_setup()
+                    if self.__check_playstore_install_fail():
+                        if num_tries == 0:
+                            raise PlaystoreInstallFailedException()
+                            return ready
+                        else:
+                            num_tries -= 1
+                            self.__clear_playstore_cache()
+                            sleep(5)
+                            self.__open_app_page(package_name)
+                            print("Retrying app install")
+                            sleep(15)
+                            self.__check_for_install()
                 sleep(0.5)
             self.__driver.orientation = 'PORTRAIT'
         return ready
+
+    def __check_for_uninstall(self):
+        content_descs = [
+            f'''new UiSelector().descriptionMatches("Uninstall")''',
+            f'''new UiSelector().className("android.widget.Button").text("Uninstall")'''
+        ]
+
+        for content_desc in content_descs:
+            self.__dprint("Searching for uninstall button with content desc: ", content_desc)
+            try:
+                self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+                self.__dprint("Found uninstall button")
+                return True
+
+            except Exception as e:  # Install btn not found
+                self.__dprint("Unable to find uninstall button with content description", str(e))
+
+        return False
+
+    def __check_for_update(self):
+        content_descs = [
+            f'''new UiSelector().descriptionMatches("Update")''',
+            f'''new UiSelector().className("android.widget.Button").text("Update")'''
+        ]
+
+        for content_desc in content_descs:
+            self.__dprint("Searching for update button with content desc: ", content_desc)
+            try:
+                self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc).click()
+                self.__dprint("Found and clicked update button")
+                return True
+
+            except Exception as e:  # Install btn not found
+                self.__dprint("Unable to find update button with content description", str(e))
+
+        return False
+
+    def __check_for_install(self):
+        content_descs = [
+            f'''new UiSelector().descriptionMatches("Install")''',
+            f'''new UiSelector().className("android.widget.Button").text("Install")'''
+        ]
+        if self.__is_emu:
+            content_descs.append('''new UiSelector().className("android.widget.Button")
+                                            .descriptionMatches("Install on more devices")''')
+
+        for content_desc in content_descs:
+            self.__dprint("Searching for install button with content desc: ", content_desc)
+            try:
+                install_btn = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+                install_btn.click()
+                self.__dprint("Clicked install button")
+                return True
+
+            except Exception as e:  # Install btn not found
+                self.__dprint("Failed to find any install button on transport id: ", self.__transport_id, e)
+
+        return False
 
     def __needs_purchase(self) -> float:
         try:
@@ -223,7 +291,7 @@ class AppInstaller:
         ''' Clicks Search Icon
 
             There is an animation when first opening app and the label is visible at first.
-            This is a possible race conditoon between the driver.implicit_wait && the time it takes for the text to appear.
+            This is a possible race condition between the driver.implicit_wait && the time it takes for the text to appear.
 
          '''
         self.__dprint("Clicking search icon...")
@@ -243,6 +311,17 @@ class AppInstaller:
             search_icon = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
             search_icon.click()
             self.__dprint("Second search icon clicked.")
+
+    def __check_playstore_pending(self):
+        try:
+            self.__dprint("Checking if app install is still pending")
+            content_desc = f'''new UiSelector().text("Pending")'''
+            self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=content_desc)
+            self.__dprint("App install is still pending")
+            return True
+        except Exception as e:
+            self.__dprint("App install is not pending")
+        return False
 
     def __check_playstore_crash(self):
         # 01-05 22:08:57.546   129   820 I WindowManager: WIN DEATH: Window{afca274 u0 com.android.vending/com.google.android.finsky.activities.MainActivity}
@@ -283,10 +362,74 @@ class AppInstaller:
             got_it_button = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=got_it_desc)
             if feedback_button and got_it_button:
                 got_it_button.click()
-            self.__dprint("PlayStore couldn't install application")
-            raise PlaystoreInstallFailedException()
+                self.__dprint("Play Store couldn't install application")
+                return True
         except Exception as e:
             self.__dprint("No app install fail found.")
+        return False
+
+    def __check_playstore_remove_apps(self):
+        try:
+            self.__dprint("Check playstore remove apps dialog")
+            free_space_text = f'''new UiSelector().text("Free up space")'''
+            continue_btn_desc = f'''new UiSelector().className("android.widget.Button").text("CONTINUE")'''
+            free_space_view = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=free_space_text)
+            continue_btn = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=continue_btn_desc)
+            if free_space_view and continue_btn:
+                continue_btn.click()
+                if self.__confirm_playstore_remove_apps():
+                    return True
+        except Exception as e:
+            self.__dprint("No remove apps dialog found.")
+        return False
+
+    def __confirm_playstore_remove_apps(self):
+        try:
+            self.__dprint("Confirming playstore remove apps to free space.")
+            remove_btn_desc = f'''new UiSelector().className("android.widget.Button").text("REMOVE")'''
+            remove_btn = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=remove_btn_desc)
+            if remove_btn:
+                remove_btn.click()
+                return True
+        except Exception as e:
+            self.__dprint("No remove apps confirm dialog found.")
+        return False
+
+    def __check_playstore_account_setup(self):
+        try:
+            self.__dprint("Checking if account needs to be fully setup")
+            setup_desc = f'''new UiSelector().text("Complete account setup")'''
+            continue_desc = f'''new UiSelector().className("android.widget.Button").text("Continue")'''
+            setup_view = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=setup_desc)
+            continue_btn = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=continue_desc)
+            if setup_view and continue_btn:
+                continue_btn.click()
+                if self.__confirm_skip_account_setup():
+                    return True
+        except Exception as e:
+            self.__dprint("No account setup needed.")
+        return False
+
+    def __confirm_skip_account_setup(self):
+        try:
+            self.__dprint("Skipping account setup")
+            skip_desc = f'''new UiSelector().className("android.widget.Button").text("Skip")'''
+            skip_btn = self.__driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value=skip_desc)
+            if skip_btn:
+                skip_btn.click()
+                return True
+        except Exception as e:
+            self.__dprint("No account setup needed.")
+        return False
+
+    def __clear_playstore_cache(self):
+        try:
+            self.__dprint("Clearing playstore crash")
+            cmd = ('adb', 'shell', 'pm', 'clear', 'com.android.vending')
+            subprocess.run(cmd, check=True, encoding='utf-8', capture_output=True).stdout.strip()
+            self.__dprint("Successfully cleared playstore crash")
+        except Exception as e:
+            self.__dprint("Error clearing playstore crash", e)
         return False
 
     def __search_playstore(self, title: str, submit=True):
@@ -378,53 +521,11 @@ class AppInstaller:
             3. Cancel / Play[Open]
             4. Uninstall / Play[Open]
         '''
-        already_installed = False  # Potentailly already isntalled
+        already_installed = False  # Potentially already installed
         err = False
-        first_method_clicked = False
-        try:
-            if self.__is_emu:
-                content_desc = f'''
-                    new UiSelector().className("android.widget.Button").descriptionMatches("Install on more devices")
-                '''
-                self.__dprint(f"Looking at {content_desc=}")
-                install_BTN = self.__driver.find_element(
-                    by=AppiumBy.ANDROID_UIAUTOMATOR,
-                    value=content_desc)
-                bounds = self.__extract_bounds(
-                    install_BTN.get_attribute("bounds"))
-                # If Install btn not found, PRice or Update not present, check for "Install on more devices" button, if found we are
-                #   most liekly on an emulator and we can click install.
-                self.__click_unknown_install_btn(bounds)
 
-
-            # Cant find a rhyme or reason as to why ACCESSIBILITY_ID
-            # Is sometimes present and other time it is not.
-            # E.g. Flash stable eve to non-dev and back to dev. Now its gone.
-            try:
-                self.__dprint(f"Looking at ACCESSIBILITY_ID, value=Install")
-                install_BTN = self.__driver.find_element(
-                    by=AppiumBy.ACCESSIBILITY_ID, value="Install")
-                install_BTN.click()
-                first_method_clicked = True
-                self.__dprint("Clicked first install")
-
-            except Exception as error:
-                self.__dprint("First install method failed.")
-
-            if not first_method_clicked:
-                content_desc = f'''
-                    new UiSelector().className("android.widget.Button").text("Install")
-                '''
-                self.__dprint(f"First failed, now Looking at {content_desc=}")
-                install_BTN = self.__driver.find_element(
-                    by=AppiumBy.ANDROID_UIAUTOMATOR,
-                    value=content_desc)
-                install_BTN.click()
-                self.__dprint("Clicked second install")
-
-        except Exception as e:  # Install btn not found
+        if not self.__check_for_install():
             err = True
-            self.__dprint("Failed to find any install button on transport id: ", self.__transport_id, e)
             already_installed = is_installed(install_package_name, self.__transport_id)
 
         # Error finding/Clicking Install button and app is not installed still...
@@ -455,15 +556,15 @@ class AppInstaller:
             # When we search by name, foogame,
             # The app foogame, by com.zyx.foogames is actually showing.
             # So we check if the packge is installed via ADB cmd because this will be a source of truth
-            # Therefore, at this point we have an installed app, that doesnt match our targeted package name.
+            # Therefore, at this point we have an installed app, that doesn't match our targeted package name.
             # NOTE: On the first run, it will install this package and report as correct....
             self.__dprint(f"Program may have installed an incorrect package, {install_package_name} was not actually installed")
             #  Exception(f"{install_package_name} was not installed.")
             raise NotInstalledException()
 
-        # We have successfully clicked an install buttin
+        # We have successfully clicked an install button
         # We wait for it to download. We will catch if its the correct package or not after installation.
-        if not self.__is_installed_UI():  # Waits up to 7mins to find install button.
+        if not self.__is_installed_UI(install_package_name):  # Waits up to 7mins to find install button.
             # raise Exception("Failed to install app!!")
             raise FoundWrongPackageException()
 
@@ -506,7 +607,7 @@ class AppInstaller:
         except PlaystoreCrashException as e:
             raise PlaystoreCrashException()
         except NeedsPurchaseException as price:
-            error = self.__return_error(last_step, AppStatus.NEEDS_PRICE)
+            error = self.__return_error(last_step, "Needs purchase", AppStatus.NEEDS_PRICE)
             error.price = float(price.message)
             return error
         except NeedsUpdateException:

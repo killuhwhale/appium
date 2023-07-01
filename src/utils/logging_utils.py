@@ -3,7 +3,10 @@
 import logging
 from typing import Dict
 from utils.utils import create_file_if_not_exists, users_home_dir
+from google.cloud import storage
 
+# Instantiates a client
+storage_client = storage.Client()
 
 class AppListTSV:
     ''' Tranformation layer between persisted storage of list to python list.
@@ -23,7 +26,8 @@ class AppListTSV:
         self.__badfilename = "bad_app_list.tsv" # This will be created in the home dir ~/
         self.__all_bad_apps = dict()
         self.__home_dir = users_home_dir()
-        self.__read_file()
+        #self.__read_file()
+        self.__read_file_from_storage()
         self.__read_bad_apps()
 
     def get_apps(self):
@@ -31,7 +35,20 @@ class AppListTSV:
         return self.__app_list
 
     def __read_file(self):
-        with open(f"{self.__home_dir}/{self.__filename}", 'r' ) as f:
+        with open(f"{self.__home_dir}/{self.__filename}", 'r') as f:
+            [self.__app_list.append([w.strip() for w in line.split("\t")]) for line in f.readlines() if [w.strip() for w in line.split("\t")] not in self.__app_list]
+
+    def __read_file_from_storage(self):
+        # The ID of your GCS bucket
+        bucket_name = "appval-387223.appspot.com"
+        # The path to your file to read from
+        # source_file_name = "local/path/to/file"
+        # The ID of your GCS object
+        destination_blob_name = f"appLists/app_list.tsv"
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(destination_blob_name)
+        with blob.open("r") as f:
             [self.__app_list.append([w.strip() for w in line.split("\t")]) for line in f.readlines() if [w.strip() for w in line.split("\t")] not in self.__app_list]
 
     def __read_bad_apps(self):
